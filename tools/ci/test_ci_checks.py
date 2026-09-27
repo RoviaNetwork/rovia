@@ -4892,35 +4892,90 @@ class PrivacyAndOwnershipTests(unittest.TestCase):
             f"says {row!r}",
         )
 
-    def test_the_environment_table_carries_the_versions_the_tools_report(self):
-        # Every version in that table is a claim about a tool. A version is the
-        # part a reader relies on and the part that changes when the tool is
-        # upgraded, so each is compared with what the tool reports. The rest of
-        # each row is a condensation — `xcodebuild -version` puts the build on a
-        # second line — so this checks the version, not a verbatim copy.
-        # The first version-looking token in the output, not the first word: this
-        # machine's Swift reports "Apple Swift version 6.2.4", and a check that
-        # assumed a prefix would be asserting the tool's branding.
-        number = re.compile(r"\d+\.\d+(?:\.\d+)?")
-        for label, command in (
-            ("`uv` / `uvx`", ["uv", "--version"]),
-            ("Xcode", ["xcodebuild", "-version"]),
-            ("Swift", ["swift", "--version"]),
-            ("Python", ["python3", "--version"]),
-        ):
+    # What the environment table is, and is not.
+    #
+    # It records the toolchain the local evidence was produced on. It is not a
+    # repository invariant, and holding it against whatever toolchain happens to be
+    # running the test made that mistake concrete: the fourth hosted CI run failed with
+    # "the record's Swift row does not carry the version the tool reports (6.1.2)" and
+    # "…Xcode row… (16.4)", because a GitHub macOS runner legitimately has a different
+    # Xcode than the machine that wrote the record. A table that only one machine can
+    # satisfy is a table about that machine, and a gate on it is a gate that can only be
+    # green in one place.
+    #
+    # What IS a repository invariant is the versions the project pins: the linter and
+    # the schema validator. Those are compared against what actually runs, everywhere.
+    # Rows the project pins, so they are repository invariants rather than
+    # observations. `pyflakes_argv()` because that is how the linter is actually run:
+    # hard-coding one route would fail on whichever machine lacks it.
+    # The `--version` flag lives in the row, not at the call site, so each row is a
+    # complete command. It was dropped from the linter row while this was being
+    # restructured, and the symptom was a linter that reported no version because it
+    # had been run over the whole of tools/.
+    PINNED_TOOL_ROWS = (
+        ("`uv` / `uvx`", lambda: ["uv", "--version"]),
+        ("Python linter", lambda: pyflakes_argv() + ["--version"]),
+    )
+
+    def test_the_pinned_tool_versions_are_what_actually_runs(self):
+        # The versions this repository chooses. A gate that runs a different pyflakes
+        # than the one it pins is not the gate that was reviewed, so this is compared
+        # against the running tool rather than against a record row.
+        for label, resolve in self.PINNED_TOOL_ROWS:
+            command = resolve()
             if shutil.which(command[0]) is None:
                 continue
             with self.subTest(row=label):
-                reported = subprocess.run(
-                    command, capture_output=True, text=True
-                ).stdout
-                found = number.search(reported)
-                self.assertIsNotNone(found, f"{' '.join(command)} reported no version")
-                self.assertIn(
-                    found.group(0), self.environment_row(label),
-                    f"the record's {label} row does not carry the version the tool "
-                    f"reports ({found.group(0)})",
+                # Both streams, and the interpreter's own echo line dropped: `python3
+                # -m pyflakes --version` writes the interpreter path and the `-m` form
+                # to stderr before the version, so the first version-shaped token in the
+                # raw output is the interpreter's — "3.14" out of python3.14 — and
+                # comparing that against the linter row would be comparing two
+                # unrelated versions.
+                result = subprocess.run(command, capture_output=True, text=True)
+                lines = [
+                    line for line in (result.stdout + result.stderr).splitlines()
+                    if line.strip() and " -m " not in line
+                ]
+                version = re.search(r"\d+\.\d+(?:\.\d+)?", "\n".join(lines))
+                self.assertIsNotNone(
+                    version,
+                    f"{' '.join(command)} reported no version in "
+                    f"{(result.stdout + result.stderr).strip()[:120]!r}",
                 )
+                self.assertIn(version.group(0), self.environment_row(label),
+                              f"the record's {label} row does not carry the version "
+                              f"that actually runs ({version.group(0)})")
+
+    def test_the_toolchain_table_is_stated_as_a_local_observation(self):
+        # The rows the project does not control — Xcode, Swift, Python, macOS — are
+        # observations, and the record has to say so rather than presenting them as
+        # requirements. Without this, a contributor on a different toolchain reads the
+        # table as a statement of what the project needs, which it is not: the project's
+        # own floor is `swift-tools-version: 6.0` and a 17.0 deployment target, both of
+        # which the hosted runner satisfies with an older Xcode.
+        record = (REPO_ROOT / "docs/development/foundation-verification.md").read_text(
+            encoding="utf-8"
+        )
+        self.assertRegex(
+            flat(record),
+            r"evidence about (this repository|one machine|this machine)",
+            "the record does not scope its own evidence to a machine",
+        )
+        header = record.split("## Environment, exactly as reported", 1)[-1][:1200]
+        self.assertRegex(
+            flat(header),
+            r"(local|this machine|observed|one machine|not a requirement|differs)",
+            "the environment table is not labelled as an observation of one machine",
+        )
+        for label in ("Xcode", "Swift", "Python"):
+            with self.subTest(row=label):
+                self.assertTrue(
+                    number := self.environment_row(label)
+                    and re.search(r"\d+\.\d+", self.environment_row(label)),
+                    f"the {label} row states no version at all",
+                )
+                self.assertIsNotNone(number)
 
     def test_the_derived_data_claim_is_stated_without_naming_a_run_directory(self):
         # Naming one run's directory left the record pointing at a path the next

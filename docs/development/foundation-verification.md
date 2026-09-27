@@ -57,6 +57,16 @@ end, unchanged by anything below.
 
 ## Environment, exactly as reported
 
+**This table is an observation of one machine, not a requirement.** It records the
+toolchain the local evidence in this document was produced on, so a reader can judge
+what the evidence covers. It is not a list of what the project needs, and a different
+toolchain does not invalidate anything here: the hosted CI runs on a different Xcode
+and a different Swift on every push, and the project's own floor is
+`swift-tools-version: 6.0` with a 17.0 deployment target. The rows that *are*
+requirements are the pinned ones — `check-jsonschema`, `pyflakes`, and every
+`actions/*` commit SHA — and those are checked against what actually runs rather than
+against this table.
+
 | Thing | Value |
 | --- | --- |
 | Host | `Darwin iMac-princeofscale.local 24.6.0 Darwin Kernel Version 24.6.0` (x86_64) |
@@ -89,14 +99,14 @@ Apple silicon or on a hosted runner.
 ### Python tool tests
 
 `./tools/ci/run-tool-tests.sh` ran every `tools/**/test_*.py` as its own
-process: **10 files, 614 tests, 0 failures**.
+process: **10 files, 615 tests, 0 failures**.
 
 | Test file | Tests | Seconds |
 | --- | --- | --- |
 | `tools/ci/test_app_dependencies.py` | 27 |
 | `tools/ci/test_audit_accessibility_identifiers.py` | 58 |
 | `tools/ci/test_check_repository_hygiene.py` | 26 |
-| `tools/ci/test_ci_checks.py` | 186 |
+| `tools/ci/test_ci_checks.py` | 187 |
 | `tools/ci/test_validate_schemas.py` | 61 |
 | `tools/ci/test_verify_engine_checksums.py` | 38 |
 | `tools/ci/test_verify_lockfiles.py` | 29 |
@@ -758,7 +768,7 @@ title to be followed by an absence rather than a pass.
 
 | Thing | Before | After |
 | --- | --- | --- |
-| Tool tests | 364 | 614 |
+| Tool tests | 364 | 615 |
 | Security-sensitive paths listed | 14, one of them nonexistent | 19, all existing |
 | Ownership directions checked | 1 | 3 |
 | Engine license declared per candidate | none, defaulted to MIT | required, derived, and cross-checked |
