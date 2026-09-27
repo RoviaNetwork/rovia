@@ -4333,73 +4333,108 @@ class PrivacyAndOwnershipTests(unittest.TestCase):
             with self.subTest(heading=heading):
                 self.assertIn(heading, readme)
 
-    # The contexts a workflow-level `env` may use, and the ones it may not.
+    # Which contexts each `env:` block may name.
     #
     # GitHub evaluates a workflow-level `env` before any runner exists, so only
-    # `github`, `inputs`, and `vars` resolve there. A workflow-level `env` naming
-    # `runner`, `secrets`, `steps`, `needs`, or `job` is rejected outright: the whole
-    # run fails with "Invalid workflow file … Unrecognized named-value" and no job is
-    # ever created. This repository shipped that mistake in `DERIVED_DATA:
-    # ${{ runner.temp }}`, and no local check could see it — the YAML parses, every
-    # test passes, and the failure is a 0-second run with zero jobs. It was found by
-    # the first hosted CI run, which is exactly the class of defect a local gate
-    # cannot reach and a hosted one can.
+    # `github`, `inputs`, and `vars` resolve there. A job-level `env` is narrower
+    # still: it adds `needs`, `strategy`, `matrix`, and `secrets`, and still has no
+    # `runner`. The `runner` context exists only inside a step's `env:` and inside a
+    # `run`, which is why this repository uses the `RUNNER_TEMP` environment variable
+    # instead: it is a real variable, so it needs no context.
+    #
+    # A name outside the set is not a runtime warning. GitHub rejects the entire
+    # workflow file with "Invalid workflow file … Unrecognized named-value", and the
+    # run fails before creating a single job. Both levels were tried in this
+    # repository's own `ci.yml` — `DERIVED_DATA: ${{ runner.temp }}` at the workflow
+    # level, then at the job level — and both produced a 0-second failed run with zero
+    # jobs. No local check can see it: the YAML parses, the tests pass, and the file
+    # is a valid workflow by every measure available before pushing.
     WORKFLOW_LEVEL_CONTEXTS = {"github", "inputs", "vars"}
+    JOB_LEVEL_CONTEXTS = WORKFLOW_LEVEL_CONTEXTS | {"needs", "strategy", "matrix", "secrets"}
 
-    def workflow_level_env_values(self, path):
-        """Every `env:` value declared at a workflow's top level, as source lines.
+    def env_blocks(self, path):
+        """Every (scope, key, value) an `env:` block declares in a workflow.
 
-        Read as text rather than parsed: the gate is about a value GitHub will refuse,
-        and a YAML round trip would normalise the very expression it needs to see.
+        Read as source lines rather than parsed. A YAML round trip normalises the
+        expression the gate exists to inspect, and `runner` is only a problem in the
+        spelling that survived a round trip, so the text is the thing to read.
         """
+        blocks = []
         lines = path.read_text(encoding="utf-8").splitlines()
-        values = []
-        in_top_env = False
-        env_indent = None
-        for line in lines:
-            if not line.strip() or line.lstrip().startswith("#"):
-                if in_top_env and not line.strip():
-                    in_top_env = False
+        for index, line in enumerate(lines):
+            stripped = line.strip()
+            if stripped != "env:":
                 continue
             indent = len(line) - len(line.lstrip())
-            stripped = line.strip()
-            if stripped == "env:" and indent == 0:
-                in_top_env = True
-                env_indent = 0
+            # A workflow-level env is at column 0; a job-level one is indented under
+            # its job; a step-level one is indented further still. Only the first two
+            # are checked, because a step's env does have `runner`.
+            scope = {0: "workflow", 2: "job"}.get(indent)
+            if scope is None:
                 continue
-            if in_top_env:
-                if indent <= 0:
-                    in_top_env = False
+            for follower in lines[index + 1:]:
+                if not follower.strip() or follower.lstrip().startswith("#"):
                     continue
-                if stripped.startswith("- ") or ":" in stripped and not stripped.startswith("#"):
-                    key, _, value = stripped.partition(":")
-                    values.append((key.strip(), value.strip(), indent))
-        self.assertIsNotNone(env_indent)
-        return values
+                follower_indent = len(follower) - len(follower.lstrip())
+                if follower_indent <= indent:
+                    break
+                key, separator, value = follower.strip().partition(":")
+                if separator and value.strip():
+                    blocks.append((scope, key.strip(), value.strip()))
+        return blocks
 
-    def test_no_workflow_level_env_names_a_runner_only_context(self):
+    def test_no_env_block_names_a_context_github_will_reject(self):
+        """Both levels, against the set each one actually allows.
+
+        Verified against this repository's own history: reinstating
+        `DERIVED_DATA: ${{ runner.temp }}` at the workflow level, and then at the job
+        level, each fails here. The first attempt at this gate checked only the
+        workflow level, and the second hosted run failed for the same reason one
+        level down — which is what a gate covering one of two places looks like from
+        the outside.
+        """
+        allowed = {"workflow": self.WORKFLOW_LEVEL_CONTEXTS, "job": self.JOB_LEVEL_CONTEXTS}
         for workflow in sorted((REPO_ROOT / ".github" / "workflows").glob("*.yml")):
-            with self.subTest(workflow=workflow.name):
-                for key, value, _ in self.workflow_level_env_values(workflow):
-                    if "${{" not in value:
-                        continue
-                    for context in re.findall(r"\$\{\{\s*([A-Za-z_][A-Za-z0-9_]*)", value):
+            for scope, key, value in self.env_blocks(workflow):
+                if "${{" not in value:
+                    continue
+                for context in re.findall(r"\$\{\{\s*([A-Za-z_][A-Za-z0-9_]*)", value):
+                    with self.subTest(workflow=workflow.name, scope=scope, key=key):
                         self.assertIn(
-                            context, self.WORKFLOW_LEVEL_CONTEXTS,
-                            f"{workflow.name} declares {key} = {value} at the "
-                            f"workflow level, and '{context}' is not available there; "
-                            "GitHub rejects the whole file and the run creates no job",
+                            context, allowed[scope],
+                            f"{workflow.name} declares {key} = {value} in a "
+                            f"{scope}-level env, and '{context}' is not available "
+                            "there; GitHub rejects the whole file and the run creates "
+                            "no job",
                         )
 
-    def test_the_context_rule_is_documented_where_the_workflow_lives(self):
-        # The reason DERIVED_DATA is on the job rather than the workflow, so the next
-        # person to move it up does not have to rediscover it from a failed run.
-        ci = (REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
-        self.assertIn("runner.temp", ci)
-        self.assertIn("Unrecognized named-value", ci)
-        self.assertRegex(
-            flat(ci), r"DERIVED_DATA lives here and not in the workflow-level",
+    def test_the_runner_temporary_path_uses_the_environment_variable(self):
+        # `$RUNNER_TEMP` rather than `${{ runner.temp }}`, and the reason written next
+        # to it, so the next person to "tidy" it back into an expression finds out
+        # from a comment rather than from a failed run.
+        workflow = REPO_ROOT / ".github" / "workflows" / "ci.yml"
+        ci = workflow.read_text(encoding="utf-8")
+        # The declared *values*, not the file: the comment above them names
+        # `${{ runner.temp }}` precisely to explain why it is not used, and a
+        # whole-file substring check would fail on its own explanation. This is the
+        # same shape as the hygiene gate excluding its own source from its own scan.
+        values = {
+            key: value
+            for scope, key, value in self.env_blocks(workflow)
+            if scope == "workflow"
+        }
+        self.assertEqual(
+            "$RUNNER_TEMP/RoviaDerivedData", values.get("DERIVED_DATA"),
+            "DERIVED_DATA must come from the RUNNER_TEMP environment variable, not "
+            "from the runner context",
         )
+        for scope, key, value in self.env_blocks(workflow):
+            with self.subTest(scope=scope, key=key):
+                self.assertNotIn("runner.", value)
+        # The reason is written next to the variable, so the next person to move it
+        # back reads a comment rather than rediscovering it from a failed run.
+        self.assertIn("Unrecognized named-value", ci)
+        self.assertIn("only in a", flat(ci))
 
     def test_readme_points_at_the_privacy_document(self):
         readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")

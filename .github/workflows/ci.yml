@@ -15,6 +15,18 @@ concurrency:
 
 env:
   ROVIA_ENGINE_LOCK: engines.lock.json
+  # $RUNNER_TEMP, not ${{ runner.temp }}. GitHub sets RUNNER_TEMP as a real
+  # environment variable for every step, and it is the only one of the two that
+  # survives being read from an `env:` block: the `runner` *context* is not
+  # available in a workflow-level `env` or a job-level `env` at all, only in a
+  # step's `env` and inside `run`. Both levels were tried here and both made
+  # GitHub reject the file with "Unrecognized named-value: 'runner'", which is a
+  # 0-second run with no job created.
+  #
+  # The path is outside the checkout on purpose: a derived-data path inside the
+  # repository makes the XCTest runner time out before running a single test,
+  # because the runner process is not granted access to the protected directory.
+  DERIVED_DATA: $RUNNER_TEMP/RoviaDerivedData
   # Must match CFBundleShortVersionString in client/app/ios/RoviaApp/Info.plist.
   # tools/ci/test_ci_checks.py fails if the two drift apart.
   ROVIA_MARKETING_VERSION: 0.1.0
@@ -23,18 +35,6 @@ jobs:
   swift-tests:
     runs-on: macos-15
     timeout-minutes: 45
-    # DERIVED_DATA lives here and not in the workflow-level `env` above, because
-    # `runner` is not one of the contexts a workflow-level `env` may use — only
-    # `github`, `inputs`, and `vars` are. Putting `${{ runner.temp }}` up there
-    # made GitHub reject the file with "Unrecognized named-value: 'runner'" and
-    # the run failed before creating a job, which is why it surfaced here and not
-    # in any local check. `tools/ci/test_ci_checks.py` now holds the rule.
-    #
-    # The path is outside the checkout on purpose: a derived-data path inside the
-    # repository makes the XCTest runner time out before running a single test,
-    # because the runner process is not granted access to the protected directory.
-    env:
-      DERIVED_DATA: ${{ runner.temp }}/RoviaDerivedData
     steps:
       - name: Checkout
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
