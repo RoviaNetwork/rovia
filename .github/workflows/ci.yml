@@ -77,12 +77,21 @@ jobs:
         run: |
           python3 tools/ci/audit-accessibility-identifiers.py
           python3 tools/ci/test_audit_accessibility_identifiers.py
+      # The same set the record's derivation reads: every JSON file this repository
+      # publishes, from `git ls-files --exclude-standard`. A `find schemas fixtures`
+      # scope was narrower than the record described, and a whole-tree walk was wider
+      # than anything checked - the walk counted the `.ci-schema-validator` virtualenv
+      # this same workflow creates, so the recorded count was right on a laptop and
+      # wrong on the runner. One definition, used by the gate, the record, and here.
       - name: Validate JSON
         run: |
+          count=0
           while read -r document; do
             python3 -m json.tool "$document" >/dev/null
-          done < <(find schemas fixtures -type f -name '*.json' | LC_ALL=C sort)
-          python3 -m json.tool "$ROVIA_ENGINE_LOCK" >/dev/null
+            count=$((count + 1))
+          done < <(git ls-files --cached --others --exclude-standard '*.json' | LC_ALL=C sort)
+          echo "validated $count JSON files"
+          test "$count" -ge 30
           python3 tools/ci/test_validate_schemas.py
           python3 tools/ci/validate-schemas.py
       - name: Test core and engine packages

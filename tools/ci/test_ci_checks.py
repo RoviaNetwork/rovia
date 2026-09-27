@@ -465,20 +465,41 @@ def duplicate_definitions(source: str, filename: str = "<test>"):
     return walk(tree.body, filename)
 
 
+def published_files():
+    """Every file git would publish, relative to the repository root.
+
+    `git ls-files --cached --others --exclude-standard` — the same call
+    `tools/ci/check-repository-hygiene.sh` makes. A count derived from a walk of the
+    working tree is a count about the machine, and this repository has been bitten by
+    that twice in one afternoon.
+    """
+    result = subprocess.run(
+        ["git", "-C", str(REPO_ROOT), "ls-files", "--cached", "--others",
+         "--exclude-standard"],
+        capture_output=True, text=True, check=True,
+    )
+    return [Path(line) for line in result.stdout.splitlines() if line]
+
+
 def json_inputs():
     """The JSON files the record's `python3 -m json.tool` line covers.
 
-    Counted by walking the tree with the same exclusions the record states, so a
-    new fixture is a change the record has to absorb rather than a file the
-    record silently stops describing.
+    Read from the publishable set rather than from a filesystem walk with a
+    hand-maintained exclusion list. Two reasons, and the second is the one that
+    broke:
+
+      * a walk needs an exclusion list, and an exclusion list is a second, silent copy
+        of `.gitignore` that nothing keeps in step with it;
+      * a GitHub-hosted runner creates `.ci-schema-validator/` inside the checkout —
+        a virtualenv full of JSON files — and the walk counted all of them. The
+        third hosted CI run failed with "the record no longer states 'over 38 files'",
+        because the count was 38 here and something larger there. The number was never
+        wrong about the repository; it was wrong about the machine.
+
+    Adding a JSON file to the repository still moves this, which is the point: the
+    record has to absorb it or stop describing it.
     """
-    excluded = {".git", ".build", "build", "__pycache__", "DerivedData", ".xcodegen"}
-    found = []
-    for path in sorted(REPO_ROOT.rglob("*.json")):
-        if excluded & set(path.relative_to(REPO_ROOT).parts):
-            continue
-        found.append(path.relative_to(REPO_ROOT))
-    return found
+    return sorted(path for path in published_files() if path.suffix == ".json")
 
 
 def json_input_groups():
@@ -4480,6 +4501,38 @@ class PrivacyAndOwnershipTests(unittest.TestCase):
             f"CI installs a different pyflakes than the gate asks for: the gate pins "
             f"{pinned.group(1)}",
         )
+
+    def test_ci_validates_exactly_the_json_the_record_describes(self):
+        """One definition of "the JSON files", used by the gate, the record, and CI.
+
+        The workflow used to walk `schemas` and `fixtures` — a narrower set than the
+        record's derivation counted — while the derivation itself walked the whole tree
+        with a hand-maintained exclusion list that did not include the virtualenv the
+        workflow creates inside the checkout. So the three disagreed: CI checked fewer
+        files than the record claimed, and the record's number was perturbed by a
+        directory nobody publishes. All three now read `git ls-files
+        --exclude-standard`.
+        """
+        # Comments stripped, because the comment that explains this change quotes the
+        # command it replaces — a whole-file substring check would fail on the
+        # explanation of the fix. Reading the commands rather than the file is also
+        # what the claim is about.
+        ci = "\n".join(
+            line for line in
+            (REPO_ROOT / ".github" / "workflows" / "ci.yml")
+            .read_text(encoding="utf-8").splitlines()
+            if not line.lstrip().startswith("#")
+        )
+        self.assertIn("git ls-files --cached --others --exclude-standard '*.json'", ci)
+        self.assertNotIn("find schemas fixtures", ci)
+        source = (REPO_ROOT / "tools" / "ci" / "test_ci_checks.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("--exclude-standard", source)
+        # And the derivation, run here, is the number the record states.
+        self.assertIn(f"over {json_input_groups()[0]} files",
+                      (REPO_ROOT / "docs/development/foundation-verification.md")
+                      .read_text(encoding="utf-8"))
 
     def test_readme_points_at_the_privacy_document(self):
         readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
