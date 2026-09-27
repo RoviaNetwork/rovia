@@ -1,0 +1,72 @@
+{
+  "apiVersion": 1,
+  "requestID": "control-routing-diagnostic",
+  "method": "routing.explain",
+  "payload": {
+    "inputSummary": {
+      "hasHost": true,
+      "hasIP": false,
+      "hasPort": true,
+      "hasNetwork": false
+    },
+    "rules": [
+      {
+        "ruleID": "00000000-0000-0000-0000-000000000801",
+        "enabled": true,
+        "matched": true,
+        "selected": true,
+        "reasonCode": "firstMatchingRule",
+        "matchers": [
+          {
+            "ruleID": "00000000-0000-0000-0000-000000000801",
+            "matcherIndex": 0,
+            "matcherType": "domain",
+            "matched": true,
+            "selected": true,
+            "applied": true,
+            "ruleEnabled": true,
+            "reasonCode": "matcherMatched"
+          },
+          {
+            "ruleID": "00000000-0000-0000-0000-000000000801",
+            "matcherIndex": 1,
+            "matcherType": "port",
+            "matched": false,
+            "selected": false,
+            "applied": false,
+            "ruleEnabled": true,
+            "reasonCode": "matcherDidNotMatch"
+          }
+        ]
+      }
+    ],
+    "matchers": [
+      {
+        "ruleID": "00000000-0000-0000-0000-000000000801",
+        "matcherIndex": 0,
+        "matcherType": "domain",
+        "matched": true,
+        "selected": true,
+        "applied": true,
+        "ruleEnabled": true,
+        "reasonCode": "matcherMatched"
+      },
+      {
+        "ruleID": "00000000-0000-0000-0000-000000000801",
+        "matcherIndex": 1,
+        "matcherType": "port",
+        "matched": false,
+        "selected": false,
+        "applied": false,
+        "ruleEnabled": true,
+        "reasonCode": "matcherDidNotMatch"
+      }
+    ],
+    "finalDecision": {
+      "type": "block"
+    },
+    "selectedGroup": null,
+    "selectedServer": null,
+    "reasonCode": "firstMatchingRule"
+  }
+}

@@ -1,0 +1,10 @@
+# Intentionally empty.
+#
+# Rovia is pre-alpha, bundles no engine, has no release, and asks for nothing. An
+# empty file is a stronger statement than a commented-out placeholder, and it keeps a
+# funding entry from appearing in the repository header before there is anything to
+# fund.
+#
+# If the project ever takes sponsorship, the condition is written down: no sponsor may
+# see a user's configuration, a provider URL, a credential, a routing decision, or any
+# aggregate of them, and no sponsor may influence which engines are enabled.

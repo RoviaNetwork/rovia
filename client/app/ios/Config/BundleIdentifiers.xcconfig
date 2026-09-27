@@ -1,0 +1,4 @@
+ROVIA_BUNDLE_IDENTIFIER = io.rovia.client
+ROVIA_TUNNEL_BUNDLE_IDENTIFIER = io.rovia.client.tunnel
+ROVIA_APP_GROUP = group.io.rovia.shared
+ROVIA_TEAM_ID =

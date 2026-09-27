@@ -1,0 +1,16 @@
+{
+  "input": {
+    "host": "www.youtube.com.",
+    "ip": null,
+    "port": 443,
+    "network": "TCP"
+  },
+  "expected": {
+    "normalizedHost": "www.youtube.com",
+    "matchedRule": "00000000-0000-0000-0000-000000000011",
+    "action": {
+      "type": "group",
+      "id": "00000000-0000-0000-0000-000000000010"
+    }
+  }
+}

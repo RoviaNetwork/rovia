@@ -1,0 +1,72 @@
+# Ownership
+#
+# One owner: @princeofscale. There is no GitHub organization behind this repository
+# yet, and GitHub teams only exist inside an organization, so a per-role team handle
+# would be a name that resolves to nothing — which reads as a review requirement and
+# enforces none. A single real account is honest: GitHub can require review by it,
+# and `docs/development/release-readiness.md` tracks that requirement as an open
+# external gate until branch protection is turned on.
+#
+# The role distinction that mattered under placeholder handles — which paths are
+# security-sensitive and which are engine-sensitive — is not lost. It lives in
+# `SECURITY.md`, which states the criterion and the list, and
+# `tools/ci/test_ci_checks.py` checks that this file and that one agree in both
+# directions and that every path named in either exists in the tree.
+
+# Everything, by default
+* @princeofscale
+
+# Apple platform and the Packet Tunnel lifecycle
+/platform/apple/ @princeofscale
+/client/app/ios/ @princeofscale
+/client/app/ios/RoviaTunnel/ @princeofscale
+
+# Engine adapters and build inputs
+/engines/ @princeofscale
+/engines.lock.json @princeofscale
+
+# Secret, parser, and routing boundaries
+/core/config/ @princeofscale
+/core/subscription/ @princeofscale
+/core/routing/ @princeofscale
+
+# Verification tooling: a change here can weaken a release gate
+/tools/ci/ @princeofscale
+/tools/reproducibility/ @princeofscale
+/tools/release/ @princeofscale
+/tools/build-engine/ @princeofscale
+
+# Release and CI security
+/.github/workflows/ @princeofscale
+
+# Public contracts and the privacy claims that depend on them
+/schemas/ @princeofscale
+/fixtures/ @princeofscale
+/docs/architecture/ @princeofscale
+/docs/security/ @princeofscale
+/docs/legal/ @princeofscale
+
+# Privacy claims
+/PRIVACY.md @princeofscale
+/SECURITY.md @princeofscale
+/THIRD_PARTY_NOTICES.md @princeofscale
+
+## What this file does and does not do
+
+Every path listed as security-sensitive in `SECURITY.md` is owned here, and every
+path named in either file exists in the tree. `tools/ci/test_ci_checks.py` checks
+both directions, so a security-sensitive path with no owner, and a path that is
+listed but is not in the tree, are each a failure.
+
+The criterion for the list is written down in `SECURITY.md`.
+
+That sentence is here because `tools/ci/test_ci_checks.py` checks for it: an ownership
+file and a security policy that describe the same paths have to say so in the same
+words, or one of them drifts and nothing notices.
+
+What this file does not do is enforce anything on its own. `CODEOWNERS` is inert
+until branch protection requires a review, and no ruleset requires one yet: the only
+possible reviewer is the repository owner, so a self-review would satisfy the
+requirement without adding a second pair of eyes. That is an open external gate in
+`docs/development/release-readiness.md`, listed as gate 7, and it is the reason the
+next thing this project needs is a second maintainer rather than another test.

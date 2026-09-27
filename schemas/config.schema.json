@@ -1,0 +1,287 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://rovia.invalid/schemas/config.schema.json",
+  "title": "Rovia canonical configuration",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "subscriptions", "servers", "groups", "routing", "dns", "privacy"],
+  "properties": {
+    "schemaVersion": { "type": "integer", "const": 1 },
+    "subscriptions": { "type": "array", "items": { "$ref": "#/$defs/subscription" } },
+    "servers": { "type": "array", "items": { "$ref": "#/$defs/server" } },
+    "groups": { "type": "array", "items": { "$ref": "#/$defs/serverGroup" } },
+    "routing": { "$ref": "#/$defs/routeSet" },
+    "dns": { "$ref": "#/$defs/dnsPolicy" },
+    "privacy": { "$ref": "#/$defs/privacyPolicy" }
+  },
+  "$defs": {
+    "uuid": { "type": "string", "format": "uuid" },
+    "secretReference": {
+      "description": "A reference to a stored secret, never the secret itself. The key is a name, so it is printable ASCII without spaces (0x21-0x7E) and at most 512 bytes; maxLength counts characters, which equals bytes because the pattern admits ASCII only. The same rule is RoviaConfig's SecretReference.isValidKey.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "key"],
+      "properties": {
+        "kind": { "const": "keychain" },
+        "key": { "type": "string", "minLength": 1, "maxLength": 512, "pattern": "^(?![\\s\\S]*[^!-~])[!-~]+$" }
+      }
+    },
+    "endpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["host", "port"],
+      "properties": {
+        "host": { "type": "string", "minLength": 1 },
+        "port": { "type": "integer", "minimum": 1, "maximum": 65535 }
+      }
+    },
+    "transportOptions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "options"],
+      "properties": {
+        "kind": { "type": "string", "minLength": 1 },
+        "options": {
+          "type": "object",
+          "propertyNames": {
+            "not": {
+              "pattern": "([Pp][^A-Za-z0-9]*[Aa][^A-Za-z0-9]*[Ss][^A-Za-z0-9]*[Ss][^A-Za-z0-9]*[Ww][^A-Za-z0-9]*[Oo][^A-Za-z0-9]*[Rr][^A-Za-z0-9]*[Dd][^A-Za-z0-9]*|[Pp][^A-Za-z0-9]*[Aa][^A-Za-z0-9]*[Ss][^A-Za-z0-9]*[Ss][^A-Za-z0-9]*[Ww][^A-Za-z0-9]*[Dd][^A-Za-z0-9]*|[Pp][^A-Za-z0-9]*[Aa][^A-Za-z0-9]*[Ss][^A-Za-z0-9]*[Ss][^A-Za-z0-9]*[Pp][^A-Za-z0-9]*[Hh][^A-Za-z0-9]*[Rr][^A-Za-z0-9]*[Aa][^A-Za-z0-9]*[Ss][^A-Za-z0-9]*[Ee][^A-Za-z0-9]*|[Pp][^A-Za-z0-9]*[Ww][^A-Za-z0-9]*[Dd][^A-Za-z0-9]*|[Pp][^A-Za-z0-9]*[Ss][^A-Za-z0-9]*[Kk][^A-Za-z0-9]*|[Tt][^A-Za-z0-9]*[Oo][^A-Za-z0-9]*[Kk][^A-Za-z0-9]*[Ee][^A-Za-z0-9]*[Nn][^A-Za-z0-9]*|[Ss][^A-Za-z0-9]*[Ee][^A-Za-z0-9]*[Cc][^A-Za-z0-9]*[Rr][^A-Za-z0-9]*[Ee][^A-Za-z0-9]*[Tt][^A-Za-z0-9]*|[Uu][^A-Za-z0-9]*[Uu][^A-Za-z0-9]*[Ii][^A-Za-z0-9]*[Dd][^A-Za-z0-9]*|[Cc][^A-Za-z0-9]*[Rr][^A-Za-z0-9]*[Ee][^A-Za-z0-9]*[Dd][^A-Za-z0-9]*[Ee][^A-Za-z0-9]*[Nn][^A-Za-z0-9]*[Tt][^A-Za-z0-9]*[Ii][^A-Za-z0-9]*[Aa][^A-Za-z0-9]*[Ll][^A-Za-z0-9]*|[Pp][^A-Za-z0-9]*[Rr][^A-Za-z0-9]*[Ii][^A-Za-z0-9]*[Vv][^A-Za-z0-9]*[Aa][^A-Za-z0-9]*[Tt][^A-Za-z0-9]*[Ee][^A-Za-z0-9]*[Kk][^A-Za-z0-9]*[Ee][^A-Za-z0-9]*[Yy][^A-Za-z0-9]*|[Aa][^A-Za-z0-9]*[Pp][^A-Za-z0-9]*[Ii][^A-Za-z0-9]*[Kk][^A-Za-z0-9]*[Ee][^A-Za-z0-9]*[Yy][^A-Za-z0-9]*|[Aa][^A-Za-z0-9]*[Cc][^A-Za-z0-9]*[Cc][^A-Za-z0-9]*[Ee][^A-Za-z0-9]*[Ss][^A-Za-z0-9]*[Ss][^A-Za-z0-9]*[Kk][^A-Za-z0-9]*[Ee][^A-Za-z0-9]*[Yy][^A-Za-z0-9]*|[Aa][^A-Za-z0-9]*[Uu][^A-Za-z0-9]*[Tt][^A-Za-z0-9]*[Hh][^A-Za-z0-9]*[Oo][^A-Za-z0-9]*[Rr][^A-Za-z0-9]*[Ii][^A-Za-z0-9]*[Zz][^A-Za-z0-9]*[Aa][^A-Za-z0-9]*[Tt][^A-Za-z0-9]*[Ii][^A-Za-z0-9]*[Oo][^A-Za-z0-9]*[Nn][^A-Za-z0-9]*|[Bb][^A-Za-z0-9]*[Ee][^A-Za-z0-9]*[Aa][^A-Za-z0-9]*[Rr][^A-Za-z0-9]*[Ee][^A-Za-z0-9]*[Rr][^A-Za-z0-9]*|[Cc][^A-Za-z0-9]*[Oo][^A-Za-z0-9]*[Oo][^A-Za-z0-9]*[Kk][^A-Za-z0-9]*[Ii][^A-Za-z0-9]*[Ee][^A-Za-z0-9]*|[Aa][^A-Za-z0-9]*[Uu][^A-Za-z0-9]*[Tt][^A-Za-z0-9]*[Hh][^A-Za-z0-9]*)"
+            }
+          },
+          "additionalProperties": { "type": "string" }
+        }
+      }
+    },
+    "tlsOptions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["allowInsecure", "alpn"],
+      "properties": {
+        "serverName": { "type": ["string", "null"] },
+        "allowInsecure": { "type": "boolean" },
+        "alpn": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "server": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "protocolKind", "endpoint", "credential", "transport", "tls", "tags"],
+      "properties": {
+        "id": { "$ref": "#/$defs/uuid" },
+        "name": { "type": "string", "minLength": 1 },
+        "protocolKind": { "enum": ["vless", "vmess", "trojan", "shadowsocks"] },
+        "endpoint": { "$ref": "#/$defs/endpoint" },
+        "credential": { "oneOf": [{ "$ref": "#/$defs/secretReference" }, { "type": "null" }] },
+        "transport": { "$ref": "#/$defs/transportOptions" },
+        "tls": { "oneOf": [{ "$ref": "#/$defs/tlsOptions" }, { "type": "null" }] },
+        "tags": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "subscription": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "source", "serverIDs", "refreshPolicy"],
+      "properties": {
+        "id": { "$ref": "#/$defs/uuid" },
+        "name": { "type": "string", "minLength": 1 },
+        "source": { "$ref": "#/$defs/subscriptionSource" },
+        "serverIDs": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/uuid" } },
+        "refreshPolicy": { "$ref": "#/$defs/refreshPolicy" },
+        "lastRefresh": { "type": ["string", "null"], "format": "date-time" },
+        "contentHash": { "type": ["string", "null"] }
+      }
+    },
+    "subscriptionSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "displayValue"],
+      "properties": {
+        "kind": { "enum": ["url", "pastedText", "file"] },
+        "displayValue": { "type": "string", "minLength": 1 },
+        "secretReference": { "oneOf": [{ "$ref": "#/$defs/secretReference" }, { "type": "null" }] }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "kind": { "const": "url" } }, "required": ["kind"] },
+          "then": {
+            "required": ["secretReference"],
+            "properties": {
+              "secretReference": { "$ref": "#/$defs/secretReference" },
+              "displayValue": { "pattern": "^https?://[^\\s/?#@]+/••••••••$" }
+            }
+          }
+        },
+        {
+        "if": { "properties": { "kind": { "enum": ["pastedText", "file"] } }, "required": ["kind"] },
+        "then": {
+          "properties": {
+            "secretReference": { "type": "null" },
+            "displayValue": {
+              "description": "The model rewrites a pastedText or file source to one of these three literals, discarding whatever the file said. The schema states the same three so a file cannot carry a value the model will silently replace.",
+              "enum": ["pasted text", "file", "invalid source display"]
+            }
+          }
+        }
+        },
+        {
+          "if": { "properties": { "kind": { "enum": ["pastedText", "file"] } }, "required": ["kind"] },
+          "then": {
+            "properties": {
+              "displayValue": {
+                "not": {
+                  "pattern": "^\\s*([Vv][Ll][Ee][Ss][Ss]|[Vv][Mm][Ee][Ss][Ss]|[Tt][Rr][Oo][Jj][Aa][Nn]|[Ss][Ss][Rr]|[Ss][Ss]|[Hh][Yy][Ss][Tt][Ee][Rr][Ii][Aa]([2]?)?|[Tt][Uu][Ii][Cc]|[Nn][Aa][Ii][Vv][Ee]|[Bb][Rr][Oo][Oo][Kk]|[Jj][Uu][Ii][Cc][Ii][Tt][Yy]|[Aa][Nn][Yy][Tt][Ll][Ss])://"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "refreshPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode"],
+      "properties": {
+        "mode": { "enum": ["manual", "interval"] },
+        "interval": { "type": ["number", "null"], "exclusiveMinimum": 0 }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "mode": { "const": "manual" } }, "required": ["mode"] },
+          "then": { "properties": { "interval": { "type": "null" } } }
+        },
+        {
+          "if": { "properties": { "mode": { "const": "interval" } }, "required": ["mode"] },
+          "then": { "required": ["interval"], "properties": { "interval": { "type": "number", "exclusiveMinimum": 0 } } }
+        }
+      ]
+    },
+    "serverGroup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "mode", "members", "selectionPolicy"],
+      "properties": {
+        "id": { "$ref": "#/$defs/uuid" },
+        "name": { "type": "string", "minLength": 1 },
+        "mode": { "enum": ["manual", "lowestLatency", "failover"] },
+        "members": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/uuid" } },
+        "selectionPolicy": { "enum": ["manual", "lowestLatency", "failover"] }
+      }
+    },
+    "routeSet": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rules", "defaultAction"],
+      "properties": {
+        "rules": { "type": "array", "items": { "$ref": "#/$defs/routeRule" } },
+        "defaultAction": { "$ref": "#/$defs/routeAction" }
+      }
+    },
+    "routeRule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "enabled", "matchers", "action"],
+      "properties": {
+        "id": { "$ref": "#/$defs/uuid" },
+        "enabled": { "type": "boolean" },
+        "matchers": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/routeMatcher" } },
+        "action": { "$ref": "#/$defs/routeAction" },
+        "note": { "type": ["string", "null"] }
+      }
+    },
+    "routeMatcher": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "value"],
+          "properties": { "type": { "const": "domain" }, "value": { "type": "string", "minLength": 1 } }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "value"],
+          "properties": { "type": { "const": "domainSuffix" }, "value": { "type": "string", "minLength": 1 } }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "value"],
+          "properties": { "type": { "const": "ipCIDR" }, "value": { "type": "string", "minLength": 3 } }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "value"],
+          "properties": { "type": { "const": "port" }, "value": { "type": "integer", "minimum": 1, "maximum": 65535 } }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "lower", "upper"],
+          "properties": {
+            "type": { "const": "portRange" },
+            "lower": { "type": "integer", "minimum": 1, "maximum": 65535 },
+            "upper": { "type": "integer", "minimum": 1, "maximum": 65535 }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "value"],
+          "properties": { "type": { "const": "network" }, "value": { "type": "string", "minLength": 1 } }
+        }
+      ]
+    },
+    "routeAction": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type"],
+          "properties": { "type": { "const": "direct" } }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type"],
+          "properties": { "type": { "const": "block" } }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "id"],
+          "properties": { "type": { "const": "group" }, "id": { "$ref": "#/$defs/uuid" } }
+        }
+      ]
+    },
+    "dnsPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "servers"],
+      "properties": {
+        "mode": { "enum": ["system", "tunnel", "custom"] },
+        "servers": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "mode": { "const": "custom" } }, "required": ["mode"] },
+          "then": { "properties": { "servers": { "minItems": 1 } } }
+        }
+      ]
+    },
+    "privacyPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["telemetryEnabled", "trafficLogging", "domainHistory", "diagnosticsRetention", "redactServerAddresses", "redactCredentials"],
+      "properties": {
+        "telemetryEnabled": { "const": false },
+        "trafficLogging": { "const": false },
+        "domainHistory": { "const": false },
+        "diagnosticsRetention": { "enum": ["memoryOnly", "userExport"] },
+        "redactServerAddresses": { "const": true },
+        "redactCredentials": { "const": true }
+      }
+    }
+  }
+}

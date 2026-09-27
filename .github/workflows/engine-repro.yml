@@ -1,0 +1,58 @@
+name: engine-repro
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'engines.lock.json'
+      - 'schemas/engine-lock.schema.json'
+      - 'tools/build-engine/**'
+      - 'tools/reproducibility/**'
+      - 'tools/ci/verify-engine-checksums.sh'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: engine-repro-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  ROVIA_ENGINE_LOCK: engines.lock.json
+
+jobs:
+  verify-lock:
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Verify the engine lock in foundation mode
+        # Foundation mode accepts an empty lock, so this runs on every change
+        # and reports whether an engine is enabled through the GitHub output
+        # file rather than through an inline script.
+        id: engine
+        run: |
+          ./tools/ci/verify-engine-checksums.sh \
+            --mode foundation \
+            --lock "$ROVIA_ENGINE_LOCK" \
+            --github-output "$GITHUB_OUTPUT"
+      - name: Validate the engine lock schema
+        run: |
+          python3 -m venv .ci-schema-validator
+          .ci-schema-validator/bin/python -m pip install --disable-pip-version-check check-jsonschema==0.38.2
+          .ci-schema-validator/bin/check-jsonschema \
+            --check-metaschema --quiet --color never schemas/engine-lock.schema.json
+          .ci-schema-validator/bin/check-jsonschema \
+            --schemafile schemas/engine-lock.schema.json --color never "$ROVIA_ENGINE_LOCK"
+      - name: Build pinned Xray artifact
+        if: steps.engine.outputs.enabled == 'true'
+        run: ./tools/build-engine/xray/build-apple.sh
+      - name: Verify the artifact
+        if: steps.engine.outputs.enabled == 'true'
+        run: ./tools/reproducibility/verify-xray.sh
+      - name: Verify the engine lock in release mode
+        # Release mode has no empty answer: it runs only when an engine is
+        # enabled, and it must find exactly one approved, fully pinned entry.
+        if: steps.engine.outputs.enabled == 'true'
+        run: ./tools/ci/verify-engine-checksums.sh --mode release --lock "$ROVIA_ENGINE_LOCK"

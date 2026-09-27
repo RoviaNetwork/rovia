@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://rovia.invalid/schemas/control-response.schema.json",
+  "title": "Rovia internal control response",
+  "description": "What the extension returns from PacketTunnelProvider.handleAppMessage. The request contract is schemas/control-api.schema.json; this file is the other half of the same exchange, so a response cannot carry a field the request contract does not define and a caller can tell a result from a refusal without guessing. The envelope is closed: an unknown field is a contract change, not a forward-compatible extra.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "requestID", "ok"],
+  "properties": {
+    "apiVersion": {
+      "description": "The control API version this build speaks.",
+      "type": "integer",
+      "const": 1
+    },
+    "requestID": {
+      "description": "The identifier from the request, or the literal 'unknown' when the request could not be parsed far enough to read one.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "ok": {
+      "description": "Whether the method ran. An ok response carries result and no error; a refusal carries error and no result.",
+      "type": "boolean"
+    },
+    "result": { "$ref": "#/$defs/result" },
+    "error": { "$ref": "#/$defs/errorCode" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "ok": { "const": true } }, "required": ["ok"] },
+      "then": {
+        "required": ["result"],
+        "properties": { "result": { "$ref": "#/$defs/result" } },
+        "not": { "required": ["error"] }
+      }
+    },
+    {
+      "if": { "properties": { "ok": { "const": false } }, "required": ["ok"] },
+      "then": {
+        "required": ["error"],
+        "properties": { "error": { "$ref": "#/$defs/errorCode" } },
+        "not": { "required": ["result"] }
+      }
+    }
+  ],
+  "$defs": {
+    "result": {
+      "description": "The only result this build can produce. status.get is the only implemented method, so the payload is the status envelope; a method that returns data will add its own closed shape and a probe here rather than widening this one.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state"],
+      "properties": {
+        "state": {
+          "description": "A non-empty state name. The only value this build emits is 'disconnected', because no engine is enabled; the value set grows with the tunnel lifecycle, so it is a bounded string rather than a one-value enum.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        }
+      }
+    },
+    "errorCode": {
+      "description": "The closed set of refusals. A refusal carries a stable code, never a message, so nothing from the request or the device can echo back into the response.",
+      "enum": ["invalid-request", "not-implemented"]
+    }
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "input": {
+    "host": null,
+    "ip": "10.12.0.9",
+    "port": 443,
+    "network": "tcp"
+  },
+  "expected": {
+    "matchedRule": "00000000-0000-0000-0000-000000000021",
+    "action": {
+      "type": "direct"
+    }
+  }
+}

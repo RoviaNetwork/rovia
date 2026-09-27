@@ -1,0 +1,9 @@
+{
+  "apiVersion": 1,
+  "requestID": "control-status-request",
+  "ok": true,
+  "result": {
+    "state": "disconnected"
+  },
+  "rawInput": "control-field-canary"
+}

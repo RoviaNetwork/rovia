@@ -1,0 +1,563 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		C10000000000000000000001 = {isa = PBXBuildFile; fileRef = B10000000000000000000001; };
+		C10000000000000000000002 = {isa = PBXBuildFile; fileRef = B10000000000000000000002; };
+		C10000000000000000000003 = {isa = PBXBuildFile; fileRef = B10000000000000000000005; };
+		C10000000000000000000004 = {isa = PBXBuildFile; fileRef = A1000000000000000000000A; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		C10000000000000000000005 = {isa = PBXBuildFile; fileRef = B1000000000000000000000A; };
+		C10000000000000000000006 = {isa = PBXBuildFile; fileRef = B1000000000000000000000B; };
+		C10000000000000000000007 = {isa = PBXBuildFile; fileRef = B1000000000000000000000C; };
+		C10000000000000000000008 = {isa = PBXBuildFile; fileRef = B1000000000000000000000D; };
+		C10000000000000000000009 = {isa = PBXBuildFile; fileRef = B1000000000000000000000E; };
+		C1000000000000000000000A = {isa = PBXBuildFile; fileRef = B1000000000000000000000F; };
+		C1000000000000000000000B = {isa = PBXBuildFile; fileRef = B10000000000000000000010; };
+		C1000000000000000000000C = {isa = PBXBuildFile; fileRef = B10000000000000000000011; };
+		C1000000000000000000000D = {isa = PBXBuildFile; fileRef = B10000000000000000000012; };
+		C1000000000000000000000E = {isa = PBXBuildFile; fileRef = B10000000000000000000013; };
+		C1000000000000000000000F = {isa = PBXBuildFile; fileRef = B10000000000000000000014; };
+		C10000000000000000000011 = {isa = PBXBuildFile; fileRef = B10000000000000000000017; };
+		C10000000000000000000012 = {isa = PBXBuildFile; fileRef = B1000000000000000000000D; };
+		C10000000000000000000013 = {isa = PBXBuildFile; fileRef = B1000000000000000000000E; };
+		C10000000000000000000014 = {isa = PBXBuildFile; productRef = E10000000000000000000002 /* RoviaRouting */; };
+		C10000000000000000000015 = {isa = PBXBuildFile; productRef = E10000000000000000000003 /* RoviaRouting */; };
+		C10000000000000000000016 = {isa = PBXBuildFile; fileRef = B10000000000000000000018 /* CanonicalRouteBridge.swift */; };
+		C10000000000000000000017 = {isa = PBXBuildFile; productRef = E10000000000000000000005 /* RoviaConfig */; };
+		C10000000000000000000018 = {isa = PBXBuildFile; productRef = E10000000000000000000006 /* RoviaConfig */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		A10000000000000000000010 = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A10000000000000000000001;
+			proxyType = 1;
+			remoteGlobalIDString = A10000000000000000000008;
+			remoteInfo = RoviaTunnel;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		A10000000000000000000009 = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = RoviaApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A1000000000000000000000A = {isa = PBXFileReference; explicitFileType = wrapper.app-extension; includeInIndex = 0; path = RoviaTunnel.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		B10000000000000000000001 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoviaApp.swift; sourceTree = "<group>"; };
+		B10000000000000000000002 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		B10000000000000000000003 = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		B10000000000000000000004 = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = RoviaApp.entitlements; sourceTree = "<group>"; };
+		B10000000000000000000005 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PacketTunnelProvider.swift; sourceTree = "<group>"; };
+		B10000000000000000000006 = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		B10000000000000000000007 = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = RoviaTunnel.entitlements; sourceTree = "<group>"; };
+		B10000000000000000000008 = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = BundleIdentifiers.xcconfig; sourceTree = "<group>"; };
+		B1000000000000000000000A = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
+		B1000000000000000000000B = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = NetworkExtension.framework; path = System/Library/Frameworks/NetworkExtension.framework; sourceTree = SDKROOT; };
+		B1000000000000000000000C = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../../../platform/apple/Sources/RoviaTunnelRuntime/TunnelLaunchCoordinator.swift; sourceTree = "<group>"; };
+		B1000000000000000000000D = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
+		B1000000000000000000000E = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSnapshot.swift; sourceTree = "<group>"; };
+		B1000000000000000000000F = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
+		B10000000000000000000010 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverviewView.swift; sourceTree = "<group>"; };
+		B10000000000000000000011 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServersView.swift; sourceTree = "<group>"; };
+		B10000000000000000000012 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoutingView.swift; sourceTree = "<group>"; };
+		B10000000000000000000013 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoutingDebuggerView.swift; sourceTree = "<group>"; };
+		B10000000000000000000014 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubscriptionInspectorView.swift; sourceTree = "<group>"; };
+		B10000000000000000000015 = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RoviaAppTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		B10000000000000000000017 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModelTests.swift; sourceTree = "<group>"; };
+		B10000000000000000000018 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanonicalRouteBridge.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		D10000000000000000000003 = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C10000000000000000000005,
+				C10000000000000000000014,
+				C10000000000000000000017,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D10000000000000000000004 = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C10000000000000000000006,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D10000000000000000000009 = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C10000000000000000000015,
+				C10000000000000000000018,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		A10000000000000000000002 = {
+			isa = PBXGroup;
+			children = (
+				A10000000000000000000004,
+				A10000000000000000000005,
+				A10000000000000000000006,
+				A1000000000000000000001B,
+				B1000000000000000000000C,
+				A10000000000000000000003,
+			);
+			sourceTree = "<group>";
+		};
+		A10000000000000000000003 = {
+			isa = PBXGroup;
+			children = (
+				A10000000000000000000009,
+				A1000000000000000000000A,
+				B10000000000000000000015,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		A10000000000000000000004 = {
+			isa = PBXGroup;
+			children = (
+				B10000000000000000000001,
+				B10000000000000000000002,
+				B1000000000000000000000D,
+				B1000000000000000000000E,
+				B1000000000000000000000F,
+				B10000000000000000000010,
+				B10000000000000000000011,
+				B10000000000000000000012,
+				B10000000000000000000013,
+				B10000000000000000000014,
+				B10000000000000000000018,
+				B10000000000000000000003,
+				B10000000000000000000004,
+			);
+			path = RoviaApp;
+			sourceTree = "<group>";
+		};
+		A10000000000000000000005 = {
+			isa = PBXGroup;
+			children = (
+				B10000000000000000000005,
+				B10000000000000000000006,
+				B10000000000000000000007,
+			);
+			path = RoviaTunnel;
+			sourceTree = "<group>";
+		};
+		A10000000000000000000006 = {
+			isa = PBXGroup;
+			children = (
+				B10000000000000000000008,
+			);
+			path = Config;
+			sourceTree = "<group>";
+		};
+		A1000000000000000000001B = {
+			isa = PBXGroup;
+			children = (
+				B10000000000000000000017,
+			);
+			path = RoviaAppTests;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		A10000000000000000000007 = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A10000000000000000000012;
+			buildPhases = (
+				D10000000000000000000001,
+				D10000000000000000000003,
+				D10000000000000000000005,
+				D10000000000000000000007,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				A10000000000000000000011,
+			);
+			name = RoviaApp;
+			packageProductDependencies = (
+				E10000000000000000000002 /* RoviaRouting */,
+				E10000000000000000000005 /* RoviaConfig */,
+			);
+			productName = RoviaApp;
+			productReference = A10000000000000000000009;
+			productType = "com.apple.product-type.application";
+		};
+		A10000000000000000000008 = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A10000000000000000000013;
+			buildPhases = (
+				D10000000000000000000002,
+				D10000000000000000000004,
+				D10000000000000000000006,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = RoviaTunnel;
+			productName = RoviaTunnel;
+			productReference = A1000000000000000000000A;
+			productType = "com.apple.product-type.app-extension";
+		};
+		A1000000000000000000001C = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A1000000000000000000001F;
+			buildPhases = (
+				D10000000000000000000008,
+				D10000000000000000000009,
+				D1000000000000000000000A,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = RoviaAppTests;
+			packageProductDependencies = (
+				E10000000000000000000003 /* RoviaRouting */,
+				E10000000000000000000006 /* RoviaConfig */,
+			);
+			productName = RoviaAppTests;
+			productReference = B10000000000000000000015;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		A10000000000000000000001 = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2630;
+				LastUpgradeCheck = 2630;
+				TargetAttributes = {
+					A10000000000000000000007 = {
+						CreatedOnToolsVersion = 26.3;
+					};
+					A10000000000000000000008 = {
+						CreatedOnToolsVersion = 26.3;
+					};
+					A1000000000000000000001C = {
+						CreatedOnToolsVersion = 26.3;
+					};
+				};
+			};
+			buildConfigurationList = A10000000000000000000014;
+			compatibilityVersion = "Xcode 15.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = A10000000000000000000002;
+			productRefGroup = A10000000000000000000003;
+			projectDirPath = "";
+			projectRoot = "";
+			packageReferences = (
+				E10000000000000000000001 /* XCLocalSwiftPackageReference "core/routing" */,
+				E10000000000000000000004 /* XCLocalSwiftPackageReference "core/config" */,
+			);
+			targets = (
+				A10000000000000000000007,
+				A10000000000000000000008,
+				A1000000000000000000001C,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		D10000000000000000000005 = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D10000000000000000000006 = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D1000000000000000000000A = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		D10000000000000000000001 = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C10000000000000000000001,
+				C10000000000000000000002,
+				C10000000000000000000008,
+				C10000000000000000000009,
+				C1000000000000000000000A,
+				C1000000000000000000000B,
+				C1000000000000000000000C,
+				C1000000000000000000000D,
+				C1000000000000000000000E,
+				C1000000000000000000000F,
+				C10000000000000000000016,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D10000000000000000000002 = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C10000000000000000000003,
+				C10000000000000000000007,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D10000000000000000000008 = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C10000000000000000000012,
+				C10000000000000000000013,
+				C10000000000000000000011,
+				C10000000000000000000016,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		A10000000000000000000011 = {
+			isa = PBXTargetDependency;
+			target = A10000000000000000000008;
+			targetProxy = A10000000000000000000010;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		D10000000000000000000007 = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				C10000000000000000000004,
+			);
+			name = "Embed App Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		A10000000000000000000015 = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "$(ROVIA_TEAM_ID)";
+				GENERATE_INFOPLIST_FILE = NO;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		A10000000000000000000016 = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "$(ROVIA_TEAM_ID)";
+				GENERATE_INFOPLIST_FILE = NO;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
+		A10000000000000000000017 = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = B10000000000000000000008;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CODE_SIGN_ENTITLEMENTS = RoviaApp/RoviaApp.entitlements;
+				INFOPLIST_FILE = RoviaApp/Info.plist;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(ROVIA_BUNDLE_IDENTIFIER)";
+				PRODUCT_NAME = Rovia;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		A10000000000000000000018 = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = B10000000000000000000008;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CODE_SIGN_ENTITLEMENTS = RoviaApp/RoviaApp.entitlements;
+				INFOPLIST_FILE = RoviaApp/Info.plist;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(ROVIA_BUNDLE_IDENTIFIER)";
+				PRODUCT_NAME = Rovia;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		A10000000000000000000019 = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = B10000000000000000000008;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = RoviaTunnel/RoviaTunnel.entitlements;
+				INFOPLIST_FILE = RoviaTunnel/Info.plist;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(ROVIA_TUNNEL_BUNDLE_IDENTIFIER)";
+				PRODUCT_NAME = RoviaTunnel;
+				SKIP_INSTALL = YES;
+			};
+			name = Debug;
+		};
+		A1000000000000000000001A = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = B10000000000000000000008;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = RoviaTunnel/RoviaTunnel.entitlements;
+				INFOPLIST_FILE = RoviaTunnel/Info.plist;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(ROVIA_TUNNEL_BUNDLE_IDENTIFIER)";
+				PRODUCT_NAME = RoviaTunnel;
+				SKIP_INSTALL = YES;
+			};
+			name = Release;
+		};
+		A1000000000000000000001D = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = B10000000000000000000008;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(ROVIA_BUNDLE_IDENTIFIER).tests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		A1000000000000000000001E = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = B10000000000000000000008;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(ROVIA_BUNDLE_IDENTIFIER).tests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		A10000000000000000000012 = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A10000000000000000000017,
+				A10000000000000000000018,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A10000000000000000000013 = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A10000000000000000000019,
+				A1000000000000000000001A,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A10000000000000000000014 = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A10000000000000000000015,
+				A10000000000000000000016,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A1000000000000000000001F = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A1000000000000000000001D,
+				A1000000000000000000001E,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		E10000000000000000000001 /* XCLocalSwiftPackageReference "core/routing" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../../../core/routing;
+		};
+		E10000000000000000000004 /* XCLocalSwiftPackageReference "core/config" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../../../core/config;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		E10000000000000000000002 /* RoviaRouting */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E10000000000000000000001 /* XCLocalSwiftPackageReference "core/routing" */;
+			productName = RoviaRouting;
+		};
+		E10000000000000000000003 /* RoviaRouting */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E10000000000000000000001 /* XCLocalSwiftPackageReference "core/routing" */;
+			productName = RoviaRouting;
+		};
+		E10000000000000000000005 /* RoviaConfig */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E10000000000000000000004 /* XCLocalSwiftPackageReference "core/config" */;
+			productName = RoviaConfig;
+		};
+		E10000000000000000000006 /* RoviaConfig */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E10000000000000000000004 /* XCLocalSwiftPackageReference "core/config" */;
+			productName = RoviaConfig;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = A10000000000000000000001;
+}

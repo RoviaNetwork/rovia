@@ -1,0 +1,17 @@
+{
+  "input": {
+    "host": null,
+    "ip": "10.0.0.1",
+    "port": 443,
+    "network": "tcp"
+  },
+  "rules": [
+    {
+      "id": "00000000-0000-0000-0000-000000000031",
+      "enabled": true,
+      "matchers": [{ "type": "ipCIDR", "value": "10.0.0.0/99" }],
+      "action": { "type": "direct" }
+    }
+  ],
+  "expectedError": "invalidCIDR"
+}

@@ -1,0 +1,7 @@
+{
+  "apiVersion": 1,
+  "requestID": "control-status-request",
+  "method": "status.get",
+  "payload": {},
+  "rawInput": "control-field-canary"
+}

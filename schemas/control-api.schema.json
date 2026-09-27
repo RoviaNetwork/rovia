@@ -1,0 +1,218 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://rovia.invalid/schemas/control-api.schema.json",
+  "title": "Rovia internal control message",
+  "description": "A host-to-extension control request. The envelope is closed: a field the schema does not declare is refused rather than ignored, and PacketTunnelProvider enforces the same three rules (the field set, the requestID bound, and an empty status.get payload). The response contract is schemas/control-response.schema.json.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "requestID", "method", "payload"],
+  "properties": {
+    "apiVersion": { "type": "integer", "const": 1 },
+    "requestID": {
+      "description": "The caller's identifier for this request, echoed back in the response. Bounded on both sides: schemas/control-response.schema.json states the same 1 to 128, because a host that may not send a long identifier must be able to match a refusal to its request.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "method": {
+      "enum": [
+        "status.get",
+        "engine.capabilities",
+        "subscription.inspect",
+        "routing.explain",
+        "health.snapshot",
+        "group.select"
+      ]
+    },
+    "payload": { "type": "object" }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "method": { "const": "status.get" } },
+        "required": ["method"]
+      },
+      "then": {
+        "properties": {
+          "payload": { "$ref": "#/$defs/emptyPayload" }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "method": { "const": "routing.explain" } },
+        "required": ["method"]
+      },
+      "then": {
+        "properties": {
+          "payload": { "$ref": "#/$defs/routingDiagnostic" }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "method": { "const": "group.select" } },
+        "required": ["method"]
+      },
+      "then": {
+        "properties": {
+          "payload": { "$ref": "#/$defs/groupSelectionDecision" }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "emptyPayload": {
+      "description": "status.get takes no parameters: the extension reports what it knows, and the request cannot become a covert channel for host state.",
+      "type": "object",
+      "additionalProperties": false,
+      "maxProperties": 0
+    },
+    "uuid": { "type": "string", "format": "uuid" },
+    "routeMatcherType": {
+      "enum": ["domain", "domainSuffix", "ipCIDR", "port", "portRange", "network"]
+    },
+    "routingMatcherReasonCode": {
+      "enum": ["matcherMatched", "matcherDidNotMatch"]
+    },
+    "routingRuleReasonCode": {
+      "enum": [
+        "ruleDisabled",
+        "noMatchers",
+        "noMatchingMatcher",
+        "firstMatchingRule",
+        "shadowedByEarlierMatch"
+      ]
+    },
+    "routingDiagnosticReasonCode": {
+      "enum": ["firstMatchingRule", "defaultAction", "invalidInput"]
+    },
+    "routeAction": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type"],
+          "properties": { "type": { "const": "direct" } }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type"],
+          "properties": { "type": { "const": "block" } }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "id"],
+          "properties": {
+            "type": { "const": "group" },
+            "id": { "$ref": "#/$defs/uuid" }
+          }
+        }
+      ]
+    },
+    "routingInputSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["hasHost", "hasIP", "hasPort", "hasNetwork"],
+      "properties": {
+        "hasHost": { "type": "boolean" },
+        "hasIP": { "type": "boolean" },
+        "hasPort": { "type": "boolean" },
+        "hasNetwork": { "type": "boolean" }
+      }
+    },
+    "routingMatcherDiagnostic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ruleID",
+        "matcherIndex",
+        "matcherType",
+        "matched",
+        "selected",
+        "applied",
+        "ruleEnabled",
+        "reasonCode"
+      ],
+      "properties": {
+        "ruleID": { "$ref": "#/$defs/uuid" },
+        "matcherIndex": { "type": "integer", "minimum": 0 },
+        "matcherType": { "$ref": "#/$defs/routeMatcherType" },
+        "matched": { "type": "boolean" },
+        "selected": { "type": "boolean" },
+        "applied": { "type": "boolean" },
+        "ruleEnabled": { "type": "boolean" },
+        "reasonCode": { "$ref": "#/$defs/routingMatcherReasonCode" }
+      }
+    },
+    "routingRuleDiagnostic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ruleID", "enabled", "matched", "selected", "reasonCode", "matchers"],
+      "properties": {
+        "ruleID": { "$ref": "#/$defs/uuid" },
+        "enabled": { "type": "boolean" },
+        "matched": { "type": "boolean" },
+        "selected": { "type": "boolean" },
+        "reasonCode": { "$ref": "#/$defs/routingRuleReasonCode" },
+        "matchers": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/routingMatcherDiagnostic" }
+        }
+      }
+    },
+    "routingDiagnostic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "inputSummary",
+        "rules",
+        "matchers",
+        "finalDecision",
+        "selectedGroup",
+        "selectedServer",
+        "reasonCode"
+      ],
+      "properties": {
+        "inputSummary": { "$ref": "#/$defs/routingInputSummary" },
+        "rules": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/routingRuleDiagnostic" }
+        },
+        "matchers": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/routingMatcherDiagnostic" }
+        },
+        "finalDecision": { "$ref": "#/$defs/routeAction" },
+        "selectedGroup": { "oneOf": [{ "$ref": "#/$defs/uuid" }, { "type": "null" }] },
+        "selectedServer": { "oneOf": [{ "$ref": "#/$defs/uuid" }, { "type": "null" }] },
+        "reasonCode": { "$ref": "#/$defs/routingDiagnosticReasonCode" }
+      }
+    },
+    "groupSelectionReasonCode": {
+      "enum": [
+        "selected",
+        "emptyGroup",
+        "manualSelectionRequired",
+        "requestedServerNotMember",
+        "noHealthyCandidate",
+        "noValidLatency",
+        "staleHealthSample",
+        "invalidGroup"
+      ]
+    },
+    "groupSelectionDecision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["groupID", "policy", "selectedServerID", "reasonCode"],
+      "properties": {
+        "groupID": { "$ref": "#/$defs/uuid" },
+        "policy": { "enum": ["manual", "lowestLatency", "failover"] },
+        "selectedServerID": { "oneOf": [{ "$ref": "#/$defs/uuid" }, { "type": "null" }] },
+        "reasonCode": { "$ref": "#/$defs/groupSelectionReasonCode" }
+      }
+    }
+  }
+}

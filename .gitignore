@@ -1,0 +1,44 @@
+# macOS
+.DS_Store
+
+# Xcode
+DerivedData/
+build/
+*.xcuserstate
+xcuserdata/
+*.xcscmblueprint
+*.xccheckout
+
+# Swift Package Manager
+.build/
+.swiftpm/
+
+# Local secrets and diagnostics
+.env
+.env.*
+*.p12
+*.mobileprovision
+*.cer
+*.key
+*.pem
+diagnostics/
+secrets/
+
+# Python tooling
+__pycache__/
+*.pyc
+# The pinned schema validator's virtualenv, created inside the checkout by
+# every workflow. It is a build input, not source.
+/.ci-schema-validator/
+
+# Local agent tooling. The task ledger and the plans it was written from are the
+# development harness's own output, not project documentation: the plans carry task
+# checkboxes that stay unticked for work that is in fact finished, which reads as
+# unfinished work in a public repository. The design record that is meant to be read
+# lives in docs/adr/ and docs/architecture/.
+/.superpowers/
+/docs/superpowers/
+
+# Generated engine artifacts
+/LibXray.xcframework/
+/Libbox.xcframework/

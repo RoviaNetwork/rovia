@@ -1,0 +1,399 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://rovia.invalid/schemas/subscription.schema.json",
+  "title": "Rovia subscription",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "name", "source", "serverIDs", "refreshPolicy"],
+  "properties": {
+    "id": { "$ref": "#/$defs/uuid" },
+    "name": { "type": "string", "minLength": 1 },
+    "source": { "$ref": "#/$defs/subscriptionSource" },
+    "serverIDs": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/uuid" } },
+    "refreshPolicy": { "$ref": "#/$defs/refreshPolicy" },
+    "lastRefresh": { "type": ["string", "null"], "format": "date-time" },
+    "contentHash": { "type": ["string", "null"] }
+  },
+  "$defs": {
+    "uuid": { "type": "string", "format": "uuid" },
+    "parsedHost": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 253,
+      "anyOf": [
+        {
+          "pattern": "^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)*[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$"
+        },
+        {
+          "pattern": "^(?:(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])$"
+        },
+        {
+          "pattern": "^[0-9a-f:.]*:[0-9a-f:.]*$"
+        }
+      ]
+    },
+    "secretReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "key"],
+      "properties": {
+        "kind": { "const": "keychain" },
+        "key": { "type": "string", "minLength": 1 }
+      }
+    },
+    "parsedSecretReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "key"],
+      "properties": {
+        "kind": { "const": "keychain" },
+        "key": { "type": "string", "minLength": 1, "maxLength": 512, "pattern": "^[!-~]+$" }
+      }
+    },
+    "parsedEndpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["host", "port"],
+      "properties": {
+        "host": { "$ref": "#/$defs/parsedHost" },
+        "port": { "type": "integer", "minimum": 1, "maximum": 65535 }
+      }
+    },
+    "parsedTransportOptions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "options"],
+      "properties": {
+        "kind": { "enum": ["tcp", "ws", "grpc", "http", "httpupgrade"] },
+        "options": {
+          "type": "object",
+          "maxProperties": 10,
+          "propertyNames": {
+            "enum": [
+              "host", "path", "serviceName", "flow", "fingerprint", "headerType", "mode",
+              "realityPublicKey", "realityShortID", "method"
+            ]
+          },
+          "additionalProperties": { "type": "string", "minLength": 1, "maxLength": 2048 },
+          "properties": {
+            "host": { "$ref": "#/$defs/parsedHost" },
+            "path": {
+              "type": "string",
+              "allOf": [
+                { "pattern": "^/[^?#\\s]{0,2047}$" },
+                { "pattern": "^[!-~]+$" }
+              ]
+            },
+            "serviceName": { "type": "string", "pattern": "^[A-Za-z0-9._-]{1,128}$" },
+            "flow": { "enum": ["xtls-rprx-vision", "xtls-rprx-vision-udp443"] },
+            "fingerprint": {
+              "enum": [
+                "chrome", "firefox", "safari", "ios", "android", "edge",
+                "360", "qq", "random", "randomized"
+              ]
+            },
+            "headerType": { "enum": ["http"] },
+            "mode": { "enum": ["gun", "multi"] },
+            "method": {
+              "enum": [
+                "aes-128-gcm", "aes-192-gcm", "aes-256-gcm",
+                "chacha20-ietf-poly1305", "xchacha20-ietf-poly1305"
+              ]
+            },
+            "realityPublicKey": { "type": "string", "pattern": "^[A-Za-z0-9_-]{43}$" },
+            "realityShortID": { "type": "string", "pattern": "^(?:[0-9A-Fa-f]{2}){1,8}$" }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "kind": { "const": "tcp" } }, "required": ["kind"] },
+          "then": {
+            "properties": {
+              "options": {
+                "propertyNames": { "not": { "enum": ["path", "serviceName", "mode"] } }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "kind": { "enum": ["ws", "http", "httpupgrade"] } },
+            "required": ["kind"]
+          },
+          "then": {
+            "properties": {
+              "options": {
+                "propertyNames": {
+                  "enum": ["host", "path", "flow", "fingerprint"]
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "kind": { "const": "grpc" } }, "required": ["kind"] },
+          "then": {
+            "properties": {
+              "options": {
+                "propertyNames": {
+                  "enum": ["serviceName", "mode", "flow", "fingerprint"]
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "parsedTLSOptions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["serverName", "allowInsecure", "alpn"],
+      "properties": {
+        "serverName": { "$ref": "#/$defs/parsedHost" },
+
+        "allowInsecure": { "type": "boolean" },
+        "alpn": {
+          "type": "array",
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^[!-~]{1,64}$" }
+        }
+      }
+    },
+    "parsedServer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "protocolKind", "endpoint", "credential", "transport", "tls", "tags"],
+      "properties": {
+        "id": { "$ref": "#/$defs/uuid" },
+        "name": { "enum": ["VLESS server", "Trojan server", "Shadowsocks server"] },
+        "protocolKind": { "enum": ["vless", "trojan", "shadowsocks"] },
+        "endpoint": { "$ref": "#/$defs/parsedEndpoint" },
+        "credential": { "$ref": "#/$defs/parsedSecretReference" },
+        "transport": { "$ref": "#/$defs/parsedTransportOptions" },
+        "tls": {
+          "oneOf": [{ "$ref": "#/$defs/parsedTLSOptions" }, { "type": "null" }]
+        },
+        "tags": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "prefixItems": [
+            { "const": "share-link" },
+            { "enum": ["vless", "trojan", "shadowsocks"] }
+          ],
+          "items": false
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "protocolKind": { "const": "vless" } },
+            "required": ["protocolKind"]
+          },
+          "then": {
+            "properties": {
+              "name": { "const": "VLESS server" },
+              "tags": {
+                "minItems": 2,
+                "maxItems": 2,
+                "prefixItems": [{ "const": "share-link" }, { "const": "vless" }]
+              },
+              "transport": {
+                "properties": {
+                  "options": {
+                    "propertyNames": { "not": { "const": "method" } }
+                  }
+                }
+              },
+              "tls": { "$ref": "#/$defs/parsedTLSOptions" }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "protocolKind": { "const": "trojan" } },
+            "required": ["protocolKind"]
+          },
+          "then": {
+            "properties": {
+              "name": { "const": "Trojan server" },
+              "tags": {
+                "minItems": 2,
+                "maxItems": 2,
+                "prefixItems": [{ "const": "share-link" }, { "const": "trojan" }]
+              },
+              "transport": {
+                "properties": {
+                  "options": {
+                    "propertyNames": {
+                      "not": {
+                        "enum": ["method", "realityPublicKey", "realityShortID"]
+                      }
+                    }
+                  }
+                }
+              },
+              "tls": { "$ref": "#/$defs/parsedTLSOptions" }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "protocolKind": { "const": "shadowsocks" } },
+            "required": ["protocolKind"]
+          },
+          "then": {
+            "properties": {
+              "name": { "const": "Shadowsocks server" },
+              "tags": {
+                "minItems": 2,
+                "maxItems": 2,
+                "prefixItems": [{ "const": "share-link" }, { "const": "shadowsocks" }]
+              },
+              "transport": {
+                "properties": {
+                  "kind": { "const": "tcp" },
+                  "options": {
+                    "required": ["method"],
+                    "maxProperties": 1,
+                    "propertyNames": { "const": "method" }
+                  }
+                }
+              },
+              "tls": { "type": "null" }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "transport": {
+                "properties": {
+                  "options": { "required": ["flow"] }
+                },
+                "required": ["options"]
+              }
+            },
+            "required": ["transport"]
+          },
+          "then": {
+            "properties": {
+              "tls": { "$ref": "#/$defs/parsedTLSOptions" }
+            }
+          }
+        },
+        {
+          "if": {
+            "anyOf": [
+              {
+                "properties": {
+                  "transport": {
+                    "properties": {
+                      "options": { "required": ["realityPublicKey"] }
+                    },
+                    "required": ["options"]
+                  }
+                },
+                "required": ["transport"]
+              },
+              {
+                "properties": {
+                  "transport": {
+                    "properties": {
+                      "options": { "required": ["realityShortID"] }
+                    },
+                    "required": ["options"]
+                  }
+                },
+                "required": ["transport"]
+              }
+            ]
+          },
+          "then": {
+            "properties": {
+              "transport": {
+                "properties": {
+                  "kind": { "const": "tcp" },
+                  "options": { "required": ["realityPublicKey"] }
+                }
+              },
+              "tls": { "$ref": "#/$defs/parsedTLSOptions" }
+            }
+          }
+        }
+      ]
+    },
+    "parsedShareLink": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["server", "displayValue"],
+      "properties": {
+        "server": { "$ref": "#/$defs/parsedServer" },
+        "displayValue": {
+          "type": "string",
+          "maxLength": 512,
+          "pattern": "^(?:vless|trojan|ss)://(?:\\[[0-9A-Fa-f:.]*:[0-9A-Fa-f:.]*\\]|[A-Za-z0-9.-]+):(?:6553[0-5]|655[0-2][0-9]|65[0-4][0-9]{2}|6[0-4][0-9]{3}|[1-5][0-9]{4}|[1-9][0-9]{0,3})/••••••••$"
+        }
+      }
+    },
+    "subscriptionSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "displayValue"],
+      "properties": {
+        "kind": { "enum": ["url", "pastedText", "file"] },
+        "displayValue": { "type": "string", "minLength": 1 },
+        "secretReference": { "oneOf": [{ "$ref": "#/$defs/secretReference" }, { "type": "null" }] }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "kind": { "const": "url" } }, "required": ["kind"] },
+          "then": {
+            "required": ["secretReference"],
+            "properties": {
+              "secretReference": { "$ref": "#/$defs/secretReference" },
+              "displayValue": { "pattern": "^https?://[^\\s/?#@]+/••••••••$" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "kind": { "enum": ["pastedText", "file"] } }, "required": ["kind"] },
+          "then": { "properties": { "secretReference": { "type": "null" } } }
+        },
+        {
+          "if": { "properties": { "kind": { "enum": ["pastedText", "file"] } }, "required": ["kind"] },
+          "then": {
+            "properties": {
+              "displayValue": {
+                "not": {
+                  "pattern": "^\\s*([Vv][Ll][Ee][Ss][Ss]|[Vv][Mm][Ee][Ss][Ss]|[Tt][Rr][Oo][Jj][Aa][Nn]|[Ss][Ss][Rr]|[Ss][Ss]|[Hh][Yy][Ss][Tt][Ee][Rr][Ii][Aa]([2]?)?|[Tt][Uu][Ii][Cc]|[Nn][Aa][Ii][Vv][Ee]|[Bb][Rr][Oo][Oo][Kk]|[Jj][Uu][Ii][Cc][Ii][Tt][Yy]|[Aa][Nn][Yy][Tt][Ll][Ss])://"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "refreshPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode"],
+      "properties": {
+        "mode": { "enum": ["manual", "interval"] },
+        "interval": { "type": ["number", "null"], "exclusiveMinimum": 0 }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "mode": { "const": "manual" } }, "required": ["mode"] },
+          "then": { "properties": { "interval": { "type": "null" } } }
+        },
+        {
+          "if": { "properties": { "mode": { "const": "interval" } }, "required": ["mode"] },
+          "then": { "required": ["interval"], "properties": { "interval": { "type": "number", "exclusiveMinimum": 0 } } }
+        }
+      ]
+    }
+  }
+}

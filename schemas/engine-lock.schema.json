@@ -1,0 +1,172 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://rovia.invalid/schemas/engine-lock.schema.json",
+  "title": "Rovia engine lock",
+  "description": "The reviewed inputs of every engine the app may run. A lock that enables an engine must record an approved, fully pinned build; a lock that enables none is the foundation state.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "runtimePolicy", "productionEngines", "candidates"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "runtimePolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["maxGoRuntimesPerProcess", "allowedProductionEngine"],
+      "properties": {
+        "maxGoRuntimesPerProcess": { "const": 1 },
+        "allowedProductionEngine": { "const": "xray" }
+      }
+    },
+    "productionEngines": {
+      "type": "array",
+      "maxItems": 1,
+      "uniqueItems": true,
+      "items": { "const": "xray" }
+    },
+    "candidates": {
+      "type": "object",
+      "required": ["xray"],
+      "properties": { "xray": { "$ref": "#/$defs/candidate" } },
+      "additionalProperties": { "$ref": "#/$defs/candidate" }
+    }
+  },
+  "if": {
+    "properties": { "productionEngines": { "minItems": 1 } },
+    "required": ["productionEngines"]
+  },
+  "then": {
+    "properties": {
+      "candidates": {
+        "required": ["xray"],
+        "properties": { "xray": { "$ref": "#/$defs/approvedCandidate" } }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "description": "An approved, enabled engine must be declared as a production engine, otherwise the SBOM would list a binary the release mode does not require.",
+      "if": {
+        "properties": {
+          "candidates": {
+            "required": ["xray"],
+            "properties": {
+              "xray": {
+                "required": ["enabled", "approval"],
+                "properties": {
+                  "enabled": { "const": true },
+                  "approval": { "const": "approved" }
+                }
+              }
+            }
+          }
+        },
+        "required": ["candidates"]
+      },
+      "then": {
+        "properties": {
+          "productionEngines": { "contains": { "const": "xray" } }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "source",
+        "version",
+        "commit",
+        "sourceArchiveSha256",
+        "artifact",
+        "sha256",
+        "goVersion",
+        "toolchain",
+        "architectures",
+        "buildFlags",
+        "linkedFrameworks",
+        "approval",
+        "license"
+      ],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "source": { "type": "string", "format": "uri", "minLength": 1 },
+        "version": { "type": ["string", "null"], "minLength": 1 },
+        "commit": {
+          "type": ["string", "null"],
+          "pattern": "^[0-9a-fA-F]{40}$"
+        },
+        "sourceArchiveSha256": {
+          "type": ["string", "null"],
+          "pattern": "^[0-9a-fA-F]{64}$"
+        },
+        "artifact": { "type": ["string", "null"], "minLength": 1 },
+        "sha256": {
+          "type": ["string", "null"],
+          "pattern": "^[0-9a-fA-F]{64}$"
+        },
+        "goVersion": { "type": ["string", "null"], "minLength": 1 },
+        "toolchain": { "type": ["string", "null"], "minLength": 1 },
+        "architectures": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "buildFlags": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "linkedFrameworks": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "approval": { "enum": ["pending", "approved"] },
+        "license": {
+          "description": "SPDX license identifier of the code this candidate builds, taken from the upstream project named by source. Required because an SBOM that declares a license it did not read is a claim about a binary nobody audited.",
+          "type": "string",
+          "enum": ["MIT", "MPL-2.0", "GPL-3.0-or-later"]
+        }
+      }
+    },
+    "approvedCandidate": {
+      "description": "What an enabled production engine must record. A partial pin is not a smaller decision: it is no decision.",
+      "allOf": [
+        {
+          "required": ["enabled", "approval"],
+          "properties": {
+            "enabled": { "const": true },
+            "approval": { "const": "approved" }
+          }
+        },
+        {
+          "required": [
+            "version",
+            "commit",
+            "sourceArchiveSha256",
+            "artifact",
+            "sha256",
+            "goVersion",
+            "toolchain"
+          ],
+          "properties": {
+            "version": { "type": "string", "minLength": 1 },
+            "commit": { "type": "string", "pattern": "^[0-9a-fA-F]{40}$" },
+            "sourceArchiveSha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+            "artifact": { "type": "string", "minLength": 1 },
+            "sha256": { "type": "string", "pattern": "^[0-9a-fA-F]{64}$" },
+            "goVersion": { "type": "string", "minLength": 1 },
+            "toolchain": { "type": "string", "minLength": 1 }
+          }
+        },
+        {
+          "required": ["architectures", "buildFlags", "linkedFrameworks"],
+          "properties": {
+            "architectures": { "minItems": 1 },
+            "buildFlags": { "minItems": 1 },
+            "linkedFrameworks": { "minItems": 1 }
+          }
+        }
+      ]
+    }
+  }
+}

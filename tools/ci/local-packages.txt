@@ -1,0 +1,14 @@
+# Local SwiftPM packages in this repository.
+#
+# tools/ci/verify-lockfiles.sh requires a Package.swift for every entry,
+# tools/reproducibility/generate-sbom.py emits one SPDX component for every
+# entry, and .github/workflows/ci.yml tests every entry. A package that exists
+# in the tree but is missing from this list fails
+# tools/ci/test_verify_lockfiles.py, so the list cannot silently drift.
+core/config
+core/routing
+core/subscription
+engines/api
+engines/xray
+engines/singbox
+platform/apple

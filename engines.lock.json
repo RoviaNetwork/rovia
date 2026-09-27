@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "runtimePolicy": {
+    "maxGoRuntimesPerProcess": 1,
+    "allowedProductionEngine": "xray"
+  },
+  "productionEngines": [],
+  "candidates": {
+    "xray": {
+      "enabled": false,
+      "source": "https://github.com/XTLS/libXray",
+      "version": null,
+      "commit": null,
+      "sourceArchiveSha256": null,
+      "artifact": null,
+      "sha256": null,
+      "goVersion": null,
+      "toolchain": null,
+      "architectures": [],
+      "buildFlags": [],
+      "linkedFrameworks": [],
+      "approval": "pending",
+      "license": "MIT"
+    },
+    "sing-box": {
+      "enabled": false,
+      "source": "https://github.com/SagerNet/sing-box",
+      "version": null,
+      "commit": null,
+      "sourceArchiveSha256": null,
+      "artifact": null,
+      "sha256": null,
+      "goVersion": null,
+      "toolchain": null,
+      "architectures": [],
+      "buildFlags": [],
+      "linkedFrameworks": [],
+      "approval": "pending",
+      "license": "GPL-3.0-or-later"
+    }
+  }
+}

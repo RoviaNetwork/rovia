@@ -1,0 +1,76 @@
+name: Feature request
+description: Propose a capability, a change to a boundary, or a piece of roadmap work.
+labels: ["enhancement", "needs triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Rovia is pre-alpha and its boundaries are deliberate, so most requests will
+        change a decision rather than add a feature. Two boundaries are unlikely to
+        move: the canonical core stays free of UI and engine dependencies, and an
+        engine's own configuration never reaches the canonical model.
+
+        If your proposal needs an ADR, say so below — that is a normal outcome here,
+        not a rejection.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What cannot be done today? Describe the situation, not the solution.
+      placeholder: |
+        When I add a routing rule, I cannot tell which earlier rule would have matched
+        first, so I cannot tell whether the new rule does anything.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you would like instead
+    validations:
+      required: true
+
+  - type: textarea
+    id: boundary
+    attributes:
+      label: Does this change a boundary or a decision?
+      description: |
+        If it touches canonical config, routing semantics, the engine interface, secret
+        storage, the control API, licensing, or the shared-core strategy, it needs an
+        ADR. Say which, and what you think the trade-off is.
+    placeholder: This adds a field to the canonical config, so it changes the schema.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Where it lands
+      options:
+        - core/config
+        - core/subscription
+        - core/routing
+        - platform/apple
+        - client/app/ios
+        - engines
+        - tools/ci
+        - documentation
+        - not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you considered
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I checked `docs/architecture/next-spikes.md` — this may already be planned.
+          required: true
+        - label: My proposal does not require telemetry, analytics, or collection of
+            user activity. Rovia does not accept those through ordinary feature
+            requests.
+          required: true

@@ -1,0 +1,16 @@
+# What this project will and will not use issues for, so a reader can tell in one
+# glance whether to file here or somewhere else.
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/princeofscale/rovia/security/advisories/new
+    about: >-
+      Report privately. Do not open a public issue for a suspected vulnerability,
+      a privacy leak, a redaction failure, or an unexpected outbound request.
+      See SECURITY.md for what counts and what to include.
+  - name: Architecture decision
+    url: https://github.com/princeofscale/rovia/discussions
+    about: >-
+      Proposals that change canonical config, routing semantics, the engine interface,
+      the control API, secret storage, licensing, or the shared-core strategy belong in
+      an ADR or RFC. Start the discussion there.

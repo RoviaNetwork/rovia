@@ -1,0 +1,30 @@
+# Rovia has no external package dependencies today: the seven Swift packages are all
+# local path dependencies, and the Python tooling is pinned exactly in the gate scripts
+# and the workflows rather than resolved from an index.
+#
+# That is why this file watches actions and not ecosystems. The two things that can
+# change under us without a commit are the GitHub Actions this repository runs, and —
+# if it is ever added — a package ecosystem. The first is a real supply-chain surface
+# today: every workflow step is a third-party action pinned by commit SHA.
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "ci"
+    labels: ["dependencies"]
+    reviewers:
+      - princeofscale
+    groups:
+      # One pull request for all action updates, so reviewing the supply chain is one
+      # review rather than seven. Splitting them invites approving several at once
+      # without reading any of them.
+      actions:
+        patterns: ["*"]
+
+  # Deliberately absent: `pip` and `npm`. Nothing is resolved from an index at
+  # runtime, and adding an ecosystem watcher here would imply a dependency that does
+  # not exist. If one is introduced, add its watcher in the same commit that adds the
+  # dependency, so the two cannot disagree.

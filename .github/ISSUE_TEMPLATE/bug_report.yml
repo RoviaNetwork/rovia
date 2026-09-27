@@ -1,0 +1,94 @@
+name: Bug report
+description: Something in Rovia does not behave as its documentation says it does.
+labels: ["bug", "needs triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time. Please read this first:
+
+        - **Do not report a security vulnerability here.** Use private
+          vulnerability reporting, or follow `SECURITY.md`. A privacy leak, a
+          redaction failure, or an unexpected outbound request is a security report,
+          not a bug.
+        - **Do not paste a real subscription URL, a real server address, or any
+          credential.** Redact first and describe the shape instead. A synthetic value
+          is more useful than a real one, because it can be reproduced.
+        - If the bug is "the VPN does not connect", that is expected in this build:
+          no production engine is enabled and no tunnel can be established. See the
+          Status section of the README.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What did you observe, and what did you expect instead?
+      placeholder: |
+        Expected: `RouteEvaluator.explain` returns a redacted host.
+        Observed:  the diagnostic contains the candidate host.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Starting from a clean checkout if you can.
+      placeholder: |
+        1. swift test --package-path core/config
+        2. …
+    validations:
+      required: true
+
+  - type: textarea
+    id: input
+    attributes:
+      label: Input, redacted
+      description: |
+        The smallest input that shows the problem, with every host, UUID, password and
+        token replaced. A synthetic value such as `synthetic.example` is preferred.
+      render: text
+
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Which part of Rovia
+      options:
+        - core/config — canonical models, loader, validation
+        - core/subscription — share-link parsing
+        - core/routing — route evaluation, diagnostics, server selection
+        - platform/apple — tunnel launch, Keychain, App Group
+        - client/app/ios — the app or the Packet Tunnel extension
+        - engines — an adapter or the engine interface
+        - tools/ci — a gate, a test, or the release pipeline
+        - documentation — a claim that does not match the code
+        - not sure
+    validations:
+      required: true
+
+  - type: input
+    id: commit
+    attributes:
+      label: Commit or version
+      placeholder: 0.1.0, or the short SHA you tested
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Toolchain and platform. `sw_vers`, `xcodebuild -version`, `swift --version`.
+      render: shell
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues and pull requests for this.
+          required: true
+        - label: I removed every real credential, host, and subscription URL from
+            the text above.
+          required: true
+        - label: I ran the relevant test suite and can say what it did.

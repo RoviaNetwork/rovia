@@ -1,0 +1,126 @@
+name: ios-ci
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  ROVIA_ENGINE_LOCK: engines.lock.json
+  # Derived data deliberately lives outside the checkout. On a developer machine
+  # a derived-data path inside the repository makes the XCTest runner time out
+  # before running a single test, because the runner process is not granted
+  # access to the protected Desktop directory. Keep this outside the workspace.
+  DERIVED_DATA: ${{ runner.temp }}/RoviaDerivedData
+  # Must match CFBundleShortVersionString in client/app/ios/RoviaApp/Info.plist.
+  # tools/ci/test_ci_checks.py fails if the two drift apart.
+  ROVIA_MARKETING_VERSION: 0.1.0
+
+jobs:
+  swift-tests:
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Show toolchain
+        run: |
+          sw_vers
+          xcodebuild -version
+          swift --version
+      - name: Install pinned Python tooling
+        run: |
+          python3 -m venv .ci-schema-validator
+          .ci-schema-validator/bin/python -m pip install --disable-pip-version-check check-jsonschema==0.38.2
+          echo "$PWD/.ci-schema-validator/bin" >> "$GITHUB_PATH"
+      - name: Verify repository inputs
+        run: |
+          ./tools/ci/verify-lockfiles.sh
+          ./tools/ci/verify-engine-checksums.sh --mode foundation --lock "$ROVIA_ENGINE_LOCK"
+          ./tools/ci/verify-third-party-notices.sh
+      - name: Check shell syntax
+        run: ./tools/ci/check-shell-syntax.sh
+      - name: Run tool tests
+        run: ./tools/ci/run-tool-tests.sh
+      - name: Audit accessibility identifiers
+        run: |
+          python3 tools/ci/audit-accessibility-identifiers.py
+          python3 tools/ci/test_audit_accessibility_identifiers.py
+      - name: Validate JSON
+        run: |
+          while read -r document; do
+            python3 -m json.tool "$document" >/dev/null
+          done < <(find schemas fixtures -type f -name '*.json' | LC_ALL=C sort)
+          python3 -m json.tool "$ROVIA_ENGINE_LOCK" >/dev/null
+          python3 tools/ci/test_validate_schemas.py
+          python3 tools/ci/validate-schemas.py
+      - name: Test core and engine packages
+        run: |
+          while read -r package; do
+            case "$package" in ''|\#*) continue ;; esac
+            echo "swift test --package-path $package"
+            swift test --package-path "$package"
+          done < tools/ci/local-packages.txt
+      - name: Generate and check the SBOM
+        run: |
+          mkdir -p build
+          python3 tools/reproducibility/generate-sbom.py . build/SBOM.spdx.json --lock "$ROVIA_ENGINE_LOCK"
+          python3 tools/reproducibility/check-sbom.py build/SBOM.spdx.json --repository .
+      - name: Resolve an iOS simulator
+        id: simulator
+        run: |
+          SIMULATOR_ID="$(xcrun simctl list devices available --json | python3 -c '
+          import json, sys
+          devices = json.load(sys.stdin)["devices"]
+          for runtime in sorted(devices, reverse=True):
+              for device in devices[runtime]:
+                  if device.get("isAvailable") and device["name"].startswith("iPhone"):
+                      print(device["udid"])
+                      raise SystemExit
+          raise SystemExit("no available iPhone simulator")
+          ')"
+          echo "Testing on simulator $SIMULATOR_ID"
+          echo "id=$SIMULATOR_ID" >> "$GITHUB_OUTPUT"
+          echo "ROVIA_SIMULATOR_ID=$SIMULATOR_ID" >> "$GITHUB_ENV"
+      - name: Test the iOS app model on a simulator
+        env:
+          ROVIA_SIMULATOR_ID: ${{ steps.simulator.outputs.id }}
+        run: |
+          xcodebuild \
+            -project client/app/ios/RoviaApp.xcodeproj \
+            -scheme RoviaApp \
+            -configuration Debug \
+            -destination "platform=iOS Simulator,id=$ROVIA_SIMULATOR_ID" \
+            -derivedDataPath "$DERIVED_DATA" \
+            test
+      - name: Build iOS simulator target without signing
+        run: |
+          xcodebuild \
+            -project client/app/ios/RoviaApp.xcodeproj \
+            -scheme RoviaApp \
+            -configuration Debug \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$DERIVED_DATA" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            build
+      - name: Verify processed bundle metadata
+        run: |
+          ./tools/ci/verify-bundle-metadata.sh \
+            "$DERIVED_DATA/Build/Products/Debug-iphonesimulator/Rovia.app" \
+            --expect-version "$ROVIA_MARKETING_VERSION"
+      - name: Install and launch on a simulator
+        env:
+          ROVIA_SIMULATOR_ID: ${{ steps.simulator.outputs.id }}
+        run: |
+          ./tools/ci/verify-simulator-install.sh \
+            "$DERIVED_DATA/Build/Products/Debug-iphonesimulator/Rovia.app" \
+            --device "$ROVIA_SIMULATOR_ID"

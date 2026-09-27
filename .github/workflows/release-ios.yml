@@ -1,0 +1,171 @@
+name: ios-release
+
+# Publishing is deliberately absent. This workflow stops at a verified, signed
+# artifact plus its provenance; uploading it is a separate, manually approved
+# step that must not be added before signing has been validated on a device.
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  ROVIA_ENGINE_LOCK: engines.lock.json
+  ROVIA_RELEASE_ARTIFACT: build/export/Rovia.ipa
+  ROVIA_RELEASE_SBOM: build/SBOM.spdx.json
+  ROVIA_RELEASE_CHECKSUMS: build/SHA256SUMS
+  ROVIA_RELEASE_MANIFEST: build/export/build-manifest.json
+
+jobs:
+  signed-release:
+    runs-on: macos-15
+    timeout-minutes: 60
+    environment: ios-production
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Install pinned Python tooling
+        # The release job runs the same schema checker as CI, so it needs the
+        # same pinned validator. Without it the checker would fall back to
+        # whatever uvx resolves, or fail late with an unrelated error.
+        run: |
+          python3 -m venv .ci-schema-validator
+          .ci-schema-validator/bin/python -m pip install --disable-pip-version-check check-jsonschema==0.38.2
+          echo "$PWD/.ci-schema-validator/bin" >> "$GITHUB_PATH"
+      - name: Verify release tag
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: ./tools/release/verify-tag.sh "$RELEASE_TAG"
+      - name: Require every release secret
+        env:
+          ROVIA_KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+          ROVIA_IOS_DIST_CERT_BASE64: ${{ secrets.IOS_DIST_CERT_BASE64 }}
+          ROVIA_IOS_DIST_CERT_PASSWORD: ${{ secrets.IOS_DIST_CERT_PASSWORD }}
+          ROVIA_IOS_APP_PROFILE_BASE64: ${{ secrets.IOS_APP_PROFILE_BASE64 }}
+          ROVIA_IOS_TUNNEL_PROFILE_BASE64: ${{ secrets.IOS_TUNNEL_PROFILE_BASE64 }}
+        run: ./tools/ci/verify-release-inputs.sh --check-secrets-only
+      - name: Require a resolved signing identity
+        run: |
+          # Refuses the placeholder $(ROVIA_TEAM_ID) in the committed plist, so
+          # the export below cannot be handed an identity substituted from
+          # whatever the environment happened to hold. Fails today: no Apple
+          # Developer team is configured for this repository.
+          ./tools/release/verify-export-options.sh \
+            --plist tools/release/ExportOptions.plist
+      - name: Verify repository inputs
+        run: |
+          ./tools/ci/check-shell-syntax.sh
+          ./tools/ci/verify-lockfiles.sh
+          ./tools/ci/verify-third-party-notices.sh
+      - name: Run tool and schema tests
+        run: |
+          ./tools/ci/run-tool-tests.sh
+          python3 tools/ci/audit-accessibility-identifiers.py
+          python3 tools/ci/test_audit_accessibility_identifiers.py
+          python3 tools/ci/test_validate_schemas.py
+          python3 tools/ci/validate-schemas.py
+      - name: Run foundation tests
+        run: |
+          while read -r package; do
+            case "$package" in ''|\#*) continue ;; esac
+            echo "swift test --package-path $package"
+            swift test --package-path "$package"
+          done < tools/ci/local-packages.txt
+      - name: Generate and check the SBOM
+        run: |
+          mkdir -p build
+          python3 tools/reproducibility/generate-sbom.py . "$ROVIA_RELEASE_SBOM" --lock "$ROVIA_ENGINE_LOCK"
+          python3 tools/reproducibility/check-sbom.py "$ROVIA_RELEASE_SBOM"
+      - name: Create temporary keychain
+        env:
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          security create-keychain -p "$KEYCHAIN_PASSWORD" rovia-build.keychain
+          security default-keychain -s rovia-build.keychain
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" rovia-build.keychain
+          security set-keychain-settings -lut 21600 rovia-build.keychain
+      - name: Import distribution certificate
+        env:
+          CERT_BASE64: ${{ secrets.IOS_DIST_CERT_BASE64 }}
+          CERT_PASSWORD: ${{ secrets.IOS_DIST_CERT_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          printf '%s' "$CERT_BASE64" | base64 --decode > /tmp/rovia-dist.p12
+          security import /tmp/rovia-dist.p12 \
+            -k rovia-build.keychain \
+            -P "$CERT_PASSWORD" \
+            -T /usr/bin/codesign
+          security set-key-partition-list \
+            -S apple-tool:,apple: \
+            -s \
+            -k "$KEYCHAIN_PASSWORD" \
+            rovia-build.keychain
+      - name: Install provisioning profiles
+        env:
+          APP_PROFILE: ${{ secrets.IOS_APP_PROFILE_BASE64 }}
+          TUNNEL_PROFILE: ${{ secrets.IOS_TUNNEL_PROFILE_BASE64 }}
+        run: |
+          profiles="$HOME/Library/MobileDevice/Provisioning Profiles"
+          mkdir -p "$profiles"
+          printf '%s' "$APP_PROFILE" | base64 --decode > "$profiles/rovia-app.mobileprovision"
+          printf '%s' "$TUNNEL_PROFILE" | base64 --decode > "$profiles/rovia-tunnel.mobileprovision"
+          # An empty or truncated profile fails the archive step with an
+          # unrelated message, or worse, signs with whatever profile is left on
+          # the runner image. Fail here instead.
+          test -s "$profiles/rovia-app.mobileprovision"
+          test -s "$profiles/rovia-tunnel.mobileprovision"
+          security cms -D -i "$profiles/rovia-app.mobileprovision" >/dev/null
+          security cms -D -i "$profiles/rovia-tunnel.mobileprovision" >/dev/null
+      - name: Archive
+        run: |
+          xcodebuild \
+            -project client/app/ios/RoviaApp.xcodeproj \
+            -scheme RoviaApp \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$PWD/build/Rovia.xcarchive" \
+            archive
+      - name: Export IPA
+        run: |
+          mkdir -p "$PWD/build/export"
+          xcodebuild \
+            -exportArchive \
+            -archivePath "$PWD/build/Rovia.xcarchive" \
+            -exportOptionsPlist tools/release/ExportOptions.plist \
+            -exportPath "$PWD/build/export"
+      - name: Produce checksums and provenance manifest
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+          ROVIA_RUNNER_IDENTITY: ${{ github.run_id }}/${{ github.run_attempt }}/${{ github.job }}
+        run: |
+          shasum -a 256 "$ROVIA_RELEASE_ARTIFACT" | tee "$ROVIA_RELEASE_CHECKSUMS"
+          ./tools/reproducibility/manifest.sh \
+            --artifact "$ROVIA_RELEASE_ARTIFACT" \
+            --sbom "$ROVIA_RELEASE_SBOM" \
+            --tag "$RELEASE_TAG" \
+            --output "$ROVIA_RELEASE_MANIFEST"
+      - name: Verify every release input
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+          ROVIA_KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+          ROVIA_IOS_DIST_CERT_BASE64: ${{ secrets.IOS_DIST_CERT_BASE64 }}
+          ROVIA_IOS_DIST_CERT_PASSWORD: ${{ secrets.IOS_DIST_CERT_PASSWORD }}
+          ROVIA_IOS_APP_PROFILE_BASE64: ${{ secrets.IOS_APP_PROFILE_BASE64 }}
+          ROVIA_IOS_TUNNEL_PROFILE_BASE64: ${{ secrets.IOS_TUNNEL_PROFILE_BASE64 }}
+        run: |
+          ./tools/ci/verify-release-inputs.sh --tag "$RELEASE_TAG"
+      - name: Cleanup signing material
+        if: always()
+        run: |
+          rm -f /tmp/rovia-dist.p12
+          rm -f \
+            "$HOME/Library/MobileDevice/Provisioning Profiles/rovia-app.mobileprovision" \
+            "$HOME/Library/MobileDevice/Provisioning Profiles/rovia-tunnel.mobileprovision"
+          security delete-keychain rovia-build.keychain || true

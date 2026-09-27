@@ -1,0 +1,9 @@
+{
+  "apiVersion": 1,
+  "requestID": "control-routing-explain",
+  "ok": false,
+  "result": {
+    "state": "disconnected"
+  },
+  "error": "not-implemented"
+}
