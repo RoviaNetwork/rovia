@@ -39,6 +39,28 @@ sys.path.insert(0, str(REPO_ROOT / "tools/ci"))
 
 import script_test_support as gate  # noqa: E402
 
+def pyflakes_argv():
+    """The argv that runs the pinned pyflakes, the same way the lint gate does.
+
+    `tools/ci/check-python-lint.sh` resolves the linter through the interpreter when
+    `pyflakes` is importable and falls back to `uvx pyflakes==<pin>` otherwise, because
+    a GitHub-hosted macOS runner has no `uvx`: the first hosted CI run failed with
+    `FileNotFoundError: [Errno 2] No such file or directory: 'uvx'`, which is a linter
+    that could not run looking exactly like a clean tree.
+
+    Anything else in this module that shells out to the linter has to come through
+    here. A test called `uvx` directly and failed on the runner for the same reason the
+    gate did, one call site after the gate had been fixed - the lesson being that a
+    dependency fixed in one place is only fixed in one place.
+    """
+    probe = subprocess.run(
+        [sys.executable, "-c", "import pyflakes"], capture_output=True, text=True
+    )
+    if probe.returncode == 0:
+        return [sys.executable, "-m", "pyflakes"]
+    return ["uvx", f"pyflakes=={PYFLAKES_VERSION}"]
+
+
 def flat(text: str) -> str:
     """Collapse whitespace, so a phrase survives being wrapped by a formatter."""
     return re.sub(r"\s+", " ", text)
@@ -1167,10 +1189,13 @@ class DuplicateDefinitionTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             target = Path(directory) / "rebound.py"
             target.write_text(source, encoding="utf-8")
+            # The same resolution the lint gate uses: the interpreter when pyflakes is
+            # importable, `uvx` otherwise. Calling `uvx` here directly was the second
+            # run to fail on a GitHub-hosted macOS runner for the same reason as the
+            # gate did - a runner has no `uvx` - and this test shells out to the linter
+            # rather than through the gate, so fixing the gate alone left it broken.
             result = subprocess.run(
-                ["uvx", f"pyflakes=={PYFLAKES_VERSION}", str(target)],
-                capture_output=True,
-                text=True,
+                pyflakes_argv() + [str(target)], capture_output=True, text=True
             )
             self.assertEqual(
                 0, result.returncode, f"pyflakes did not run: {result.stderr.strip()[:300]}"
