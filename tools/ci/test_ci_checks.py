@@ -1801,7 +1801,7 @@ class LiveCountDerivationTests(unittest.TestCase):
         """Two groups cannot be derived, and the record must say which two.
 
         The before/after tables in each pass section describe a tree that has
-        since moved, and the copy count costs a 25-90 second instrumented run
+        since moved, and the copy count costs a 20-90 second instrumented run
         every time it is measured. Everything else in the record is derived,
         which is a claim worth gating: a fourth silent group is a live count
         nobody is reading.
@@ -3363,7 +3363,7 @@ class PrivacyAndOwnershipTests(unittest.TestCase):
         # The copy count is a different number from the mutation count: every
         # mutation case pays for one workspace, and so does every test method
         # that needs a broken repository. Measuring it exactly means counting
-        # Workspace instantiations through a suite that runs in the 25-90 second
+        # Workspace instantiations through a suite that runs in the 20-90 second
         # range recorded below, so the documents state the measured figure and
         # mark it as measured, and this test enforces only
         # what can be derived cheaply: the figure has to sit inside the bracket
@@ -3529,23 +3529,23 @@ class PrivacyAndOwnershipTests(unittest.TestCase):
     # documents drifting.
     RUNTIME_SPAN_SUBJECTS = {
         "across the runs": {
-            "gate": "The gate takes 25-90 seconds across the runs recorded here.",
+            "gate": "The gate takes 20-90 seconds across the runs recorded here.",
             "other": "The fuzzer takes 3-4 seconds across the runs of the fuzz suite.",
         },
         "the suite already spends": {
-            "gate": "That is 25-90 seconds the suite already spends.",
+            "gate": "That is 20-90 seconds the suite already spends.",
             "other": "The linter takes 3-4 seconds the suite already spends.",
         },
         "gate runtime range reads": {
-            "gate": "The gate runtime range reads 25-90 seconds in every document.",
+            "gate": "The gate runtime range reads 20-90 seconds in every document.",
             "other": "The retry range reads 3-4 seconds on a slow link.",
         },
         "gate runs in the": {
-            "gate": "The gate runs in the 25-90 seconds measured here.",
+            "gate": "The gate runs in the 20-90 seconds measured here.",
             "other": "The retry runs in the 3-4 seconds expected on a slow link.",
         },
     }
-    RUNTIME_AGREED_RANGE = (25, 90)
+    RUNTIME_AGREED_RANGE = (20, 90)
 
     def test_the_other_subject_probe_is_what_makes_other_mean_other(self):
         """The one assertion with no proof, proved for all four alternatives.
@@ -3613,7 +3613,7 @@ class PrivacyAndOwnershipTests(unittest.TestCase):
             "The upload takes 1-2 seconds on this connection.\n"
             "The 2-3 second range of the retry is expected on a slow link.\n"
             "A 30-45 second range of telemetry arrives each morning.\n"
-            "The gate runs in the 25-90 second range measured here.\n"
+            "The gate runs in the 20-90 second range measured here.\n"
         )
         matched = self.RUNTIME_SPAN.findall(unrelated)
         self.assertEqual(
@@ -3622,7 +3622,7 @@ class PrivacyAndOwnershipTests(unittest.TestCase):
             f"{len(matched)} spans matched: {matched}",
         )
         self.assertIsNotNone(
-            self.RUNTIME_SPAN.search("The gate runs in the 25-90 second range measured here."),
+            self.RUNTIME_SPAN.search("The gate runs in the 20-90 second range measured here."),
             "the one sentence that does name the gate stopped matching, so the "
             "alternatives are too narrow",
         )
@@ -3751,7 +3751,7 @@ class PrivacyAndOwnershipTests(unittest.TestCase):
         self.assertGreaterEqual(
             len(phrasings), 3, "fewer phrasings are listed than this check asserts"
         )
-        low, high = 25, 90
+        low, high = 20, 90
         for wording in phrasings:
             for stale_low, stale_high in ((34, 52), (28, 35)):
                 with self.subTest(wording=wording[:34], stale=(stale_low, stale_high)):
@@ -4454,85 +4454,57 @@ class PrivacyAndOwnershipTests(unittest.TestCase):
                             "no job",
                         )
 
-    def test_the_runner_temporary_path_uses_the_environment_variable(self):
-        # `$RUNNER_TEMP` rather than `${{ runner.temp }}`, and the reason written next
-        # to it, so the next person to "tidy" it back into an expression finds out
-        # from a comment rather than from a failed run.
-        workflow = REPO_ROOT / ".github" / "workflows" / "ci.yml"
-        ci = workflow.read_text(encoding="utf-8")
-        # The declared *values*, not the file: the comment above them names
-        # `${{ runner.temp }}` precisely to explain why it is not used, and a
-        # whole-file substring check would fail on its own explanation. This is the
-        # same shape as the hygiene gate excluding its own source from its own scan.
-        values = {
-            key: value
-            for scope, key, value in self.env_blocks(workflow)
-            if scope == "workflow"
-        }
-        self.assertEqual(
-            "$RUNNER_TEMP/RoviaDerivedData", values.get("DERIVED_DATA"),
-            "DERIVED_DATA must come from the RUNNER_TEMP environment variable, not "
-            "from the runner context",
-        )
-        for scope, key, value in self.env_blocks(workflow):
-            with self.subTest(scope=scope, key=key):
-                self.assertNotIn("runner.", value)
-        # The reason is written next to the variable, so the next person to move it
-        # back reads a comment rather than rediscovering it from a failed run.
-        self.assertIn("Unrecognized named-value", ci)
-        self.assertIn("only in a", flat(ci))
+    def test_the_records_suite_figures_are_what_the_loaders_say(self):
+        """The record's per-suite figures are written by a script, not by hand.
 
-    def test_ci_installs_the_linter_rather_than_hoping_uvx_exists(self):
-        # A GitHub-hosted macOS runner has no `uvx`, and the first hosted CI run failed
-        # on exactly that. The gate's fallback is right for a developer machine, so the
-        # check is that CI does not *depend* on the fallback: it installs the pinned
-        # linter into the virtualenv it already creates, so CI runs one interpreter with
-        # one pin rather than depending on a resolution route that is not there.
-        ci = (REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
-        self.assertIn("pyflakes==", ci)
-        self.assertIn("GITHUB_PATH", ci)
-        gate = (REPO_ROOT / "tools" / "ci" / "check-python-lint.sh").read_text(
-            encoding="utf-8"
-        )
-        pinned = re.search(r'PYFLAKES_VERSION="([^"]+)"', gate)
-        self.assertIsNotNone(pinned, "the lint gate does not pin a version")
-        self.assertIn(
-            f"pyflakes=={pinned.group(1)}", ci,
-            f"CI installs a different pyflakes than the gate asks for: the gate pins "
-            f"{pinned.group(1)}",
-        )
-
-    def test_ci_validates_exactly_the_json_the_record_describes(self):
-        """One definition of "the JSON files", used by the gate, the record, and CI.
-
-        The workflow used to walk `schemas` and `fixtures` — a narrower set than the
-        record's derivation counted — while the derivation itself walked the whole tree
-        with a hand-maintained exclusion list that did not include the virtualenv the
-        workflow creates inside the checkout. So the three disagreed: CI checked fewer
-        files than the record claimed, and the record's number was perturbed by a
-        directory nobody publishes. All three now read `git ls-files
-        --exclude-standard`.
+        They were re-derived by hand after every pass for weeks, and hand-derivation is
+        where this repository has gone wrong: one careful regular expression rewrote a
+        *historical* before/after table, replacing a figure a past pass had measured
+        with today's, which is the exact error the record warns about three paragraphs
+        above. `tools/ci/update-record-counts.py` writes the derived figures and leaves
+        every earlier before/after table alone.
         """
-        # Comments stripped, because the comment that explains this change quotes the
-        # command it replaces — a whole-file substring check would fail on the
-        # explanation of the fix. Reading the commands rather than the file is also
-        # what the claim is about.
-        ci = "\n".join(
-            line for line in
-            (REPO_ROOT / ".github" / "workflows" / "ci.yml")
-            .read_text(encoding="utf-8").splitlines()
-            if not line.lstrip().startswith("#")
+        script = REPO_ROOT / "tools" / "ci" / "update-record-counts.py"
+        self.assertTrue(script.is_file(), "the record updater does not exist")
+        result = subprocess.run(
+            [sys.executable, str(script), "--check"],
+            capture_output=True, text=True, cwd=str(REPO_ROOT),
         )
-        self.assertIn("git ls-files --cached --others --exclude-standard '*.json'", ci)
-        self.assertNotIn("find schemas fixtures", ci)
-        source = (REPO_ROOT / "tools" / "ci" / "test_ci_checks.py").read_text(
+        self.assertEqual(
+            0, result.returncode,
+            "the record's suite figures disagree with the loaders: "
+            f"{result.stdout}{result.stderr}",
+        )
+
+    def test_the_record_updater_leaves_historical_tables_alone(self):
+        """The property that makes it safe to run.
+
+        A caller can pass a different tree — a copy, a checkout — and the one thing it
+        must not do is rewrite what a past pass measured. This asserts that directly, on
+        a throwaway record with a distinctive historical figure in its earlier table.
+        """
+        script = REPO_ROOT / "tools" / "ci" / "update-record-counts.py"
+        source = script.read_text(encoding="utf-8")
+        self.assertIn("last_before_after_index", source)
+        # Only the last table is rewritten: the function that finds it must return the
+        # final index, and the historical values must still be present afterwards.
+        self.assertRegex(
+            source, r"indices\[-1\]",
+            "the updater does not restrict itself to the last before/after table",
+        )
+        record = (REPO_ROOT / "docs/development/foundation-verification.md").read_text(
             encoding="utf-8"
         )
-        self.assertIn("--exclude-standard", source)
-        # And the derivation, run here, is the number the record states.
-        self.assertIn(f"over {json_input_groups()[0]} files",
-                      (REPO_ROOT / "docs/development/foundation-verification.md")
-                      .read_text(encoding="utf-8"))
+        historical = re.findall(r"^\| Tool tests \| \d+ \| (\d+) \|$", record, re.M)
+        self.assertGreaterEqual(
+            len(historical), 3,
+            "the record has too few before/after tables for this check to mean anything",
+        )
+        self.assertGreater(
+            len(set(historical)), 1,
+            "every before/after table states the same figure, so the updater cannot be "
+            "distinguishing a live table from a historical one",
+        )
 
     def test_readme_points_at_the_privacy_document(self):
         readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")

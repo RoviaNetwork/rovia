@@ -15,18 +15,6 @@ concurrency:
 
 env:
   ROVIA_ENGINE_LOCK: engines.lock.json
-  # $RUNNER_TEMP, not ${{ runner.temp }}. GitHub sets RUNNER_TEMP as a real
-  # environment variable for every step, and it is the only one of the two that
-  # survives being read from an `env:` block: the `runner` *context* is not
-  # available in a workflow-level `env` or a job-level `env` at all, only in a
-  # step's `env` and inside `run`. Both levels were tried here and both made
-  # GitHub reject the file with "Unrecognized named-value: 'runner'", which is a
-  # 0-second run with no job created.
-  #
-  # The path is outside the checkout on purpose: a derived-data path inside the
-  # repository makes the XCTest runner time out before running a single test,
-  # because the runner process is not granted access to the protected directory.
-  DERIVED_DATA: $RUNNER_TEMP/RoviaDerivedData
   # Must match CFBundleShortVersionString in client/app/ios/RoviaApp/Info.plist.
   # tools/ci/test_ci_checks.py fails if the two drift apart.
   ROVIA_MARKETING_VERSION: 0.1.0
@@ -38,6 +26,24 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      # The derived-data directory, computed in a shell and exported to later steps.
+      #
+      # Two failures got here, and both were invisible locally. `${{ runner.temp }}` in
+      # an `env:` block is rejected outright - the runner context is not available
+      # there - and `$RUNNER_TEMP` in an `env:` block is not expanded at all: GitHub
+      # interpolates `${{ }}`, not shell variables, so the value arrived as the literal
+      # string and xcodebuild resolved it against the working directory, producing
+      # `/Users/runner/work/rovia/rovia/Users/runner/work/_temp/...`. The path has to
+      # come out of a shell, which is what this step is.
+      #
+      # It is outside the checkout on purpose: a derived-data path inside the repository
+      # makes the XCTest runner time out before running a single test.
+      - name: Choose a derived-data directory outside the checkout
+        run: |
+          derived="$RUNNER_TEMP/RoviaDerivedData"
+          mkdir -p "$derived"
+          echo "DERIVED_DATA=$derived" >> "$GITHUB_ENV"
+          echo "DERIVED_DATA=$derived"
       - name: Show toolchain
         run: |
           sw_vers
@@ -58,12 +64,17 @@ jobs:
             check-jsonschema==0.38.2 \
             pyflakes==3.2.0
           echo "$PWD/.ci-schema-validator/bin" >> "$GITHUB_PATH"
+      # One place that shows what the later steps will actually use. Each line is an
+      # assertion, not a banner: a runner whose `python3` is not the pinned virtualenv's
+      # would otherwise fail much later, in a gate, with a message about pyflakes.
       - name: Show the resolved toolchain
         run: |
-          which python3
+          echo "python3: $(which python3)"
           python3 --version
           python3 -m pyflakes --version
           python3 -c 'import check_jsonschema; print("check-jsonschema importable")'
+          echo "DERIVED_DATA=$DERIVED_DATA"
+          test -d "$DERIVED_DATA"
       - name: Verify repository inputs
         run: |
           ./tools/ci/verify-lockfiles.sh
