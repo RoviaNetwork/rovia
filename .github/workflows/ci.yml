@@ -15,11 +15,6 @@ concurrency:
 
 env:
   ROVIA_ENGINE_LOCK: engines.lock.json
-  # Derived data deliberately lives outside the checkout. On a developer machine
-  # a derived-data path inside the repository makes the XCTest runner time out
-  # before running a single test, because the runner process is not granted
-  # access to the protected Desktop directory. Keep this outside the workspace.
-  DERIVED_DATA: ${{ runner.temp }}/RoviaDerivedData
   # Must match CFBundleShortVersionString in client/app/ios/RoviaApp/Info.plist.
   # tools/ci/test_ci_checks.py fails if the two drift apart.
   ROVIA_MARKETING_VERSION: 0.1.0
@@ -28,6 +23,18 @@ jobs:
   swift-tests:
     runs-on: macos-15
     timeout-minutes: 45
+    # DERIVED_DATA lives here and not in the workflow-level `env` above, because
+    # `runner` is not one of the contexts a workflow-level `env` may use — only
+    # `github`, `inputs`, and `vars` are. Putting `${{ runner.temp }}` up there
+    # made GitHub reject the file with "Unrecognized named-value: 'runner'" and
+    # the run failed before creating a job, which is why it surfaced here and not
+    # in any local check. `tools/ci/test_ci_checks.py` now holds the rule.
+    #
+    # The path is outside the checkout on purpose: a derived-data path inside the
+    # repository makes the XCTest runner time out before running a single test,
+    # because the runner process is not granted access to the protected directory.
+    env:
+      DERIVED_DATA: ${{ runner.temp }}/RoviaDerivedData
     steps:
       - name: Checkout
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683

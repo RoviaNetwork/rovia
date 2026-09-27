@@ -89,14 +89,14 @@ Apple silicon or on a hosted runner.
 ### Python tool tests
 
 `./tools/ci/run-tool-tests.sh` ran every `tools/**/test_*.py` as its own
-process: **10 files, 609 tests, 0 failures**.
+process: **10 files, 611 tests, 0 failures**.
 
 | Test file | Tests | Seconds |
 | --- | --- | --- |
 | `tools/ci/test_app_dependencies.py` | 27 | 31.13 |
 | `tools/ci/test_audit_accessibility_identifiers.py` | 58 | 2.09 |
 | `tools/ci/test_check_repository_hygiene.py` | 26 | 6.38 |
-| `tools/ci/test_ci_checks.py` | 181 | 17.23 |
+| `tools/ci/test_ci_checks.py` | 183 | 17.23 |
 | `tools/ci/test_validate_schemas.py` | 61 | 122.99 |
 | `tools/ci/test_verify_engine_checksums.py` | 38 | 4.20 |
 | `tools/ci/test_verify_lockfiles.py` | 29 | 5.67 |
@@ -609,7 +609,7 @@ returns 1.
 
 | Thing | Before | After |
 | --- | --- | --- |
-| Tool tests | 358 | 361 |
+| Tool tests | 364 | 611 |
 | Mutations | 43 | 45 |
 | Leak channels | 5 | 9 |
 | Hard-coded object identifiers in the gate | 1 | 0 |
@@ -758,7 +758,7 @@ title to be followed by an absence rather than a pass.
 
 | Thing | Before | After |
 | --- | --- | --- |
-| Tool tests | 364 | 609 |
+| Tool tests | 364 | 611 |
 | Security-sensitive paths listed | 14, one of them nonexistent | 19, all existing |
 | Ownership directions checked | 1 | 3 |
 | Engine license declared per candidate | none, defaulted to MIT | required, derived, and cross-checked |
