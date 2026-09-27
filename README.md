@@ -291,8 +291,12 @@ The short version:
 New code is MIT-provisional, which does **not** mean every binary would be MIT. If a
 build ever ships GPL-covered sing-box, the distribution model has to change and the
 project needs legal review first — an official client, or a successful iOS build, is
-not a licence grant. See [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) and
-[ADR-0004](docs/adr/0004-engine-licensing.md).
+not a licence grant.
+
+[`docs/legal/licensing.md`](docs/legal/licensing.md) states the boundary of the grant,
+[`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) records each engine candidate's
+status, and [ADR-0004](docs/adr/0004-engine-licensing.md) records the decision. None
+of it is legal advice.
 
 ## Verification
 
