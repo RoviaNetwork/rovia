@@ -44,7 +44,7 @@ evaluator, 20 give a raw trace somewhere to live, and 2 are contract deletions.
 The 7 shapes must *not* be flagged, and they are not part of the 47: they are the
 cases the check has to leave alone, because a gate that cries wolf is a gate
 people turn off. The suite copies the tree 69 times, which is most of its
-28–52 seconds across the runs recorded in this repository's verification record, which is a measurement on one x86_64 Mac and not a bound. That figure is measured by counting `Workspace` instantiations, one per copy,
+25–90 seconds across the runs recorded in this repository's verification record, which is a measurement on one x86_64 Mac and not a bound. That figure is measured by counting `Workspace` instantiations, one per copy,
 not by counting `shutil.copytree` calls, which recurse; the test enforces only the
 bracket the mutation and test counts imply.
 

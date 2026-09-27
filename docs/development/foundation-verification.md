@@ -24,7 +24,7 @@ Two groups cannot be derived and are exempt:
    a tree that has since moved, so no derivation can recover them. A test requires
    each such table to sit under a pass heading so its numbers are read as history.
 2. **The instrumented copy count.** It is 69, and it is measured by instrumenting
-   the suite's `Workspace` construction. Measuring it costs the 28-52 seconds the
+   the suite's `Workspace` construction. Measuring it costs the 25-90 seconds the
    suite already spends, so a test enforces a derived bracket instead of the
    figure.
 
@@ -89,20 +89,20 @@ Apple silicon or on a hosted runner.
 ### Python tool tests
 
 `./tools/ci/run-tool-tests.sh` ran every `tools/**/test_*.py` as its own
-process: **10 files, 611 tests, 0 failures**.
+process: **10 files, 613 tests, 0 failures**.
 
 | Test file | Tests | Seconds |
 | --- | --- | --- |
-| `tools/ci/test_app_dependencies.py` | 27 | 31.13 |
-| `tools/ci/test_audit_accessibility_identifiers.py` | 58 | 2.09 |
-| `tools/ci/test_check_repository_hygiene.py` | 26 | 6.38 |
-| `tools/ci/test_ci_checks.py` | 183 | 17.23 |
-| `tools/ci/test_validate_schemas.py` | 61 | 122.99 |
-| `tools/ci/test_verify_engine_checksums.py` | 38 | 4.20 |
-| `tools/ci/test_verify_lockfiles.py` | 29 | 5.67 |
-| `tools/ci/test_verify_release_inputs.py` | 99 | 104.44 |
-| `tools/reproducibility/test_generate_sbom.py` | 63 | 11.43 |
-| `tools/reproducibility/test_manifest.py` | 27 | 13.42 |
+| `tools/ci/test_app_dependencies.py` | 27 |
+| `tools/ci/test_audit_accessibility_identifiers.py` | 58 |
+| `tools/ci/test_check_repository_hygiene.py` | 26 |
+| `tools/ci/test_ci_checks.py` | 185 |
+| `tools/ci/test_validate_schemas.py` | 61 |
+| `tools/ci/test_verify_engine_checksums.py` | 38 |
+| `tools/ci/test_verify_lockfiles.py` | 29 |
+| `tools/ci/test_verify_release_inputs.py` | 99 |
+| `tools/reproducibility/test_generate_sbom.py` | 63 |
+| `tools/reproducibility/test_manifest.py` | 27 |
 
 `tools/ci/test_app_dependencies.py` is the gate on the iOS app's dependency on
 the canonical domain packages, and it is written as a mutation suite. The Xcode
@@ -279,7 +279,7 @@ the bundle launches. Neither is evidence of a tunnel.
 
 | Check | Result |
 | --- | --- |
-| `pyyaml` 6.0.2 over `.github/workflows/*.yml` | all three parse: `ci.yml` 1 job / 15 steps, `engine-repro.yml` 1 job / 6 steps, `release-ios.yml` 1 job / 17 steps; every one declares `permissions: contents: read` |
+| `pyyaml` 6.0.2 over `.github/workflows/*.yml` | all three parse: `ci.yml` 1 job / 16 steps, `engine-repro.yml` 1 job / 6 steps, `release-ios.yml` 1 job / 17 steps; every one declares `permissions: contents: read` |
 | `./tools/ci/check-python-lint.sh` | `3.2.0 Python 3.14.4 on Darwin, 14 files`, `no findings`; invoked by `run-tool-tests.sh`, followed by the warnings gate |
 | `./tools/ci/check-python-warnings.sh` | `Python 3.14.7, 14 files, warnings are errors`, `no warnings`; the last step of `run-tool-tests.sh` |
 | `bash -n` over every script in the tree | the same script count as the shell-syntax gate above, no syntax error |
@@ -437,7 +437,7 @@ cases that look like a violation and must not be flagged, and they are not part 
 the 47: adding one makes the gate no stricter. Each mutation is applied to a
 temporary copy of the repository and the matching check must fail. The suite runs
 27 tests and makes 69 copies of the tree. That figure is **measured**, by
-counting `Workspace` instantiations — one per copy — rather than counting `shutil.copytree` calls, which recurse: the same run makes 6486 `copytree` calls and 69 outermost ones, and quoting the unqualified number would be wrong by two orders of magnitude. Measuring it costs the 28–52 seconds across the runs recorded in this repository's verification record, which is a measurement on one x86_64 Mac and not a bound. The width of that range is machine load, not the gate:
+counting `Workspace` instantiations — one per copy — rather than counting `shutil.copytree` calls, which recurse: the same run makes 6486 `copytree` calls and 69 outermost ones, and quoting the unqualified number would be wrong by two orders of magnitude. Measuring it costs the 25–90 seconds across the runs recorded in this repository's verification record, which is a measurement on one x86_64 Mac and not a bound. The width of that range is machine load and the number of mutation cases, not a property of the gate: the suite copies the tree once per case, so adding cases adds time, and a loaded machine stretches the rest. The observation in the table above sits inside it:
 `test_app_dependencies.py` ran its 27 tests in 27.6s on an idle machine and in
 51.6s while the machine reported a load average of 37, with no code change between
 the two. The seconds column therefore records the run this entry describes, and a
@@ -758,7 +758,7 @@ title to be followed by an absence rather than a pass.
 
 | Thing | Before | After |
 | --- | --- | --- |
-| Tool tests | 364 | 611 |
+| Tool tests | 364 | 613 |
 | Security-sensitive paths listed | 14, one of them nonexistent | 19, all existing |
 | Ownership directions checked | 1 | 3 |
 | Engine license declared per candidate | none, defaulted to MIT | required, derived, and cross-checked |
@@ -1053,7 +1053,7 @@ Each of these was a claim in this document that had stopped being true:
   recurses: that instrument yields 6486 calls for 69 copies. The figure counts
   `Workspace` instantiations — 69, matching the outermost `copytree` calls — and
   the documents now say so. A derived bracket of 54 to 81 is what a test enforces,
-  because measuring the number costs the 28–52 seconds the suite already spends.
+  because measuring the number costs the 25–90 seconds the suite already spends.
 - The overclaim blocklist covered seven documents before the fourth pass and five
   after it, because `README.md` and `SECURITY.md` were dropped — two documents, not
   one. The prose had been left describing the pre-pass count, and the before/after
@@ -1062,7 +1062,7 @@ Each of these was a claim in this document that had stopped being true:
   where they describe the current state, and a test reads the prose and the row
   and requires them to agree.
 - The gate runtime was 31 seconds in two documents and 28 in the third. All three
-  now state 28–52 seconds across recorded runs, labelled a measurement on one
+  now state 25–90 seconds across recorded runs, labelled a measurement on one
   x86_64 Mac and not a bound, and the record's own seconds column for that suite is
   required to fall inside the stated range.
 - "Ten gates" and the record's own nine-item list were not the same length. They
@@ -1135,7 +1135,7 @@ pins `cwd` and the second passes `-C`; a test runs every test in the module from
 outside the repository and requires it to pass, and checks the nested run's own
 count against the module so the claim cannot narrow back to a class.
 
-The gate runtime range reads 28-52 seconds in every document that states it. A
+The gate runtime range reads 25-90 seconds in every document that states it. A
 stale 28-34 survived wherever the consistency check's required phrase was
 absent, because the check only looked at the sentences that carried it; the check now collects
 every runtime span in the three documents whatever phrase introduces it, and a test

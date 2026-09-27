@@ -60,7 +60,7 @@ and adding one makes the gate no stricter. `test_app_dependencies.py` runs 27
 tests and copies the
 tree 69 times, because each test that needs a broken repository pays for one copy
 and the mutation cases pay for one each. That figure is **measured**, not derived:
-it comes from counting `Workspace` instantiations — one per copy — rather than counting `shutil.copytree` calls, which recurse: the same run makes 6486 `copytree` calls and 69 outermost ones, and quoting the unqualified number would be wrong by two orders of magnitude, and measuring it costs the 28–52 seconds across the runs recorded in this repository's verification record, which is a measurement on one x86_64 Mac and not a bound, so
+it comes from counting `Workspace` instantiations — one per copy — rather than counting `shutil.copytree` calls, which recurse: the same run makes 6486 `copytree` calls and 69 outermost ones, and quoting the unqualified number would be wrong by two orders of magnitude, and measuring it costs the 25–90 seconds across the runs recorded in this repository's verification record, which is a measurement on one x86_64 Mac and not a bound, so
 `tools/ci/test_ci_checks.py` enforces only the bracket the mutation and test
 counts imply — 54 copies at the low end, 81 at the high — and not the number
 itself. A check with no mutation is an assertion

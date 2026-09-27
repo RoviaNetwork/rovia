@@ -83,10 +83,40 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if ! command -v uvx >/dev/null 2>&1; then
-  printf '%s\n' "check-python-lint: uvx is not on PATH, so the pinned pyflakes cannot be resolved" >&2
+# How the linter is resolved, and why there are two ways.
+#
+# `uvx` was the only route, and it is not present on a GitHub-hosted macOS runner: the
+# first hosted CI run failed with `FileNotFoundError: [Errno 2] No such file or
+# directory: 'uvx'`, which is a linter that could not run being indistinguishable from a
+# clean tree by anything but the exit status. A developer machine usually has uv; a
+# CI runner usually has a virtualenv with pinned packages. So the gate takes whichever
+# can actually produce the pinned version, states which one it used, and refuses if
+# neither can.
+#
+# Order matters for reproducibility rather than convenience: an importable `pyflakes`
+# is preferred, because CI already creates a pinned virtualenv for the schema
+# validator and adding pyflakes to it keeps the lint run on one interpreter with one
+# pinned version. `uvx` remains the fallback so a developer with no virtualenv still
+# gets the same gate.
+if python3 -c "import pyflakes" >/dev/null 2>&1; then
+  lint_runner="module"
+elif command -v uvx >/dev/null 2>&1; then
+  lint_runner="uvx"
+else
+  printf '%s\n' "check-python-lint: no pyflakes available: python3 cannot import it" >&2
+  printf '%s\n' "check-python-lint:   and uvx is not on PATH to fetch pyflakes==${PYFLAKES_VERSION}" >&2
   printf '%s\n' "check-python-lint: refusing to report success from a linter that did not run" >&2
   exit 1
+fi
+
+# One function, defined once, so the version probe and the per-file run cannot disagree
+# about which linter is being used. `module` runs the interpreter's own import, which
+# is the path CI takes once pyflakes is in its pinned virtualenv; `uvx` resolves and
+# pins the exact version, which is what a developer with no virtualenv gets.
+if [[ "$lint_runner" = "module" ]]; then
+  lint_resolve() { python3 -m pyflakes "$@"; }
+else
+  lint_resolve() { uvx "pyflakes==${PYFLAKES_VERSION}" "$@"; }
 fi
 
 # A while-read loop rather than mapfile: the macOS default bash is 3.2, which has
@@ -106,7 +136,7 @@ fi
 
 # --version is asked for first so that a linter which resolved but produced no
 # findings is distinguishable from one that never ran.
-version_line="$(uvx "pyflakes==${PYFLAKES_VERSION}" --version 2>&1)" || {
+version_line="$(lint_resolve --version 2>&1)" || {
   printf '%s\n' "check-python-lint: could not run pyflakes==${PYFLAKES_VERSION}:" >&2
   printf '%s\n' "$version_line" >&2
   exit 1
@@ -116,11 +146,11 @@ if ! printf '%s' "$version_line" | grep -q "${PYFLAKES_VERSION}"; then
   exit 1
 fi
 
-printf '%s\n' "check-python-lint: $version_line, ${#files[@]} files"
+printf '%s\n' "check-python-lint: $version_line via $lint_runner, ${#files[@]} files"
 
 findings=0
 for file in "${files[@]}"; do
-  if ! output="$(uvx "pyflakes==${PYFLAKES_VERSION}" "$file" 2>&1)"; then
+  if ! output="$(lint_resolve "$file" 2>&1)"; then
     printf '%s\n' "$output" >&2
     findings=$((findings + 1))
   fi

@@ -43,11 +43,27 @@ jobs:
           sw_vers
           xcodebuild -version
           swift --version
+      # pyflakes is installed into the same virtualenv, exactly pinned, so the lint
+      # gate resolves through the interpreter rather than through `uvx`. A GitHub-hosted
+      # macOS runner has no `uvx`: the first hosted run failed with `FileNotFoundError:
+      # [Errno 2] No such file or directory: 'uvx'`, which is a linter that could not run
+      # being reported as a clean tree by anything but the exit status. `uvx` remains
+      # the gate's fallback for a developer with no virtualenv, and the gate states
+      # which route it used. Putting the venv's bin on PATH is what makes `python3`
+      # resolve to the pinned interpreter for every later step.
       - name: Install pinned Python tooling
         run: |
           python3 -m venv .ci-schema-validator
-          .ci-schema-validator/bin/python -m pip install --disable-pip-version-check check-jsonschema==0.38.2
+          .ci-schema-validator/bin/python -m pip install --disable-pip-version-check \
+            check-jsonschema==0.38.2 \
+            pyflakes==3.2.0
           echo "$PWD/.ci-schema-validator/bin" >> "$GITHUB_PATH"
+      - name: Show the resolved toolchain
+        run: |
+          which python3
+          python3 --version
+          python3 -m pyflakes --version
+          python3 -c 'import check_jsonschema; print("check-jsonschema importable")'
       - name: Verify repository inputs
         run: |
           ./tools/ci/verify-lockfiles.sh

@@ -1755,7 +1755,7 @@ class LiveCountDerivationTests(unittest.TestCase):
         """Two groups cannot be derived, and the record must say which two.
 
         The before/after tables in each pass section describe a tree that has
-        since moved, and the copy count costs a 28-52 second instrumented run
+        since moved, and the copy count costs a 25-90 second instrumented run
         every time it is measured. Everything else in the record is derived,
         which is a claim worth gating: a fourth silent group is a live count
         nobody is reading.
@@ -3317,7 +3317,7 @@ class PrivacyAndOwnershipTests(unittest.TestCase):
         # The copy count is a different number from the mutation count: every
         # mutation case pays for one workspace, and so does every test method
         # that needs a broken repository. Measuring it exactly means counting
-        # Workspace instantiations through a suite that runs in the 28-52 second
+        # Workspace instantiations through a suite that runs in the 25-90 second
         # range recorded below, so the documents state the measured figure and
         # mark it as measured, and this test enforces only
         # what can be derived cheaply: the figure has to sit inside the bracket
@@ -3483,23 +3483,23 @@ class PrivacyAndOwnershipTests(unittest.TestCase):
     # documents drifting.
     RUNTIME_SPAN_SUBJECTS = {
         "across the runs": {
-            "gate": "The gate takes 28-52 seconds across the runs recorded here.",
+            "gate": "The gate takes 25-90 seconds across the runs recorded here.",
             "other": "The fuzzer takes 3-4 seconds across the runs of the fuzz suite.",
         },
         "the suite already spends": {
-            "gate": "That is 28-52 seconds the suite already spends.",
+            "gate": "That is 25-90 seconds the suite already spends.",
             "other": "The linter takes 3-4 seconds the suite already spends.",
         },
         "gate runtime range reads": {
-            "gate": "The gate runtime range reads 28-52 seconds in every document.",
+            "gate": "The gate runtime range reads 25-90 seconds in every document.",
             "other": "The retry range reads 3-4 seconds on a slow link.",
         },
         "gate runs in the": {
-            "gate": "The gate runs in the 28-52 seconds measured here.",
+            "gate": "The gate runs in the 25-90 seconds measured here.",
             "other": "The retry runs in the 3-4 seconds expected on a slow link.",
         },
     }
-    RUNTIME_AGREED_RANGE = (28, 52)
+    RUNTIME_AGREED_RANGE = (25, 90)
 
     def test_the_other_subject_probe_is_what_makes_other_mean_other(self):
         """The one assertion with no proof, proved for all four alternatives.
@@ -3567,7 +3567,7 @@ class PrivacyAndOwnershipTests(unittest.TestCase):
             "The upload takes 1-2 seconds on this connection.\n"
             "The 2-3 second range of the retry is expected on a slow link.\n"
             "A 30-45 second range of telemetry arrives each morning.\n"
-            "The gate runs in the 28-52 second range measured here.\n"
+            "The gate runs in the 25-90 second range measured here.\n"
         )
         matched = self.RUNTIME_SPAN.findall(unrelated)
         self.assertEqual(
@@ -3576,7 +3576,7 @@ class PrivacyAndOwnershipTests(unittest.TestCase):
             f"{len(matched)} spans matched: {matched}",
         )
         self.assertIsNotNone(
-            self.RUNTIME_SPAN.search("The gate runs in the 28-52 second range measured here."),
+            self.RUNTIME_SPAN.search("The gate runs in the 25-90 second range measured here."),
             "the one sentence that does name the gate stopped matching, so the "
             "alternatives are too narrow",
         )
@@ -3705,7 +3705,7 @@ class PrivacyAndOwnershipTests(unittest.TestCase):
         self.assertGreaterEqual(
             len(phrasings), 3, "fewer phrasings are listed than this check asserts"
         )
-        low, high = 28, 52
+        low, high = 25, 90
         for wording in phrasings:
             for stale_low, stale_high in ((34, 52), (28, 35)):
                 with self.subTest(wording=wording[:34], stale=(stale_low, stale_high)):
@@ -4436,6 +4436,26 @@ class PrivacyAndOwnershipTests(unittest.TestCase):
         self.assertIn("Unrecognized named-value", ci)
         self.assertIn("only in a", flat(ci))
 
+    def test_ci_installs_the_linter_rather_than_hoping_uvx_exists(self):
+        # A GitHub-hosted macOS runner has no `uvx`, and the first hosted CI run failed
+        # on exactly that. The gate's fallback is right for a developer machine, so the
+        # check is that CI does not *depend* on the fallback: it installs the pinned
+        # linter into the virtualenv it already creates, so CI runs one interpreter with
+        # one pin rather than depending on a resolution route that is not there.
+        ci = (REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+        self.assertIn("pyflakes==", ci)
+        self.assertIn("GITHUB_PATH", ci)
+        gate = (REPO_ROOT / "tools" / "ci" / "check-python-lint.sh").read_text(
+            encoding="utf-8"
+        )
+        pinned = re.search(r'PYFLAKES_VERSION="([^"]+)"', gate)
+        self.assertIsNotNone(pinned, "the lint gate does not pin a version")
+        self.assertIn(
+            f"pyflakes=={pinned.group(1)}", ci,
+            f"CI installs a different pyflakes than the gate asks for: the gate pins "
+            f"{pinned.group(1)}",
+        )
+
     def test_readme_points_at_the_privacy_document(self):
         readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
         self.assertIn("PRIVACY.md", readme)
@@ -4658,9 +4678,22 @@ class PrivacyAndOwnershipTests(unittest.TestCase):
             "the record says docs/superpowers is gitignored, and it is not — the "
             "plans would be published with unticked checkboxes for finished work",
         )
-        # And the unticked checkboxes are the stated reason for the second one.
+        # The unticked checkboxes are the record's other stated reason for excluding
+        # `docs/superpowers`, and that check is conditional on the plans being here.
+        #
+        # `docs/superpowers` is gitignored, so a fresh clone does not have it — the same
+        # correction as the ledger above. The unticked count is verified where it is
+        # verifiable, and the ignore status, which is verifiable everywhere, is verified
+        # always. Both are needed: dropping the conditional fails every contributor, and
+        # dropping the ignore check lets the plans be published unticked.
         plans = sorted((REPO_ROOT / "docs/superpowers").rglob("*.md"))
-        self.assertTrue(plans, "docs/superpowers has no plan files")
+        if not plans:
+            self.assertTrue(
+                status["docs/superpowers"],
+                "docs/superpowers has no plan files and is not gitignored, so they "
+                "would be published with unticked checkboxes for finished work",
+            )
+            return
         unticked = sum(
             len(re.findall(r"(?m)^- \[ \]", plan.read_text(encoding="utf-8")))
             for plan in plans
@@ -4887,16 +4920,42 @@ class PrivacyAndOwnershipTests(unittest.TestCase):
         return occurrences
 
     def lint_count_documents(self):
-        ledger = REPO_ROOT / ".superpowers/sdd/2026-09-24-rovia-hardening"
-        return {
-            "progress.md": (ledger / "progress.md").read_text(encoding="utf-8"),
-            "task-7-report.md": (ledger / "task-7-report.md").read_text(
-                encoding="utf-8"
-            ),
+        """Every document that states how many tests hold the lint gate.
+
+        The local task ledger is read when it is there and skipped when it is not, and
+        that is a correction rather than a convenience. The ledger lives under
+        `.superpowers/`, which is gitignored because it is the development harness's own
+        output rather than project documentation, so it is absent from every fresh clone
+        — and reading it unconditionally made this test fail for any contributor and for
+        the first hosted CI run, with
+        `FileNotFoundError: … /.superpowers/sdd/2026-09-24-rovia-hardening/progress.md`.
+        A test that only passes on the machine that wrote it is a test about that machine.
+
+        The document that is published is required, and the asymmetry is the point: a
+        stale count in `ci.md` is a claim a reader is shown, and a stale count in a
+        gitignored ledger is shown to nobody.
+        """
+        documents = {
             "docs/development/ci.md": (REPO_ROOT / "docs/development/ci.md").read_text(
                 encoding="utf-8"
             ),
         }
+        ledger = REPO_ROOT / ".superpowers/sdd/2026-09-24-rovia-hardening"
+        for name in ("progress.md", "task-7-report.md"):
+            path = ledger / name
+            if path.is_file():
+                documents[name] = path.read_text(encoding="utf-8")
+        return documents
+
+    def test_the_published_lint_count_document_is_required(self):
+        # The companion to the skip above, so the skip cannot quietly become the only
+        # behaviour: if `ci.md` stopped existing, "no document disagrees" would be
+        # vacuously true.
+        self.assertIn("docs/development/ci.md", self.lint_count_documents())
+        self.assertTrue(
+            (REPO_ROOT / "docs/development/ci.md").is_file(),
+            "the published document stating the lint-gate count is missing",
+        )
 
     def test_the_documented_lint_test_count_matches_the_gate_class(self):
         holding = self.lint_gate_tests()
