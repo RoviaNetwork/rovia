@@ -96,9 +96,8 @@ are both failures.
 
 ### This list does not enforce a review
 
-An active ruleset on `main` requires a pull request, forbids deletion and
-An active ruleset on `main` requires a pull request, forbids deletion and
-force-push, and permits only a squash merge
+An active ruleset on `main` requires a pull request,
+forbids deletion and force-push, and permits only a squash merge
 (<https://github.com/princeofscale/rovia/rules/24096965>). **It does not require a
 review, and that is a decision rather than an oversight.** The only account with
 write access is the repository owner, and GitHub does not count the author's own

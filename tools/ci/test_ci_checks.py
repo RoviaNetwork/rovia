@@ -4367,25 +4367,56 @@ class PrivacyAndOwnershipTests(unittest.TestCase):
                 # review and a requirement must also carry a negation, a hypothetical,
                 # or an explicit statement of intent - otherwise it asserts a review
                 # that does not exist.
-                # Split per source line before splitting on sentence punctuation, and
-                # not the other way round. `flat()` collapses newlines, so a markdown
-                # heading - which carries no terminating full stop - would be glued to
-                # the sentence after it, and the negation in the heading would mask a
-                # contradiction in the body. That was a real miss: appending "A review
-                # is required before merging to main." directly under a heading that
-                # says the list "does not enforce a review" passed this check. Line
-                # structure is a stronger boundary than punctuation here.
+                # Split into blocks, then into sentences. `flat()` collapses newlines,
+                # so a markdown heading - which carries no terminating full stop - would
+                # be glued to the sentence after it, and the negation in a heading would
+                # mask a contradiction in the body. That was a real miss: appending
+                # "A review is required before merging to main." directly under a
+                # heading that says the list "does not enforce a review" passed.
+                #
+                # A heading is therefore a boundary - but it is not the *only* one
+                # allowed, because splitting per line was itself a miss: a claim
+                # wrapped as "A review is" / "required before merging to main." spans
+                # two lines, and neither fragment contains both the subject and the
+                # requirement, so the check saw nothing. Blocks join wrapped prose and
+                # list-item continuations, and split only where the author started a new
+                # unit.
                 lines = (REPO_ROOT / name).read_text(encoding="utf-8").splitlines()
+                blocks, current = [], []
+                for line in lines:
+                    stripped = line.strip()
+                    if not stripped:
+                        if current:
+                            blocks.append(current)
+                            current = []
+                        continue
+                    starts_unit = stripped.startswith("#") or re.match(
+                        r"^([-*+]|\d+\.)\s", stripped
+                    )
+                    if starts_unit:
+                        if current:
+                            blocks.append(current)
+                        current = [stripped]
+                    else:
+                        current.append(stripped)
+                if current:
+                    blocks.append(current)
                 sentences = [
                     sentence
-                    for line in lines
-                    for sentence in re.split(r"(?<=[.!?])\s+", flat(line))
+                    for block in blocks
+                    for sentence in re.split(r"(?<=[.!?])\s+", flat(" ".join(block)))
                     if sentence.strip()
                 ]
                 for sentence in sentences:
-                    if "review" not in sentence:
+                    # Case-insensitive throughout: these documents mix "Review",
+                    # "review" and "REVIEW", and a check that only reads the lowercase
+                    # spelling is a check with a hole shaped like capitalisation.
+                    if not re.search(r"review", sentence, re.IGNORECASE):
                         continue
-                    if not re.search(r"\brequir|\bmust be approved|\bapprove\b", sentence):
+                    if not re.search(
+                        r"\brequir|\bmust be approved|\bapprove\b",
+                        sentence, re.IGNORECASE,
+                    ):
                         continue
                     # Scoped to the claim actually at issue: a review enforced on the
                     # protected branch. A process rule that says a *future* change needs
@@ -4393,7 +4424,9 @@ class PrivacyAndOwnershipTests(unittest.TestCase):
                     # different subject, and flagging it would be the check being wrong
                     # rather than the document.
                     if not re.search(
-                        r"\bmain\b|ruleset|branch protection|\bcode ?owners?\b"
+                        # "code-owner", "code owner" and CODEOWNERS are the same noun;
+                        # only the first two were being missed.
+                        r"\bmain\b|ruleset|branch protection|\bcode[- ]?owners?\b"
                         r"|\bmerge|protected|default branch",
                         sentence,
                         re.IGNORECASE,
@@ -4403,6 +4436,7 @@ class PrivacyAndOwnershipTests(unittest.TestCase):
                         r"\bnot\b|\bno\b|\bnothing\b|\bnever\b|\bwould\b|\bcannot\b"
                         r"|\bstatement of intent\b|\bintent\b|\bintended\b|\bif\b|\buntil\b",
                         sentence,
+                        re.IGNORECASE,
                     ):
                         continue
                     self.fail(
