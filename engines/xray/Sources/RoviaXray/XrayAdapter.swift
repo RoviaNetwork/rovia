@@ -37,13 +37,3 @@ public struct XrayAdapter: TunnelEngine {
         throw EngineError.notIncludedInBuild("xray")
     }
 }
-
-public struct XrayConfigCompiler: EngineConfigCompiler {
-    public typealias Output = Data
-
-    public init() {}
-
-    public func compile(_ configuration: CanonicalTunnelConfiguration) throws -> Data {
-        throw EngineError.notIncludedInBuild("xray")
-    }
-}
