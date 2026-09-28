@@ -84,6 +84,28 @@ the change hard to review, which is the only reason anyone reads it.
   [`docs/development/release-readiness.md`](docs/development/release-readiness.md).
 
 
+## Before you commit
+
+`pre-commit` is configured in `.pre-commit-config.yaml`, and pre-commit.ci runs the
+same configuration on every pull request. Eleven hooks, of which four are the same
+gates the hosted runner executes — the publishable-tree hygiene check, the pinned
+pyflakes gate, the warnings-are-errors compile, and the shell syntax check — so the
+defects they catch are found before a runner is spent on them.
+
+```text
+pre-commit run --all-files
+```
+
+Two hooks are left out on purpose, and the reason is in the file: 92 tracked files
+carry trailing whitespace, and cleaning it is a separate mechanical change rather
+than part of wiring up a gate. Two of the arguments in the file are load-bearing —
+`--assume-in-merge` on `check-merge-conflict` and `--enforce-all` on
+`check-added-large-files` — and `tools/ci/test_ci_checks.py` fails if either is
+removed, because a hook that silently cannot fire is worse than no hook at all.
+
+Details, including what the hooks do not catch, are in
+[`docs/development/ci.md`](docs/development/ci.md#the-pre-commit-gate).
+
 ## Reporting a vulnerability
 
 Not through a public issue and not through a pull request. See
