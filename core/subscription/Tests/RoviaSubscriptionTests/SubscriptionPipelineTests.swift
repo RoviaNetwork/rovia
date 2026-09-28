@@ -216,7 +216,38 @@ final class SubscriptionFetcherTests: XCTestCase {
             session: StubSession { _ in (Data("x".utf8), httpResponse(url: url, status: 200)) }
         )
         let fetched = try await fetcher.fetch(url)
-        XCTAssertEqual(fetched, Data("x".utf8))
+        XCTAssertEqual(fetched.data, Data("x".utf8))
+        XCTAssertNil(fetched.userInfo)
+    }
+
+    func testParsesUserInfoHeader() async throws {
+        let url = URL(string: "https://provider.example/sub")!
+        let response = HTTPURLResponse(
+            url: url,
+            statusCode: 200,
+            httpVersion: nil,
+            headerFields: ["subscription-userinfo": "upload=100; download=200; total=1000; expire=1893456000"]
+        )!
+        let fetcher = SubscriptionFetcher(session: StubSession { _ in (Data("x".utf8), response) })
+        let fetched = try await fetcher.fetch(url)
+        let info = try XCTUnwrap(fetched.userInfo)
+        XCTAssertEqual(info.uploadBytes, 100)
+        XCTAssertEqual(info.downloadBytes, 200)
+        XCTAssertEqual(info.totalBytes, 1000)
+        XCTAssertEqual(info.expireDate, Date(timeIntervalSince1970: 1_893_456_000))
+    }
+
+    func testMalformedUserInfoHeaderIsIgnored() async throws {
+        let url = URL(string: "https://provider.example/sub")!
+        let response = HTTPURLResponse(
+            url: url,
+            statusCode: 200,
+            httpVersion: nil,
+            headerFields: ["subscription-userinfo": "garbage;;;"]
+        )!
+        let fetcher = SubscriptionFetcher(session: StubSession { _ in (Data("x".utf8), response) })
+        let fetched = try await fetcher.fetch(url)
+        XCTAssertNil(fetched.userInfo)
     }
 
     func testHTTPBlockedByDefaultAllowedByPolicy() async throws {
@@ -232,7 +263,7 @@ final class SubscriptionFetcherTests: XCTestCase {
             policy: SubscriptionFetchPolicy(allowInsecureHTTP: true)
         )
         let fetchedInsecure = try await allowed.fetch(url)
-        XCTAssertEqual(fetchedInsecure, Data("x".utf8))
+        XCTAssertEqual(fetchedInsecure.data, Data("x".utf8))
     }
 
     func testRejectsNonHTTPSErrorStatusesAndEmptyBodies() async {

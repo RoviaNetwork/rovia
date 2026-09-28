@@ -17,6 +17,9 @@ public struct StoredSubscription: Equatable, Sendable, Identifiable {
     public var acceptedCount: Int
     public var rejectedCount: Int
     public var updatedAt: Date
+    /// Last provider-reported traffic/expiry, if the provider sends
+    /// `subscription-userinfo`. Absent for pasted imports and old files.
+    public var userInfo: SubscriptionUserInfo?
     /// Explicit opt-in to plain-HTTP fetch for this subscription only.
     /// Decoded with a default so files written before this field exist
     /// keep loading.
@@ -30,7 +33,8 @@ public struct StoredSubscription: Equatable, Sendable, Identifiable {
         acceptedCount: Int = 0,
         rejectedCount: Int = 0,
         updatedAt: Date = Date(),
-        allowInsecure: Bool = false
+        allowInsecure: Bool = false,
+        userInfo: SubscriptionUserInfo? = nil
     ) {
         self.id = id
         self.name = name
@@ -40,6 +44,7 @@ public struct StoredSubscription: Equatable, Sendable, Identifiable {
         self.rejectedCount = rejectedCount
         self.updatedAt = updatedAt
         self.allowInsecure = allowInsecure
+        self.userInfo = userInfo
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -51,6 +56,7 @@ public struct StoredSubscription: Equatable, Sendable, Identifiable {
         case rejectedCount
         case updatedAt
         case allowInsecure
+        case userInfo
     }
 
     public init(from decoder: Decoder) throws {
@@ -63,6 +69,7 @@ public struct StoredSubscription: Equatable, Sendable, Identifiable {
         rejectedCount = try container.decode(Int.self, forKey: .rejectedCount)
         updatedAt = try container.decode(Date.self, forKey: .updatedAt)
         allowInsecure = try container.decodeIfPresent(Bool.self, forKey: .allowInsecure) ?? false
+        userInfo = try container.decodeIfPresent(SubscriptionUserInfo.self, forKey: .userInfo)
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -75,6 +82,7 @@ public struct StoredSubscription: Equatable, Sendable, Identifiable {
         try container.encode(rejectedCount, forKey: .rejectedCount)
         try container.encode(updatedAt, forKey: .updatedAt)
         try container.encode(allowInsecure, forKey: .allowInsecure)
+        try container.encodeIfPresent(userInfo, forKey: .userInfo)
     }
 }
 
@@ -139,13 +147,15 @@ public actor SubscriptionStore {
 
     /// Atomic refresh update. Call only after a successful import; network
     /// and decode failures never reach this method, which is what keeps the
-    /// last working version on disk.
+    /// last working version on disk. `userInfo` overwrites unconditionally:
+    /// a refresh carries the latest provider state, including its absence.
     public func replaceServers(
         id: UUID,
         servers: [Server],
         acceptedCount: Int,
         rejectedCount: Int,
-        updatedAt: Date = Date()
+        updatedAt: Date = Date(),
+        userInfo: SubscriptionUserInfo? = nil
     ) throws {
         guard let index = records.firstIndex(where: { $0.id == id }) else {
             throw SubscriptionStoreError.unknownSubscription
@@ -154,6 +164,7 @@ public actor SubscriptionStore {
         records[index].acceptedCount = acceptedCount
         records[index].rejectedCount = rejectedCount
         records[index].updatedAt = updatedAt
+        records[index].userInfo = userInfo
         try persist()
     }
 

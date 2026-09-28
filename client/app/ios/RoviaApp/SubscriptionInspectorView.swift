@@ -1,3 +1,4 @@
+import Foundation
 import RoviaSubscription
 import SwiftUI
 
@@ -163,6 +164,11 @@ struct SubscriptionInspectorView: View {
                     .font(.footnote)
                     .foregroundStyle(.orange)
             }
+            if let info = subscription.userInfo, let line = userInfoLine(info) {
+                Text(line)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
         }
         .padding(.vertical, 4)
         .contextMenu {
@@ -202,6 +208,25 @@ struct SubscriptionInspectorView: View {
         }
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier(AppAccessibilityIdentifier.subscriptionSummary)
+    }
+
+    private func userInfoLine(_ info: SubscriptionUserInfo) -> String? {
+        var parts: [String] = []
+        if let total = info.totalBytes {
+            let used = (info.uploadBytes ?? 0) + (info.downloadBytes ?? 0)
+            parts.append("\(formatBytes(used)) of \(formatBytes(total)) used")
+        }
+        if let expire = info.expireDate {
+            parts.append("expires \(expire.formatted(date: .abbreviated, time: .omitted))")
+        }
+        guard !parts.isEmpty else { return nil }
+        return parts.joined(separator: " · ")
+    }
+
+    private func formatBytes(_ value: Int64) -> String {
+        let formatter = ByteCountFormatter()
+        formatter.countStyle = .binary
+        return formatter.string(fromByteCount: value)
     }
 
     private func reasonText(_ reason: ShareLinkParseError) -> String {

@@ -89,8 +89,8 @@ final class SubscriptionCoordinator {
 
     func add(url: URL, name: String, allowInsecure: Bool) async throws -> SubscriptionImportSummary {
         let id = UUID()
-        let raw = try await fetch(url: url, allowInsecure: allowInsecure)
-        let document = try decode(raw)
+        let downloaded = try await fetch(url: url, allowInsecure: allowInsecure)
+        let document = try decode(downloaded.data)
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedName.isEmpty else { throw SubscriptionCoordinatorError.invalidInput }
         try secrets.save(Data(url.absoluteString.utf8), for: SecretKeys.subscriptionURL(id))
@@ -102,7 +102,8 @@ final class SubscriptionCoordinator {
                 displayValue: url.absoluteString,
                 secretReference: SecretReference(key: SecretKeys.subscriptionURL(id))
             ),
-            allowInsecure: allowInsecure
+            allowInsecure: allowInsecure,
+            userInfo: downloaded.userInfo
         )
         return try await importAndStore(lines: document.lines, record: record, isFirstImport: true)
     }
@@ -156,8 +157,10 @@ final class SubscriptionCoordinator {
             throw SubscriptionCoordinatorError.secretUnavailable
         }
         let raw = try await fetch(url: url, allowInsecure: record.allowInsecure)
-        let document = try decode(raw)
-        return try await importAndStore(lines: document.lines, record: record, isFirstImport: false)
+        let document = try decode(raw.data)
+        var refreshRecord = record
+        refreshRecord.userInfo = raw.userInfo
+        return try await importAndStore(lines: document.lines, record: refreshRecord, isFirstImport: false)
     }
 
     /// Refreshes every URL subscription. Pasted/single-link records have no
@@ -301,7 +304,7 @@ final class SubscriptionCoordinator {
 
     // MARK: - Private
 
-    private func fetch(url: URL, allowInsecure: Bool) async throws -> Data {
+    private func fetch(url: URL, allowInsecure: Bool) async throws -> SubscriptionFetchResult {
         let fetcher = SubscriptionFetcher(
             session: session,
             policy: SubscriptionFetchPolicy(allowInsecureHTTP: allowInsecure)

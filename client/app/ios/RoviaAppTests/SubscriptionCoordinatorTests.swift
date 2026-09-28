@@ -23,10 +23,12 @@ private func coordinatorHTTPResponse(url: URL, status: Int) -> HTTPURLResponse {
 private final class CoordinatorBodyBox: @unchecked Sendable {
     var body: String
     var fail: Bool
+    var headers: [String: String]?
 
-    init(body: String, fail: Bool = false) {
+    init(body: String, fail: Bool = false, headers: [String: String]? = nil) {
         self.body = body
         self.fail = fail
+        self.headers = headers
     }
 }
 
@@ -256,6 +258,35 @@ final class SubscriptionCoordinatorTests: XCTestCase {
         let summaries = await coordinator.refreshAll()
         XCTAssertEqual(summaries.count, 1)
         XCTAssertEqual(summaries[0].accepted, 1)
+    }
+
+    func testUserInfoHeaderPersistsAndClearsOnRefresh() async throws {
+        let box = CoordinatorBodyBox(
+            body: coordinatorVLESS,
+            headers: ["subscription-userinfo": "upload=10; download=20; total=100; expire=1893456000"]
+        )
+        let (coordinator, _, _, _) = makeCoordinator(handler: { request in
+            let response = HTTPURLResponse(
+                url: request.url!,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: box.headers
+            )!
+            return (Data(box.body.utf8), response)
+        })
+        try await coordinator.loadPersisted()
+        let added = try await coordinator.add(
+            url: URL(string: "https://provider.example/sub")!,
+            name: "Provider",
+            allowInsecure: false
+        )
+        let stored = await coordinator.subscriptions()
+        XCTAssertEqual(stored[0].userInfo?.totalBytes, 100)
+        XCTAssertEqual(stored[0].userInfo?.expireDate, Date(timeIntervalSince1970: 1_893_456_000))
+        box.headers = nil
+        _ = try await coordinator.refresh(id: added.subscriptionID)
+        let refreshed = await coordinator.subscriptions()
+        XCTAssertNil(refreshed[0].userInfo)
     }
 
     func testLegacyFileWithoutAllowInsecureLoads() async throws {
