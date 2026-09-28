@@ -16,11 +16,12 @@ final class AppModelTests: XCTestCase {
         content: AppContent = .sample,
         loadError: (any Error)? = nil,
         subscriptions: SubscriptionCoordinator? = nil,
-        probeLatency: (@Sendable (String, Int) async -> Int?)? = nil
+        probeLatency: (@Sendable (String, Int) async -> Int?)? = nil,
+        favoritesStorage: UserDefaults = .standard
     ) -> (AppModel, CountingFixtureProvider) {
         let now = fixedNow
         let provider = CountingFixtureProvider(content: content, loadError: loadError)
-        let model = AppModel(tunnel: tunnel, fixtures: provider, subscriptions: subscriptions, probeLatency: probeLatency, now: { now })
+        let model = AppModel(tunnel: tunnel, fixtures: provider, subscriptions: subscriptions, probeLatency: probeLatency, favoritesStorage: favoritesStorage, now: { now })
         return (model, provider)
     }
 
@@ -833,6 +834,22 @@ final class AppModelTests: XCTestCase {
         assertEqual(box.calls, 1)
         assertTrue(await model.refreshStaleSubscriptions())
         assertEqual(box.calls, 1)
+    }
+
+    func testFavoritesToggleAndPersist() async {
+        let suite = UUID().uuidString
+        let storage = UserDefaults(suiteName: suite)!
+        defer { storage.removePersistentDomain(forName: suite) }
+        let (model, _) = makeModel(tunnel: StubTunnelController(), favoritesStorage: storage)
+        assertTrue(await model.bootstrap())
+        assertTrue(await model.toggleFavorite("srv-fi-01"))
+        assertTrue(model.isFavorite("srv-fi-01"))
+        assertFalse(await model.toggleFavorite("srv-missing"))
+        let relaunched = makeModel(tunnel: StubTunnelController(), favoritesStorage: storage).0
+        assertTrue(relaunched.isFavorite("srv-fi-01"))
+        assertTrue(await relaunched.bootstrap())
+        assertTrue(await relaunched.toggleFavorite("srv-fi-01"))
+        assertFalse(relaunched.isFavorite("srv-fi-01"))
     }
 
     private func makeSubscriptionModel(

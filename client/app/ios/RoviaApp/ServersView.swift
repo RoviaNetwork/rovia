@@ -3,6 +3,9 @@ import SwiftUI
 struct ServersView: View {
     let model: AppModel
 
+    @State private var searchText = ""
+    @State private var favoritesOnly = false
+
     var body: some View {
         Group {
             if model.snapshot.content.servers.isEmpty {
@@ -27,10 +30,33 @@ struct ServersView: View {
                     latencyButton
                     SampleDataNotice(identifier: AppAccessibilityIdentifier.serversScreen + ".notice")
                 }
+                .searchable(text: $searchText, prompt: "Search servers")
+                .toolbar {
+                    ToolbarItem(placement: .primaryAction) {
+                        Button {
+                            favoritesOnly.toggle()
+                        } label: {
+                            Label("Favorites only", systemImage: favoritesOnly ? "star.fill" : "star")
+                        }
+                        .accessibilityIdentifier(AppAccessibilityIdentifier.serversScreen + ".favoritesOnly")
+                    }
+                }
             }
         }
         .navigationTitle(AppRoute.servers.title)
         .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private var filteredServers: [ServerSummary] {
+        var servers = model.snapshot.visibleServers
+        if favoritesOnly {
+            servers = servers.filter { model.isFavorite($0.id) }
+        }
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !query.isEmpty else { return servers }
+        return servers.filter {
+            $0.name.lowercased().contains(query) || $0.protocolLabel.lowercased().contains(query)
+        }
     }
 
     private var profileCard: some View {
@@ -109,13 +135,13 @@ struct ServersView: View {
             // LazyVStack: rows are built on scroll, not all upfront. With
             // thousands of servers an eager VStack stalls the first frame.
             LazyVStack(alignment: .leading, spacing: 12) {
-                if model.snapshot.visibleServers.isEmpty {
+                if filteredServers.isEmpty {
                     Text("No server matches \(model.snapshot.serverFilterDescription). Choose a different profile or group to see members.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                ForEach(model.snapshot.visibleServers) { server in
+                ForEach(filteredServers) { server in
                     serverRow(server)
                 }
             }
@@ -160,6 +186,15 @@ struct ServersView: View {
                     }
                 }
                 Spacer(minLength: 8)
+                Button {
+                    Task { await model.toggleFavorite(server.id) }
+                } label: {
+                    Image(systemName: model.isFavorite(server.id) ? "star.fill" : "star")
+                        .foregroundStyle(model.isFavorite(server.id) ? Color.yellow : Color.secondary)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(model.isFavorite(server.id) ? "Unfavorite \(server.name)" : "Favorite \(server.name)")
+                .accessibilityIdentifier(AppAccessibilityIdentifier.serversScreen + ".favorite." + server.id)
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
                     .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
                     .accessibilityHidden(true)

@@ -67,6 +67,7 @@ enum AppAction: Hashable, Sendable {
     case removeSubscription(UUID)
     case probeServers
     case refreshStaleSubscriptions(TimeInterval)
+    case toggleFavorite(ServerID)
 
     var label: String {
         switch self {
@@ -102,6 +103,8 @@ enum AppAction: Hashable, Sendable {
             "Measure server latency"
         case .refreshStaleSubscriptions:
             "Refresh subscriptions updated over an hour ago"
+        case .toggleFavorite:
+            "Toggle a favorite server"
         }
     }
 }
@@ -114,6 +117,10 @@ final class AppModel {
     /// Stored subscriptions for the management UI. Updated on every
     /// subscription mutation and on bootstrap.
     private(set) var storedSubscriptions: [StoredSubscription] = []
+    /// Favorite servers, persisted across launches. IDs are stable across
+    /// refreshes, so a favorite survives subscription updates; a favorite
+    /// whose server disappeared simply matches nothing.
+    private(set) var favoriteServerIDs: Set<ServerID> = []
 
     var refreshingSubscriptions: Set<UUID> {
         subscriptions?.isRefreshing ?? []
@@ -127,6 +134,7 @@ final class AppModel {
     private let fixtures: any FixtureProviding
     private let subscriptions: SubscriptionCoordinator?
     private let probeLatency: (@Sendable (String, Int) async -> Int?)?
+    private let favoritesStorage: UserDefaults
     private let now: @Sendable () -> Date
 
     init(
@@ -134,14 +142,19 @@ final class AppModel {
         fixtures: any FixtureProviding = StaticFixtureProvider(),
         subscriptions: SubscriptionCoordinator? = nil,
         probeLatency: (@Sendable (String, Int) async -> Int?)? = nil,
+        favoritesStorage: UserDefaults = .standard,
         now: @escaping @Sendable () -> Date = { Date() }
     ) {
         self.tunnel = tunnel
         self.fixtures = fixtures
         self.subscriptions = subscriptions
         self.probeLatency = probeLatency
+        self.favoritesStorage = favoritesStorage
         self.now = now
+        self.favoriteServerIDs = Set(favoritesStorage.stringArray(forKey: Self.favoritesKey) ?? [])
     }
+
+    private static let favoritesKey = "rovia.favoriteServerIDs"
 
     var pendingActions: Set<AppAction> {
         inFlightActions
@@ -251,6 +264,15 @@ final class AppModel {
         await perform(.refreshStaleSubscriptions(maxAge))
     }
 
+    func isFavorite(_ id: ServerID) -> Bool {
+        favoriteServerIDs.contains(id)
+    }
+
+    @discardableResult
+    func toggleFavorite(_ id: ServerID) async -> Bool {
+        await perform(.toggleFavorite(id))
+    }
+
     @discardableResult
     func perform(_ action: AppAction) async -> Bool {
         guard inFlightActions.insert(action).inserted else { return false }
@@ -289,6 +311,8 @@ final class AppModel {
             return await probeServers()
         case let .refreshStaleSubscriptions(maxAge):
             return await refreshStale(maxAge: maxAge)
+        case let .toggleFavorite(id):
+            return applyFavorite(id)
         }
     }
 
@@ -721,6 +745,17 @@ final class AppModel {
             } catch {}
         }
         await resyncSubscriptions(lastResult: last)
+        return true
+    }
+
+    private func applyFavorite(_ id: ServerID) -> Bool {
+        guard snapshot.system == .ready, snapshot.content.server(id: id) != nil else { return false }
+        if favoriteServerIDs.contains(id) {
+            favoriteServerIDs.remove(id)
+        } else {
+            favoriteServerIDs.insert(id)
+        }
+        favoritesStorage.set(Array(favoriteServerIDs), forKey: Self.favoritesKey)
         return true
     }
 
