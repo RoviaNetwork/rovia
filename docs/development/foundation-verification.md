@@ -99,14 +99,14 @@ Apple silicon or on a hosted runner.
 ### Python tool tests
 
 `./tools/ci/run-tool-tests.sh` ran every `tools/**/test_*.py` as its own
-process: **10 files, 614 tests, 0 failures**.
+process: **10 files, 615 tests, 0 failures**.
 
 | Test file | Tests | Seconds |
 | --- | --- | --- |
 | `tools/ci/test_app_dependencies.py` | 27 | 25.53 |
 | `tools/ci/test_audit_accessibility_identifiers.py` | 58 | 2.05 |
 | `tools/ci/test_check_repository_hygiene.py` | 26 | 6.27 |
-| `tools/ci/test_ci_checks.py` | 186 | 22.88 |
+| `tools/ci/test_ci_checks.py` | 187 | 22.88 |
 | `tools/ci/test_validate_schemas.py` | 61 | 105.12 |
 | `tools/ci/test_verify_engine_checksums.py` | 38 | 2.96 |
 | `tools/ci/test_verify_lockfiles.py` | 29 | 3.35 |
@@ -768,7 +768,7 @@ title to be followed by an absence rather than a pass.
 
 | Thing | Before | After |
 | --- | --- | --- |
-| Tool tests | 364 | 614 |
+| Tool tests | 364 | 615 |
 | Security-sensitive paths listed | 14, one of them nonexistent | 19, all existing |
 | Ownership directions checked | 1 | 3 |
 | Engine license declared per candidate | none, defaulted to MIT | required, derived, and cross-checked |

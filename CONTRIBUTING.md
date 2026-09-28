@@ -73,9 +73,16 @@ the change hard to review, which is the only reason anyone reads it.
 - Fill in the security and privacy impact section when the pull request touches
   parsers, secrets, routing, tunnels, signing, or CI. "This cannot affect any of them"
   is a valid answer; leaving it blank is not.
-- **CODEOWNERS does not enforce anything yet.** There is no branch protection and only
-  one maintainer, so a required review would be a self-review. The gate is tracked as
-  open item 7 in [`docs/development/release-readiness.md`](docs/development/release-readiness.md).
+- **A pull request is required, and no review is enforced.** An active ruleset on
+  `main` requires a pull request, forbids deletion and force-push, and permits
+  only a squash merge, so open a pull request rather than pushing to `main`.
+  A review is not required, and not enforced: the only account with write access is
+  the maintainer, and GitHub does not count the author's own approval, so a review
+  requirement here would make the repository unmergeable rather than safer.
+  `CODEOWNERS` therefore enforces nothing yet. What is missing is an independent
+  approver, not a resolvable handle. Both are tracked as an open gate in
+  [`docs/development/release-readiness.md`](docs/development/release-readiness.md).
+
 
 ## Reporting a vulnerability
 

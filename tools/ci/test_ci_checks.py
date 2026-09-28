@@ -4303,27 +4303,172 @@ class PrivacyAndOwnershipTests(unittest.TestCase):
                     f"{name} still names the placeholder namespace",
                 )
 
-    def test_both_documents_say_no_review_is_enforced_yet(self):
-        # The honest consequence of one owner: `CODEOWNERS` is inert until branch
-        # protection requires a review, and requiring a review from the only possible
-        # reviewer would be a self-review. Both documents have to say so, because a
-        # reader of either one alone would otherwise believe a review is required.
-        for document, name in ((self.codeowners, "CODEOWNERS"), (self.security, "SECURITY.md")):
+    def test_the_protection_that_exists_is_stated_as_precisely_as_the_gap(self):
+        """Branch protection is partly real now, so "nothing is protected" is too strong.
+
+        An active ruleset on `main` requires a pull request, forbids deletion and
+        force-push, and permits only a squash merge. A document that still says
+        `CODEOWNERS` is "inert until branch protection requires a review" is right
+        about the review and wrong about the protection, and a reader cannot tell which
+        half any given sentence means. So each document has to name both, and the two
+        are asserted as two claims rather than one phrase.
+
+        Three of these assertions exist because the first version of this test was too
+        weak in ways worth recording:
+
+        * "GitHub does not count the author's approval" explains *why* a review rule is
+          unusable. It does not say the rule is off, and a document could state the
+          explanation and then claim a review **is** required. The gap claim is the one
+          being protected, so it is matched on its own words.
+        * Calling the handles "placeholders" stopped being true when they became a real
+          account. A document repeating that is describing a different problem from the
+          one this repository has, which is the absence of a second approver.
+        * A blanket ban on "nothing currently enforces" was too broad: the sentence is
+          still true *of the review*. What is stale is the claim that nothing at all is
+          protected, and that is what the positive assertions above hold.
+        """
+        for name in ("SECURITY.md", "CODEOWNERS", "GOVERNANCE.md", "CONTRIBUTING.md"):
+            flattened = flat((REPO_ROOT / name).read_text(encoding="utf-8"))
             with self.subTest(document=name):
-                flattened = flat(document)
+                # What the ruleset does.
+                self.assertIn("active ruleset", flattened)
+                self.assertIn("requires a pull request", flattened)
+                self.assertIn("squash", flattened)
+                self.assertIn("force-push", flattened)
+                # What it does not do, on its own words.
                 self.assertRegex(
                     flattened,
-                    r"branch protection|external gate",
-                    f"{name} does not say that required review is an open gate",
+                    r"(does not require a review|not required|is not enforced|is off)",
+                    f"{name} does not say that no review is enforced",
                 )
-        self.assertRegex(
-            flat(self.codeowners), r"inert until branch protection",
-            "CODEOWNERS does not say that it enforces nothing on its own",
-        )
-        self.assertRegex(
-            flat(self.security), r"enforces nothing|nothing currently enforces",
-            "SECURITY.md does not say that 'requires maintainer review' is not enforced",
-        )
+                self.assertRegex(
+                    flattened,
+                    r"unmergeable|paralysis|blocks? every pull request",
+                    f"{name} does not say why requiring a review is not an option yet",
+                )
+                # What the gap actually is.
+                self.assertNotIn(
+                    "placeholder", flattened,
+                    f"{name} calls the CODEOWNERS handles placeholders; they name a "
+                    "real account, and the gap is the missing approver",
+                )
+                self.assertRegex(
+                    flattened,
+                    r"independent approver|second pair of eyes|second maintainer",
+                    f"{name} does not say what the gap actually is",
+                )
+
+                # A document that states the gap correctly can still be wrong in the
+                # same paragraph, and the positive assertions above would not notice.
+                # This is the failure mode the second CodeRabbit review was about: a
+                # document that says "a review is required" *and* explains that no
+                # review is enforced. The explanation is what a reader quotes; the
+                # contradiction is what they act on. So every sentence that mentions
+                # review and a requirement must also carry a negation, a hypothetical,
+                # or an explicit statement of intent - otherwise it asserts a review
+                # that does not exist.
+                # Split into blocks, then into sentences. `flat()` collapses newlines,
+                # so a markdown heading - which carries no terminating full stop - would
+                # be glued to the sentence after it, and the negation in a heading would
+                # mask a contradiction in the body. That was a real miss: appending
+                # "A review is required before merging to main." directly under a
+                # heading that says the list "does not enforce a review" passed.
+                #
+                # A heading is therefore a boundary - but it is not the *only* one
+                # allowed, because splitting per line was itself a miss: a claim
+                # wrapped as "A review is" / "required before merging to main." spans
+                # two lines, and neither fragment contains both the subject and the
+                # requirement, so the check saw nothing. Blocks join wrapped prose and
+                # list-item continuations, and split only where the author started a new
+                # unit.
+                lines = (REPO_ROOT / name).read_text(encoding="utf-8").splitlines()
+                blocks, current = [], []
+                for line in lines:
+                    stripped = line.strip()
+                    if not stripped:
+                        if current:
+                            blocks.append(current)
+                            current = []
+                        continue
+                    starts_unit = stripped.startswith("#") or re.match(
+                        r"^([-*+]|\d+\.)\s", stripped
+                    )
+                    if starts_unit:
+                        if current:
+                            blocks.append(current)
+                        current = [stripped]
+                    else:
+                        current.append(stripped)
+                if current:
+                    blocks.append(current)
+                sentences = [
+                    sentence
+                    for block in blocks
+                    for sentence in re.split(r"(?<=[.!?])\s+", flat(" ".join(block)))
+                    if sentence.strip()
+                ]
+                for sentence in sentences:
+                    # Case-insensitive throughout: these documents mix "Review",
+                    # "review" and "REVIEW", and a check that only reads the lowercase
+                    # spelling is a check with a hole shaped like capitalisation.
+                    if not re.search(r"review", sentence, re.IGNORECASE):
+                        continue
+                    if not re.search(
+                        r"\brequir|\bmust be approved|\bapprove\b",
+                        sentence, re.IGNORECASE,
+                    ):
+                        continue
+                    # Scoped to the claim actually at issue: a review enforced on the
+                    # protected branch. A process rule that says a *future* change needs
+                    # a human-reviewed lockfile is a different sentence about a
+                    # different subject, and flagging it would be the check being wrong
+                    # rather than the document.
+                    if not re.search(
+                        # "code-owner", "code owner" and CODEOWNERS are the same noun;
+                        # only the first two were being missed.
+                        r"\bmain\b|ruleset|branch protection|\bcode[- ]?owners?\b"
+                        r"|\bmerge|protected|default branch",
+                        sentence,
+                        re.IGNORECASE,
+                    ):
+                        continue
+                    if re.search(
+                        r"\bnot\b|\bno\b|\bnothing\b|\bnever\b|\bwould\b|\bcannot\b"
+                        r"|\bstatement of intent\b|\bintent\b|\bintended\b|\bif\b|\buntil\b",
+                        sentence,
+                        re.IGNORECASE,
+                    ):
+                        continue
+                    self.fail(
+                        f"{name} asserts a review that is not enforced: {sentence[:160]!r}"
+                    )
+
+    def test_both_documents_say_no_review_is_enforced_yet(self):
+        """The review gap has to be named as an open gate, not just as a caveat.
+
+        This test previously asserted the literal phrase "inert until branch
+        protection requires a review", which was true when no ruleset existed and
+        became false the moment one did. Asserting a sentence about the *absence* of
+        protection is how the stale claim survived in the first place: the sentence
+        itself outlived the state it described. The state is asserted positively now,
+        by `test_the_protection_that_exists_is_stated_as_precisely_as_the_gap`, and
+        what remains here is the narrower job - both documents must tell a reader that
+        the missing review is a tracked gap rather than a settled fact.
+        """
+        for document, name in ((self.codeowners, "CODEOWNERS"), (self.security, "SECURITY.md")):
+            with self.subTest(document=name):
+                self.assertRegex(
+                    flat(document),
+                    r"open (external )?gate|gate in|external gate",
+                    f"{name} does not point at the open gate for the missing review",
+                )
+                # The documents describe the same gap in the same terms, so a reader
+                # who sees one and not the other is not misled about the other.
+                self.assertRegex(
+                    flat(document),
+                    r"independent approver|second pair of eyes|second maintainer",
+                    f"{name} does not name the gap as the missing approver",
+                )
 
     def test_the_readme_figures_are_what_the_loaders_say(self):
         # The README is the first thing a reader sees and the least audited document
@@ -4773,16 +4918,29 @@ class PrivacyAndOwnershipTests(unittest.TestCase):
             "executed, and the executed one is recorded in the document's Closed section",
         )
         body = self.readiness_document()
+        readiness_lines = body.splitlines()
         for number, title in gates:
             with self.subTest(gate=number, title=title):
                 # Every gate must name at least one path in the tree that would
                 # have to change for it to be executed, so a row cannot drift
                 # into describing something that is not here.
-                row = next(
-                    line
-                    for line in body.splitlines()
+                index = next(
+                    position for position, line in enumerate(readiness_lines)
                     if line.startswith(f"| {number} |")
                 )
+                row = readiness_lines[index]
+                # The whole row, including its continuation lines. The rows are
+                # wrapped for readability, so a rule that reads only the first physical
+                # line of a row cannot see a path named further down - and the failure
+                # it produces is "this gate names no path", which is a statement about
+                # the checker rather than about the gate.
+                row_lines = [row]
+                for continuation in readiness_lines[index + 1:]:
+                    if continuation.startswith("  ") and not continuation.strip().startswith("|"):
+                        row_lines.append(continuation)
+                    else:
+                        break
+                row = " ".join(part.strip() for part in row_lines)
                 paths = re.findall(r"`([A-Za-z0-9._/-]+)`", row)
                 if not paths:
                     # A gate about work that has not started has no path to
@@ -4805,10 +4963,20 @@ class PrivacyAndOwnershipTests(unittest.TestCase):
     def test_the_readiness_disclosure_covers_the_gates_the_code_knows_about(self):
         # Source-derived: each of these is a gate this repository can see but not
         # run, named by the file that would have to change.
-        # Hosted CI execution is deliberately absent: it ran, and the run is recorded
-        # in that document's own `## Closed` section. A gate leaves this set by being
-        # executed, so the way to re-add it is to delete the evidence, not to edit this
-        # dict - which is the direction a reviewer would have to notice.
+        # Hosted CI execution and the four configured security controls are
+        # deliberately absent: they ran, or they are set, and the evidence is recorded
+        # in that document's own `## Closed` section with the API response that shows
+        # it. A gate leaves this set by being executed, so the way to re-add one is to
+        # delete the evidence, not to edit this dict - which is the direction a reviewer
+        # would have to notice.
+        #
+        # The advisories gate is here under a narrower name than it used to carry. It
+        # was "Third-party advisories, dependency review, and secret scanning", and it
+        # stayed open after secret scanning, push protection, Dependabot security
+        # updates, automated security fixes, and private vulnerability reporting had all
+        # been enabled, because the gate names a bundle and only part of the bundle
+        # moved. What is genuinely unclosed is dependency review and the absence of a
+        # written advisory-response process, and the gate says that.
         required = {
             "Signing, provisioning, and the Apple team identity":
                 "tools/release/ExportOptions.plist",
@@ -4816,8 +4984,8 @@ class PrivacyAndOwnershipTests(unittest.TestCase):
             "Upload, TestFlight, and App Store submission": "CODEOWNERS",
             "Physical-device VPN behaviour": "tools/ci/verify-simulator-install.sh",
             "A production engine": "engines.lock.json",
-            "Environment approvals and branch protection": "CODEOWNERS",
-            "Third-party advisories, dependency review, and secret scanning":
+            "Required review, and environment approvals": "CODEOWNERS",
+            "Dependency review and an advisory-response process":
                 "tools/ci/verify-lockfiles.sh",
             "Upstream SPDX tooling": "tools/reproducibility/check-sbom.py",
             "Android": "engines.lock.json",

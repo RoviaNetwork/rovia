@@ -26,7 +26,8 @@ A privacy leak, a redaction failure, or an unexpected outbound request is a secu
 
 ## Security-sensitive changes
 
-Changes under these areas require maintainer review:
+Changes under these areas are intended to require maintainer review, which is a
+statement of intent rather than a control:
 
 - `platform/apple/`
 - `engines/`
@@ -95,11 +96,22 @@ are both failures.
 
 ### This list does not enforce a review
 
-`CODEOWNERS` is inert until branch protection requires a review, and no ruleset
-requires one yet. The only owner is `@princeofscale`, so a required review would
-be a self-review and would add no second pair of eyes. Until there is a second
-maintainer, "requires maintainer review" above is a statement of intent that
-**nothing currently enforces**. That is listed as an open external gate in
+An active ruleset on `main` requires a pull request,
+forbids deletion and force-push, and permits only a squash merge
+(<https://github.com/princeofscale/rovia/rules/24096965>). **It does not require a
+review, and that is a decision rather than an oversight.** The only account with
+write access is the repository owner, and GitHub does not count the author's own
+approval, so a one-review rule would make the repository unmergeable — which is
+protection by paralysis, not protection. `require_code_owner_review` is off for the
+same reason: every handle in `CODEOWNERS` is the owner account rather than a team,
+and a rule requiring a team that does not exist would block every pull request.
+
+So "requires maintainer review" above is a statement of intent that **nothing
+currently enforces**. The protection that does exist is structural — a change to
+`main` cannot arrive as a force-push or as a direct push — and the honest reading of
+the sentence is that this project would benefit from a second pair of eyes and has
+none. The gap is not the handles: they are real and they resolve. It is the absence
+of an independent approver. That is listed as an open external gate in
 `docs/development/release-readiness.md` rather than described as a control.
 
 The earlier version of this file named per-role handles under an organisation

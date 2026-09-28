@@ -12,24 +12,25 @@ consensus process to describe and no second opinion available inside the project
 
 That is a real constraint, not a formality. The two consequences worth naming:
 
-- **No review is enforced.** `CODEOWNERS` names a real account, but no ruleset requires
-  a review, and a review by the only possible reviewer would be a self-review. So
-  "requires maintainer review" in `SECURITY.md` and in this file is a statement of
-  intent. It is tracked as open gate 7 in
-  [`docs/development/release-readiness.md`](docs/development/release-readiness.md).
-- **One person's judgement is the whole process.** An ADR records a decision and its
-  reasoning, and there is no second reader who has to agree before it is merged.
+- **A pull request is required, and no review is enforced.** An active ruleset on `main`
+  requires a pull request, forbids deletion and force-push, and allows only a squash
+  merge. It does not require a review, because the only possible reviewer is the
+  repository owner and GitHub does not count the author's own approval — one-reviewer
+  protection here would be protection by paralysis, and `require_code_owner_review`
+  is off for the same reason. So "requires maintainer review" in `SECURITY.md` and
+  in this file is a statement of intent, and the protection that exists is that a
+  change can only reach `main` through a pull request that nobody is obliged to read.
+  The gap is not the handles; they are real. It is the absence of an independent
+  approver, and this repository has one maintainer. Tracked as an open gate in
 
-What partially offsets this: the decisions are written down before they are
-implemented, the gates are executable rather than reviewed, and every claim the
-project makes about itself is derived from a test that can fail. A reviewer does not
-have to trust the prose; they can run it.
+  [`docs/development/release-readiness.md`](docs/development/release-readiness.md).
 
 ## Decision model
 
 - Routine implementation changes use normal pull requests.
 - Architectural changes use an ADR or RFC **before** implementation, not after.
-- Security-sensitive changes require review from the relevant CODEOWNERS — which, see
+- Security-sensitive changes are intended to require review from the relevant
+  CODEOWNERS, which is an intent rather than an enforced control — see
   above, means an intent rather than an enforced requirement today.
 - Engine updates require a human-reviewed lockfile pull request. No engine update is
   possible mechanically: the lock refuses an entry without a full commit SHA, a
