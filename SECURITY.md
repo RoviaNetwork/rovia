@@ -97,8 +97,10 @@ are both failures.
 ### This list does not enforce a review
 
 An active ruleset on `main` requires a pull request,
-forbids deletion and force-push, and permits only a squash merge
-(<https://github.com/princeofscale/rovia/rules/24096965>). **It does not require a
+forbids deletion and force-push, permits only a squash merge, and requires the
+`swift-tests` status check to pass
+(<https://github.com/princeofscale/rovia/rules/24096965>), so a change cannot reach
+`main` without its own gates having run. **It does not require a
 review, and that is a decision rather than an oversight.** The only account with
 write access is the repository owner, and GitHub does not count the author's own
 approval, so a one-review rule would make the repository unmergeable — which is

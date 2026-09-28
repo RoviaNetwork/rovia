@@ -112,19 +112,29 @@ No release has been made and none is planned until the rows below close.
 | 3 | **Upload, TestFlight, and App Store submission** | No upload step exists in any workflow, and `tools/ci/test_ci_checks.py` fails if one appears. Nothing has been submitted anywhere, and no submission is planned by this slice. | A deliberate decision to add an upload step, with credentials and an App Store Connect record. |
 | 4 | **Physical-device VPN behaviour** | Profile installation, the Packet Tunnel Provider lifecycle, IPv4, IPv6, dual-stack, failover, and reconnect are all unverified. A simulator process staying alive says nothing about any of them, and the simulator runs in `tools/ci/verify-simulator-install.sh` are launch checks only. | A signed build on a device, with tunnel traffic observed. Blocked by step 2. |
 | 5 | **A production engine** | `engines.lock.json` enables no engine and approves none. `tools/build-engine/xray/build-apple.sh` refuses even with an approved lock, because the deterministic build recipe does not exist, and `tools/reproducibility/verify-xray.sh` refuses because no approved artifact exists. No engine has been built, hashed, or compared. | A reproducible engine build: a pinned commit, a verified upstream digest, a 64-character artifact hash matching bytes on disk, and a second build producing the same digest. |
-| 6 | **Required review, and environment approvals** | Branch protection is now partly
-  real: an active ruleset on `main` requires a pull request, forbids deletion and
-  force-push, and permits only a squash merge
-  (<https://github.com/princeofscale/rovia/rules/24096965>). A required review is
-  deliberately **off**, because the only account with write access is the
-  repository owner and GitHub does not count the author's own approval — a
-  one-reviewer rule would make the repository unmergeable, which is protection by
-  paralysis. `require_code_owner_review` is off for the same reason: every handle in
-  `CODEOWNERS` is a placeholder for a team that does not exist, so requiring one
-  would block every pull request, so **no review is currently required on any
-  path**, including the security-sensitive ones. The `ios-production` environment
-  and its reviewers
-  are still unconfigured, and the release job in
+| 6 | **Required review, and environment approvals** | Branch protection is partly
+  real. An active ruleset on `main` (<https://github.com/princeofscale/rovia/rules/24096965>)
+  requires a pull request, forbids deletion and force-push, permits only a squash
+  merge, and requires the `swift-tests` status check to pass — so a pull request whose
+  CI is red or still running cannot be merged. The required check was added after
+  `required_approving_review_count: 0` was read as what it is: with no required status
+  check, "no review is enforced" also meant "no CI is enforced", and a pull request
+  could be merged without anything having run on it. Verified rather than assumed: a
+  throwaway pull request was opened, and an ordinary merge attempt was refused with
+  `BLOCKED` while `swift-tests` was still in progress.
+
+  A required *review* is deliberately **off**, and that is a decision rather than an
+  oversight. The only account with write access is the repository owner, and GitHub
+  does not count the author's own approval, so `required_approving_review_count: 1`
+  would make the repository unmergeable — protection by paralysis.
+  `require_code_owner_review` is off for the same reason, but for the opposite reason
+  to the one previously recorded here: every handle in `CODEOWNERS` is the owner
+  account rather than a team, and the handles are real and they resolve. The gap is
+  not an unresolvable name, it is that there is nobody independent to review. So
+  **no human review is currently required on any path**, including the
+  security-sensitive ones, and a green `swift-tests` is evidence that the code passes
+  its own gates and not that anyone read the change. The `ios-production` environment
+  and its reviewers are still unconfigured, and the release job in
   `.github/workflows/release-ios.yml` is the one that would carry them. The ownership
   lists in `CODEOWNERS` and `SECURITY.md` are checked against each other and against
   the tree, which checks the lists agree — not that anyone is reviewing. | A second

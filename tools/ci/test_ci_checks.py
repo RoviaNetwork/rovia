@@ -5161,9 +5161,15 @@ class PrivacyAndOwnershipTests(unittest.TestCase):
         for _, title in self.readiness_gates():
             with self.subTest(gate=title):
                 self.assertNotRegex(body.lower(), rf"{re.escape(title.lower())} (passed|succeeded)")
+        # "no *human* review is currently required" is deliberately not "no review":
+        # the ruleset does require a review-free gate to pass, and a document that
+        # collapsed the two would describe a repository with no CI, which stopped
+        # being true when `swift-tests` became a required status check. Both halves
+        # are asserted so neither can be dropped.
         for phrase in (
             "It is not evidence about a tunnel",
-            "no review is currently required on any path",
+            "no human review is currently required on any path",
+            "requires the `swift-tests` status check to pass",
             "The refusal of a gate is a result, not a gap",
             "It is not a VPN",
             "This is row 7, not a control",
