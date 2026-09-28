@@ -12,9 +12,12 @@ consensus process to describe and no second opinion available inside the project
 
 That is a real constraint, not a formality. The two consequences worth naming:
 
-- **A pull request is required, and no review is enforced.** An active ruleset on `main`
-  requires a pull request, forbids deletion and force-push, and allows only a squash
-  merge. It does not require a review, because the only possible reviewer is the
+- **A pull request and a passing CI run are required, and no review is enforced.** An
+  active ruleset on `main` requires a pull request, forbids deletion and force-push,
+  allows only a squash merge, and requires the `swift-tests` status check to pass
+  strictly, so an ordinary merge cannot land with CI red and the branch has to be up
+  to date with `main` when it does land. An administrator can still merge with
+  `gh pr merge --admin`; this describes the ordinary path. It does not require a review, because the only possible reviewer is the
   repository owner and GitHub does not count the author's own approval — one-reviewer
   protection here would be protection by paralysis, and `require_code_owner_review`
   is off for the same reason. So "requires maintainer review" in `SECURITY.md` and
