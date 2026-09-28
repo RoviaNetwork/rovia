@@ -16,5 +16,11 @@ struct ContentView: View {
                     await model.refreshStaleSubscriptions()
                 }
             }
+            .onOpenURL { url in
+                guard let target = SubscriptionCoordinator.importTarget(from: url) else { return }
+                Task {
+                    await model.addSubscriptionText(target.text, name: target.name ?? "Imported subscription")
+                }
+            }
     }
 }

@@ -228,6 +228,43 @@ final class SubscriptionCoordinator {
         return result
     }
 
+    /// Parses an inbound `rovia://import?url=<subscription-url>&name=<optional>`
+    /// deep link. Returns the raw text and display name — the caller runs it
+    /// through the usual classifier, so subscription URLs, single share
+    /// links, and multi-line/base64 containers all take their normal path.
+    /// A single garbage line is rejected here (freeform paste belongs to the
+    /// in-app paste UI, not to a link another app can fire); anything the
+    /// import itself refuses later still fails loudly with reasons.
+    nonisolated static func importTarget(from deepLink: URL) -> (text: String, name: String?)? {
+        guard deepLink.scheme?.lowercased() == "rovia",
+              deepLink.host?.lowercased() == "import",
+              let components = URLComponents(url: deepLink, resolvingAgainstBaseURL: false),
+              let encoded = components.queryItems?.first(where: { $0.name == "url" })?.value
+        else {
+            return nil
+        }
+        // URLComponents already percent-decoded the parameter once.
+        let trimmed = encoded.trimmingCharacters(in: .whitespacesAndNewlines)
+        switch SubscriptionInputClassifier.classify(trimmed) {
+        case .subscriptionURL, .singleShareLink:
+            break
+        case .pastedText:
+            // Containers travel by deep link too — but only containers, not
+            // one meaningless line.
+            guard let data = trimmed.data(using: .utf8),
+                  let document = try? SubscriptionDocumentDecoder.decode(data),
+                  document.lines.count > 1 || document.wasBase64
+            else {
+                return nil
+            }
+        case .none:
+            return nil
+        }
+        let name = components.queryItems?.first(where: { $0.name == "name" })?.value?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return (trimmed, name?.isEmpty == true ? nil : name)
+    }
+
     /// Projects every stored subscription into content the existing
     /// selection, group, and routing UI already understands: one profile
     /// and one group per subscription, servers with stable IDs.

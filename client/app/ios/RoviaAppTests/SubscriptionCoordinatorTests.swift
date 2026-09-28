@@ -272,3 +272,36 @@ final class SubscriptionCoordinatorTests: XCTestCase {
         XCTAssertFalse(records[0].allowInsecure)
     }
 }
+
+final class DeepLinkTests: XCTestCase {
+    func testImportLinkParsesURLAndName() {
+        let link = URL(string: "rovia://import?url=https%3A%2F%2Fprovider.example%2Fsub&name=Provider")!
+        let target = SubscriptionCoordinator.importTarget(from: link)
+        XCTAssertEqual(target?.text, "https://provider.example/sub")
+        XCTAssertEqual(target?.name, "Provider")
+    }
+
+    func testImportLinkAcceptsSingleShareLink() {
+        let single = "vless://00000000-0000-0000-0000-000000000001@synthetic.example:443?encryption=none&security=tls&type=tcp"
+        var components = URLComponents(string: "rovia://import")!
+        components.queryItems = [URLQueryItem(name: "url", value: single)]
+        let target = SubscriptionCoordinator.importTarget(from: components.url!)
+        XCTAssertEqual(target?.text, single)
+        XCTAssertNil(target?.name)
+    }
+
+    func testImportLinkAcceptsBase64Container() {
+        let container = Data(coordinatorVLESS.utf8).base64EncodedString()
+        var components = URLComponents(string: "rovia://import")!
+        components.queryItems = [URLQueryItem(name: "url", value: container)]
+        let target = SubscriptionCoordinator.importTarget(from: components.url!)
+        XCTAssertEqual(target?.text, container)
+    }
+
+    func testNonImportLinksAreRejected() {
+        XCTAssertNil(SubscriptionCoordinator.importTarget(from: URL(string: "rovia://other?url=https://x.example/")!))
+        XCTAssertNil(SubscriptionCoordinator.importTarget(from: URL(string: "https://provider.example/sub")!))
+        XCTAssertNil(SubscriptionCoordinator.importTarget(from: URL(string: "rovia://import")!))
+        XCTAssertNil(SubscriptionCoordinator.importTarget(from: URL(string: "rovia://import?url=not%20a%20link")!))
+    }
+}
