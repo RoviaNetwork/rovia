@@ -112,6 +112,16 @@ struct SubscriptionInspectorView: View {
                 Text("Subscriptions")
             }
             .accessibilityIdentifier(AppAccessibilityIdentifier.subscriptionEntries)
+            Section {
+                Label(
+                    "Credentials are never shown. Server addresses are replaced with a redacted placeholder, and secrets stay in the Keychain.",
+                    systemImage: "eye.slash"
+                )
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier(AppAccessibilityIdentifier.subscriptionRedaction)
+            }
         }
         .listStyle(.insetGrouped)
         .refreshable {

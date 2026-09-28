@@ -7,7 +7,7 @@ private let vlessLine = "vless://00000000-0000-0000-0000-000000000001@synthetic.
 private let trojanLine = "trojan://Pipeline-Password-1@synthetic.example:443?security=tls"
 private let ssLine = "ss://YWVzLTI1Ni1nY206cGFzcw@synthetic.example:8388"
 
-private func testSink(prefix: String = "test/credential") -> ShareLinkCredentialSink {
+private func makeTestSink(prefix: String = "test/credential") -> ShareLinkCredentialSink {
     var count = 0
     return { _ in
         count += 1
@@ -119,7 +119,7 @@ final class SubscriptionImporterTests: XCTestCase {
     func testPartialImportReportsAcceptedAndRejected() {
         let result = SubscriptionImporter.importLines(
             [vlessLine, "vmess://eyJhZGRyZXNzIjoieCJ9", "definitely not a link"],
-            credentialSink: testSink()
+            credentialSink: makeTestSink()
         )
         XCTAssertEqual(result.accepted.count, 1)
         XCTAssertEqual(result.rejected.count, 2)
@@ -131,7 +131,7 @@ final class SubscriptionImporterTests: XCTestCase {
         // Regression: the old pre-check rejected any UUID containing a–f.
         let result = SubscriptionImporter.importLines(
             ["vless://7b0c2f4a-9e1d-4c3b-8a5f-6d2e1c0b9a87@synthetic.example:443?encryption=none&security=tls&type=tcp"],
-            credentialSink: testSink()
+            credentialSink: makeTestSink()
         )
         XCTAssertEqual(result.accepted.count, 1)
         XCTAssertTrue(result.rejected.isEmpty)
@@ -140,17 +140,17 @@ final class SubscriptionImporterTests: XCTestCase {
     func testDeduplicatesByLine() {
         let result = SubscriptionImporter.importLines(
             [trojanLine, trojanLine, vlessLine],
-            credentialSink: testSink()
+            credentialSink: makeTestSink()
         )
         XCTAssertEqual(result.accepted.count, 2)
         XCTAssertTrue(result.rejected.isEmpty)
     }
 
     func testIDsAreStableAcrossRefreshes() {
-        let first = SubscriptionImporter.importLines([vlessLine, trojanLine], credentialSink: testSink())
+        let first = SubscriptionImporter.importLines([vlessLine, trojanLine], credentialSink: makeTestSink())
         let second = SubscriptionImporter.importLines(
             [trojanLine, vlessLine, "vmess://eyJhZGRyZXNzIjoieCJ9"],
-            credentialSink: testSink()
+            credentialSink: makeTestSink()
         )
         let idsFirst = Dictionary(uniqueKeysWithValues: first.accepted.map { ($0.displayValue, $0.server.id) })
         for parsed in second.accepted {
@@ -165,7 +165,7 @@ final class SubscriptionImporterTests: XCTestCase {
         let parsed = try ShareLinkParser.parse(
             Data(link.utf8),
             id: UUID(),
-            credentialSink: testSink()
+            credentialSink: makeTestSink()
         )
         XCTAssertNil(parsed.server.transport.options["realityShortID"])
     }
@@ -175,7 +175,7 @@ final class SubscriptionImporterTests: XCTestCase {
             try ShareLinkParser.parse(
                 Data("vless://00000000-0000-0000-0000-000000000001@synthetic.example:443?encryption=none&type".utf8),
                 id: UUID(),
-                credentialSink: testSink()
+                credentialSink: makeTestSink()
             )
         ) { error in
             XCTAssertEqual(error as? ShareLinkParseError, .invalidQuery)
@@ -188,7 +188,7 @@ final class SubscriptionImporterTests: XCTestCase {
             try ShareLinkParser.parse(
                 Data("vless://00000000-0000-0000-0000-000000000001@synthetic.example:443?encryption=none&a=b=c".utf8),
                 id: UUID(),
-                credentialSink: testSink()
+                credentialSink: makeTestSink()
             )
         ) { error in
             XCTAssertEqual(error as? ShareLinkParseError, .unsupportedQueryKey)
@@ -337,7 +337,7 @@ final class SubscriptionStoreTests: XCTestCase {
         let store = SubscriptionStore(directory: directory)
         try await store.load()
         var record = storedRecord()
-        let imported = SubscriptionImporter.importLines([trojanLine], credentialSink: testSink())
+        let imported = SubscriptionImporter.importLines([trojanLine], credentialSink: makeTestSink())
         XCTAssertEqual(imported.accepted.count, 1)
         record.servers = imported.accepted.map(\.server)
         record.acceptedCount = imported.accepted.count
@@ -360,7 +360,7 @@ final class SubscriptionScaleTests: XCTestCase {
                 "vless://00000000-0000-0000-0000-\(String(format: "%012X", index))@h\(index).example:443?encryption=none&security=tls&type=tcp"
             }
             let start = Date()
-            let result = SubscriptionImporter.importLines(lines, credentialSink: testSink())
+            let result = SubscriptionImporter.importLines(lines, credentialSink: makeTestSink())
             let elapsed = Date().timeIntervalSince(start)
             XCTAssertEqual(result.accepted.count, count, "count \(count)")
             XCTAssertTrue(result.rejected.isEmpty, "count \(count)")

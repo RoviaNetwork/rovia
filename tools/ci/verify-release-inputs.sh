@@ -26,7 +26,7 @@
 #      SBOM, and engine lock, with hashes that match the files on disk.
 #
 # The order of 4 through 8 is the order the body runs in, and
-# tools/ci/test_ci_checks.py derives this list from the body and requires
+# tools/ci/test_ci_docs.py derives this list from the body and requires
 # CHANGELOG.md and docs/development/ci.md to state the same order. The engine
 # lock used to be documented as the last check, which it has never been.
 #
