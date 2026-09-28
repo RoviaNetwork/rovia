@@ -95,7 +95,25 @@ No release has been made and none is planned until the rows below close.
 | 3 | **Upload, TestFlight, and App Store submission** | No upload step exists in any workflow, and `tools/ci/test_ci_checks.py` fails if one appears. Nothing has been submitted anywhere, and no submission is planned by this slice. | A deliberate decision to add an upload step, with credentials and an App Store Connect record. |
 | 4 | **Physical-device VPN behaviour** | Profile installation, the Packet Tunnel Provider lifecycle, IPv4, IPv6, dual-stack, failover, and reconnect are all unverified. A simulator process staying alive says nothing about any of them, and the simulator runs in `tools/ci/verify-simulator-install.sh` are launch checks only. | A signed build on a device, with tunnel traffic observed. Blocked by step 2. |
 | 5 | **A production engine** | `engines.lock.json` enables no engine and approves none. `tools/build-engine/xray/build-apple.sh` refuses even with an approved lock, because the deterministic build recipe does not exist, and `tools/reproducibility/verify-xray.sh` refuses because no approved artifact exists. No engine has been built, hashed, or compared. | A reproducible engine build: a pinned commit, a verified upstream digest, a 64-character artifact hash matching bytes on disk, and a second build producing the same digest. |
-| 6 | **Environment approvals and branch protection** | The `ios-production` environment, its reviewers, and branch protection are unconfigured. Every handle in `CODEOWNERS` is a placeholder for a team that does not exist, so **no review is currently required on any path, including the security-sensitive ones**. The ownership lists in `CODEOWNERS` and `SECURITY.md` are now checked against each other and against the tree, but that checks the lists agree, not that anyone is reviewing. | Real GitHub teams, then branch protection requiring their review on the paths `SECURITY.md` lists. |
+| 6 | **Required review, and environment approvals** | Branch protection is now partly
+  real: an active ruleset on `main` requires a pull request, forbids deletion and
+  force-push, and permits only a squash merge
+  (<https://github.com/princeofscale/rovia/rules/24096965>). A required review is
+  deliberately **off**, because the only account with write access is the
+  repository owner and GitHub does not count the author's own approval — a
+  one-reviewer rule would make the repository unmergeable, which is protection by
+  paralysis. `require_code_owner_review` is off for the same reason: every handle in
+  `CODEOWNERS` is a placeholder for a team that does not exist, so requiring one
+  would block every pull request, so **no review is currently required on any
+  path**, including the security-sensitive ones. The `ios-production` environment
+  and its reviewers
+  are still unconfigured, and the release job in
+  `.github/workflows/release-ios.yml` is the one that would carry them. The ownership
+  lists in `CODEOWNERS` and `SECURITY.md` are checked against each other and against
+  the tree, which checks the lists agree — not that anyone is reviewing. | A second
+  maintainer with write access, and a GitHub organisation so that per-role teams can
+  exist. Then `required_approving_review_count: 1` and `require_code_owner_review` can
+  be turned on, and the `ios-production` environment configured with its reviewers. |
 | 7 | **Third-party advisories, dependency review, and secret scanning** | None is configured in this repository. The local packages have no external dependencies (`tools/ci/verify-lockfiles.sh` reports 7 local path dependencies and 0 locked externals), so there is nothing to scan today, and nothing would catch a dependency added tomorrow. | GitHub dependency review and secret scanning, or an equivalent pinned scanner. |
 | 8 | **Upstream SPDX tooling** | `tools/reproducibility/check-sbom.py` checks this repository's own documented invariants. It is not a third-party SPDX validator, and no `spdx-tools` run has occurred. The `documentNamespace` host is a deliberate `.invalid` placeholder that will not resolve. | A run of a conformant SPDX validator against the generated document. |
 | 9 | **Android** | Not started. No path in this repository is Android code, so this row names no file: there is nothing here that would have to change, and claiming a path would be a fiction. No claim is made about any other platform. | A separate slice. |

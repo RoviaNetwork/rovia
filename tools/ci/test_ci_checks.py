@@ -4303,6 +4303,42 @@ class PrivacyAndOwnershipTests(unittest.TestCase):
                     f"{name} still names the placeholder namespace",
                 )
 
+    def test_the_protection_that_exists_is_stated_as_precisely_as_the_gap(self):
+        """Branch protection is partly real now, so "nothing enforces" is too strong.
+
+        An active ruleset requires a pull request, forbids deletion and force-push, and
+        permits only a squash merge. A document that still says `CODEOWNERS` is "inert
+        until branch protection requires a review" is wrong about the first half while
+        being right about the second, and a reader cannot tell which half a given
+        sentence means. So each document has to name both: what the ruleset does, and
+        that no review is required and why.
+
+        The reason is the part that matters. There is one account with write access and
+        GitHub does not count the author's own approval, so a one-reviewer rule would
+        make the repository unmergeable. That is the opposite of protection, and writing
+        it down is what stops the rule being turned on and then worked around.
+        """
+        for name in ("SECURITY.md", "CODEOWNERS", "GOVERNANCE.md", "CONTRIBUTING.md"):
+            with self.subTest(document=name):
+                flattened = flat((REPO_ROOT / name).read_text(encoding="utf-8"))
+                for claim in (
+                    "requires a pull request",
+                    "squash",
+                ):
+                    self.assertIn(
+                        claim, flattened,
+                        f"{name} does not say what the active ruleset does",
+                    )
+                self.assertRegex(
+                    flattened,
+                    r"(does not require|not required|does not count the author)",
+                    f"{name} does not say that no review is enforced",
+                )
+                self.assertRegex(
+                    flattened,
+                    r"unmergeable|paralysis|blocks? every pull request",
+                    f"{name} does not say why requiring a review is not an option yet",
+                )
     def test_both_documents_say_no_review_is_enforced_yet(self):
         # The honest consequence of one owner: `CODEOWNERS` is inert until branch
         # protection requires a review, and requiring a review from the only possible
@@ -4316,14 +4352,20 @@ class PrivacyAndOwnershipTests(unittest.TestCase):
                     r"branch protection|external gate",
                     f"{name} does not say that required review is an open gate",
                 )
-        self.assertRegex(
-            flat(self.codeowners), r"inert until branch protection",
-            "CODEOWNERS does not say that it enforces nothing on its own",
-        )
-        self.assertRegex(
-            flat(self.security), r"enforces nothing|nothing currently enforces",
-            "SECURITY.md does not say that 'requires maintainer review' is not enforced",
-        )
+        # The phrasing changed when the ruleset was activated, and the assertion has to
+        # follow the truth rather than the wording: what must survive is that no review
+        # is required and that `CODEOWNERS` enforces nothing by itself. The first version
+        # of this assertion looked for "inert until branch protection", which was a true
+        # sentence until a ruleset existed and then stopped being one.
+        for document, name in ((self.codeowners, "CODEOWNERS"),
+                               (self.security, "SECURITY.md")):
+            with self.subTest(document=name):
+                self.assertRegex(
+                    flat(document),
+                    r"(does not enforce anything by itself|enforces nothing by itself"
+                    r"|does not require a review)",
+                    f"{name} does not say that CODEOWNERS enforces nothing by itself",
+                )
 
     def test_the_readme_figures_are_what_the_loaders_say(self):
         # The README is the first thing a reader sees and the least audited document
@@ -4773,16 +4815,29 @@ class PrivacyAndOwnershipTests(unittest.TestCase):
             "executed, and the executed one is recorded in the document's Closed section",
         )
         body = self.readiness_document()
+        readiness_lines = body.splitlines()
         for number, title in gates:
             with self.subTest(gate=number, title=title):
                 # Every gate must name at least one path in the tree that would
                 # have to change for it to be executed, so a row cannot drift
                 # into describing something that is not here.
-                row = next(
-                    line
-                    for line in body.splitlines()
+                index = next(
+                    position for position, line in enumerate(readiness_lines)
                     if line.startswith(f"| {number} |")
                 )
+                row = readiness_lines[index]
+                # The whole row, including its continuation lines. The rows are
+                # wrapped for readability, so a rule that reads only the first physical
+                # line of a row cannot see a path named further down - and the failure
+                # it produces is "this gate names no path", which is a statement about
+                # the checker rather than about the gate.
+                row_lines = [row]
+                for continuation in readiness_lines[index + 1:]:
+                    if continuation.startswith("  ") and not continuation.strip().startswith("|"):
+                        row_lines.append(continuation)
+                    else:
+                        break
+                row = " ".join(part.strip() for part in row_lines)
                 paths = re.findall(r"`([A-Za-z0-9._/-]+)`", row)
                 if not paths:
                     # A gate about work that has not started has no path to
@@ -4816,7 +4871,7 @@ class PrivacyAndOwnershipTests(unittest.TestCase):
             "Upload, TestFlight, and App Store submission": "CODEOWNERS",
             "Physical-device VPN behaviour": "tools/ci/verify-simulator-install.sh",
             "A production engine": "engines.lock.json",
-            "Environment approvals and branch protection": "CODEOWNERS",
+            "Required review, and environment approvals": "CODEOWNERS",
             "Third-party advisories, dependency review, and secret scanning":
                 "tools/ci/verify-lockfiles.sh",
             "Upstream SPDX tooling": "tools/reproducibility/check-sbom.py",

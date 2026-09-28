@@ -64,9 +64,16 @@ That sentence is here because `tools/ci/test_ci_checks.py` checks for it: an own
 file and a security policy that describe the same paths have to say so in the same
 words, or one of them drifts and nothing notices.
 
-What this file does not do is enforce anything on its own. `CODEOWNERS` is inert
-until branch protection requires a review, and no ruleset requires one yet: the only
-possible reviewer is the repository owner, so a self-review would satisfy the
-requirement without adding a second pair of eyes. That is an open external gate in
-`docs/development/release-readiness.md`, listed as gate 7, and it is the reason the
-next thing this project needs is a second maintainer rather than another test.
+What this file does not do is enforce anything on its own. An active ruleset on
+`main` requires a pull request, forbids deletion and force-push, and permits only a
+squash merge — so the *shape* of a change is protected. It does not require a review,
+and `require_code_owner_review` is off, because the only possible reviewer is the
+repository owner: GitHub does not count the author's own approval, so requiring one
+reviewer would make the repository unmergeable, and requiring a team that does not
+exist would block every pull request.
+
+That is the whole of the protection, and it is worth reading plainly: a change can
+only reach `main` through a pull request, and no human being is obliged to look at it.
+The gap is an open external gate in `docs/development/release-readiness.md`, and it
+is the reason the next thing this project needs is a second maintainer rather than
+another test.

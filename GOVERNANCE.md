@@ -12,10 +12,15 @@ consensus process to describe and no second opinion available inside the project
 
 That is a real constraint, not a formality. The two consequences worth naming:
 
-- **No review is enforced.** `CODEOWNERS` names a real account, but no ruleset requires
-  a review, and a review by the only possible reviewer would be a self-review. So
-  "requires maintainer review" in `SECURITY.md` and in this file is a statement of
-  intent. It is tracked as open gate 7 in
+- **No review is enforced, and a pull request is.** An active ruleset on `main`
+  requires a pull request, forbids deletion and force-push, and allows only a squash
+  merge. It does not require a review, because the only possible reviewer is the
+  repository owner and GitHub does not count the author's own approval — one-reviewer
+  protection here would be protection by paralysis, and `require_code_owner_review`
+  is off for the same reason. So "requires maintainer review" in `SECURITY.md` and
+  in this file is a statement of intent, and the protection that exists is that a
+  change can only reach `main` through a pull request that nobody is obliged to read.
+  Tracked as an open gate in
   [`docs/development/release-readiness.md`](docs/development/release-readiness.md).
 - **One person's judgement is the whole process.** An ADR records a decision and its
   reasoning, and there is no second reader who has to agree before it is merged.
