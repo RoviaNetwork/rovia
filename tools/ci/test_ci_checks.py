@@ -2397,6 +2397,162 @@ jobs:
                 self.assertIn(token, forbidden)
 
 
+class PreCommitConfigTests(unittest.TestCase):
+    """`.pre-commit-config.yaml` exists because pre-commit.ci is installed.
+
+    With no configuration the app does not skip - it posts `error during ci config`
+    and leaves a failing status on every pull request. Adding the file to make that
+    status go away would be the wrong fix, and it is checkable: the hooks have to be
+    hooks that run, on this tree, today.
+
+    Most of these assertions exist because two hooks in this file were silently
+    inert when first written, and both would have passed every test that only
+    asserted the hook id was present:
+
+    * `check-merge-conflict` reads the git directory, and returns success without
+      opening a single file unless it finds MERGE_HEAD or is passed
+      `--assume-in-merge`. Standalone - which is how pre-commit.ci invokes it, and
+      how it is verified here - it therefore never fires.
+    * `check-added-large-files` intersects its input with
+      `git diff --staged --diff-filter=A`, so it only inspects files added in this
+      one commit. A build product committed small and grown by a later commit is
+      never checked, which is the case that matters.
+
+    A hook that cannot fail is worse than a hook that is absent, because the
+    configuration then reads as coverage. The two assertions below are the guard.
+    """
+
+    def setUp(self):
+        self.path = REPO_ROOT / ".pre-commit-config.yaml"
+        self.assertTrue(self.path.is_file(), "the pre-commit configuration is missing")
+        self.text = self.path.read_text(encoding="utf-8")
+
+    def test_the_config_asks_merge_conflict_to_read_the_files_it_is_given(self):
+        # Without the flag the hook exits 0 before reading anything whenever the
+        # repository is not mid-merge, which is the normal case.
+        self.assertRegex(
+            self.text,
+            r"id: check-merge-conflict\s*\n\s*args: \[[^\]]*--assume-in-merge[^\]]*\]",
+            "check-merge-conflict is declared without --assume-in-merge, so it "
+            "returns success without reading a file unless a merge is in progress",
+        )
+
+    def test_the_config_makes_the_size_ceiling_apply_to_every_file(self):
+        # Without the flag the hook only sees files added in this commit, so the
+        # ceiling says nothing about a file that grew after it was committed.
+        self.assertRegex(
+            self.text,
+            r"id: check-added-large-files\s*\n\s*args: \[[^\]]*--enforce-all[^\]]*\]",
+            "check-added-large-files is declared without --enforce-all, so it only "
+            "inspects files newly added in this commit",
+        )
+
+    def test_every_hook_repository_is_pinned(self):
+        # pre-commit.ci reads this file from the pull request, so a floating ref
+        # would let a pull request decide what runs in CI. Same argument that pins
+        # every action in .github/workflows, asserted by WorkflowPolicyTests.
+        revisions = re.findall(r"^\s*rev:\s*(\S+)\s*$", self.text, re.MULTILINE)
+        self.assertTrue(revisions, "no hook repository is declared")
+        for revision in revisions:
+            with self.subTest(rev=revision):
+                self.assertNotRegex(revision, r"^(v?\d|main|master|latest)$")
+
+    def test_every_local_hook_names_a_script_that_exists_and_runs(self):
+        entries = re.findall(r"^\s*entry:\s*(\S+)\s*$", self.text, re.MULTILINE)
+        self.assertTrue(entries, "no local hook is declared")
+        for entry in entries:
+            with self.subTest(entry=entry):
+                target = REPO_ROOT / entry
+                self.assertTrue(target.is_file(), f"{entry} does not exist")
+                self.assertTrue(
+                    os.access(target, os.X_OK), f"{entry} is not executable"
+                )
+
+    def test_the_local_hooks_are_the_gates_the_hosted_runner_already_runs(self):
+        """pre-commit and CI must not drift into checking different things.
+
+        The point of the local hooks is to reach the same defects earlier, not to add
+        a second opinion. A pre-commit-only gate is a gate nobody runs in CI, and a
+        CI-only gate is one nobody runs before committing.
+
+        Three of the runner's four gates are here. The fourth, the pyflakes gate, is
+        deliberately absent and the set is asserted at three so it cannot be added back
+        by accident: it resolves pyflakes only from a pinned route, and the
+        pre-commit.ci container has neither an interpreter that can import pyflakes nor
+        `uvx` on PATH, so it runs and refuses. Re-adding it here would either give the
+        same claim two meanings or produce a gate that reports success without running.
+        The gate is not lost - `ios-ci` builds a virtualenv with pyflakes==3.2.0 and puts
+        it on PATH before calling the script, and `run-tool-tests.sh` reaches it locally.
+        """
+        self.assertIn(
+            "refusing to report success from a linter that did not run", self.text,
+            "the reason the pyflakes gate is absent is not recorded in the config, so "
+            "the next person to add it back has to rediscover it by reading a run log",
+        )
+        # No attempt is made here to assert the absence of the file name: the
+        # configuration has to *mention* the script to explain why it is not wired,
+        # and a test that forbade the mention would forbid the explanation. The
+        # `entry:` set above is the assertion that matters - a hook is wired by
+        # naming an entry, so an entry outside that set is not wired.
+        declared = set(re.findall(r"^\s*entry:\s*(\S+)\s*$", self.text, re.MULTILINE))
+        self.assertEqual(
+            declared,
+            {
+                "tools/ci/check-repository-hygiene.sh",
+                "tools/ci/check-python-warnings.sh",
+                "tools/ci/check-shell-syntax.sh",
+            },
+            "the pre-commit local hooks and the hosted gates have diverged; one of "
+            "the two is not checking what the other checks",
+        )
+        # Three of the four are named by `run-tool-tests.sh` rather than by the
+        # workflow, and that indirection is deliberate: the runner is one step and the
+        # gates belong together, and a local machine gets the same set by running the
+        # runner. So a gate counts as covered if either the workflow or the runner
+        # names it - the same distinction `WorkflowPolicyTests` already draws with
+        # REACHED_THOUGH_THE_RUNNER, and for the same reason.
+        workflow = (WORKFLOWS / "ci.yml").read_text(encoding="utf-8")
+        runner = (REPO_ROOT / "tools/ci/run-tool-tests.sh").read_text(encoding="utf-8")
+        # Named `script`, not `gate`: `gate` is the module alias
+        # `script_test_support as gate` used throughout this file, and shadowing it
+        # with a loop variable is what pyflakes correctly reported on the first run
+        # of this test.
+        for script in declared:
+            with self.subTest(script=script):
+                self.assertTrue(
+                    script in workflow or script in runner,
+                    f"{script} is a pre-commit hook but neither ci.yml nor "
+                    "run-tool-tests.sh executes it, so it is not a CI gate at all",
+                )
+
+    def test_the_documented_exclusions_stay_excluded(self):
+        """The two hooks left out on purpose, and the reason, stay in the file.
+
+        92 tracked files carry trailing whitespace, and cleaning it is a 92-file
+        mechanical diff unrelated to this configuration. That decision is recorded in
+        the file's comments so it is not re-made silently - and if either hook is
+        added later, this fails and forces the diff and the record to be updated
+        together.
+        """
+        self.assertIn("trailing-whitespace", self.text)
+        self.assertIn("end-of-file-fixer", self.text)
+        # The pattern is compiled here rather than passed as a string, and that is the
+        # second version's correction. AssertNotRegex has no `flags` parameter, so the
+        # first attempt passed the flag positionally, where it was taken as `msg`: the
+        # pattern was compiled without MULTILINE, `^` and `$` matched only the ends of
+        # the whole string, and the assertion passed for every configuration including
+        # the one it exists to reject. Adding the hook back is what exposed it.
+        for hook in ("trailing-whitespace", "end-of-file-fixer"):
+            with self.subTest(hook=hook):
+                self.assertNotRegex(
+                    self.text,
+                    re.compile(rf"^\s*- id: {re.escape(hook)}\s*$", re.MULTILINE),
+                    f"{hook} is declared. It is excluded on purpose because cleaning "
+                    "92 files is a separate change, not part of this one; adding it "
+                    "means making that diff and updating this record together",
+                )
+
+
 class CheckShellSyntaxTests(unittest.TestCase):
     def setUp(self):
         self.directory = Path(tempfile.mkdtemp())

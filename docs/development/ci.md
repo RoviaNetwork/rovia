@@ -7,6 +7,7 @@ workflow's secret-presence and signing steps.
 ## Local equivalents
 
 ```text
+pre-commit run --all-files                           # the same four Python/shell/hygiene gates, plus the structural hooks, before a commit exists
 ./tools/ci/check-shell-syntax.sh                     # every tracked script parses
 ./tools/ci/run-tool-tests.sh                         # every tools/**/test_*.py file, then both Python gates and the hygiene gate
 ./tools/ci/verify-lockfiles.sh                        # package manifests and the engine lock
@@ -151,6 +152,85 @@ Two of its steps assert facts rather than exit codes:
 `tools/ci/verify-simulator-install.sh` installs that bundle, launches it, checks
 the process is alive, and terminates it. It is not evidence of a Packet Tunnel
 Provider lifecycle or of anything on a physical device.
+
+## The pre-commit gate
+
+The pre-commit.ci app is installed on this repository, so a pull request gets a
+second status alongside `swift-tests`. It reads `.pre-commit-config.yaml` from
+the pull request itself, which is why every hook repository is pinned there for
+the same reason every action in `.github/workflows` is pinned: an unpinned ref
+would let a pull request decide what runs in CI.
+
+The file exists because the app is installed. With no configuration the app does
+not skip - it posts `error during ci config` and leaves a failing status on
+every pull request, which is worse than no status, because a check that is always
+red is a check people learn to ignore. Adding the file to silence that status
+would be the wrong fix, so the hooks are real and they pass on this tree.
+
+Ten hooks, and three of them are the hosted runner's own gates run earlier and on
+the same code:
+
+| Hook | What it is |
+| --- | --- |
+| `check-merge-conflict` | a conflict marker that survived a resolution |
+| `check-case-conflict` | two paths differing only in case, which build on macOS and not on Linux |
+| `check-yaml`, `check-json` | a workflow or manifest that does not parse never runs |
+| `check-added-large-files` | build products, archives, derived data, over 2 MB |
+| `detect-private-key` | key material, independently of the repository's own hygiene gate |
+| `destroyed-symlinks` | a committed symlink replaced by a regular file |
+| the three local hooks | `check-repository-hygiene.sh`, `check-python-warnings.sh`, `check-shell-syntax.sh` |
+
+Two arguments in that file are load-bearing, and both were absent in the version
+that was written first. They are asserted by `PreCommitConfigTests` in
+`tools/ci/test_ci_checks.py`, because a hook that cannot fail is worse than a hook
+that is absent - the configuration then reads as coverage:
+
+- `check-merge-conflict` takes `--assume-in-merge`. Without it the hook reads the
+  git directory, finds no `MERGE_HEAD`, and returns success without opening a
+  file - so on `pre-commit run --all-files`, which is how pre-commit.ci invokes it,
+  it never fires at all.
+- `check-added-large-files` takes `--enforce-all`. Without it the hook intersects
+  its input with `git diff --staged --diff-filter=A`, so it only sees files added
+  in this one commit. A build product committed small and replaced by a later
+  commit - the ordinary way one arrives - is never checked.
+
+`check-python-lint.sh` is the fourth hosted gate and is deliberately not a
+pre-commit hook, for an environment reason rather than a preference. That gate
+resolves pyflakes only from a pinned route: it imports pyflakes from the current
+interpreter, or fetches `pyflakes==3.2.0` through `uvx`. On a contributor's
+machine both routes exist. In the pre-commit.ci container neither does, and the
+gate runs and refuses:
+
+```text
+check-python-lint: no pyflakes available: python3 cannot import it
+check-python-lint:   and uvx is not on PATH to fetch pyflakes==3.2.0
+check-python-lint: refusing to report success from a linter that did not run
+```
+
+This is the same defect that failed the first hosted run - a hosted macOS runner
+has no `uvx` either - and the same discipline that fixed it there is the reason
+the hook is absent here. Both available fixes were rejected: declaring the hook
+with pre-commit's own `language: python` and `additional_dependencies:
+[pyflakes==3.2.0]` does work in that container, but it gives one claim two routes
+and "pyflakes clean" stops having a single meaning; and skipping the gate when the
+tool is absent is a gate that reports success without running. `ios-ci` builds a
+virtualenv with `pyflakes==3.2.0` and puts it on PATH before calling the script, and
+`run-tool-tests.sh` reaches the same script locally, so the lint gate still runs in
+both of the places that can actually run it.
+
+`trailing-whitespace` and `end-of-file-fixer` are deliberately absent. 92 tracked
+files carry trailing whitespace, and cleaning it is a 92-file mechanical diff
+that has nothing to do with a pre-commit configuration. `PreCommitConfigTests`
+asserts they stay absent until that diff and this record are updated together.
+
+What the hooks do *not* catch is recorded rather than assumed. Five of them were
+verified by planting a defect - a conflict marker, malformed YAML, malformed
+JSON, key material, an oversized file, and a machine path in the publishable set
+- and confirming the run fails; `detect-private-key` and the repository's own
+hygiene gate both caught the planted key, from different implementations.
+`check-case-conflict` cannot be exercised on a case-insensitive filesystem, and
+`destroyed-symlinks` cannot be exercised in a tree with no symlinks, so those two
+are unverified here and are recorded as such.
 
 ## App model tests
 
@@ -387,6 +467,11 @@ rather than at this summary.
   tests that read files the repository does not publish. `docs/development/release-readiness.md`
   lists what a run found and what is still open.
   The remaining external gates are:
+- **The pre-commit gate runs, and is not an external gate.** `.pre-commit-config.yaml`
+  is a real configuration whose eleven hooks pass on this tree, and the arguments that
+  make two of them functional instead of inert are asserted by `PreCommitConfigTests`.
+  What the gate does not cover - a case-only path conflict, and a committed symlink
+  replaced by a regular file - is recorded above as unverified rather than assumed.
 - **Signing, provisioning, archive, and export.** No certificate import,
   `xcodebuild archive`, `-exportArchive`, TestFlight, or App Store submission has
   been performed, so the release gate's happy path is only exercised against a

@@ -1,0 +1,137 @@
+# pre-commit configuration for Rovia.
+#
+# Why this file exists: the pre-commit.ci app is installed on this repository, and it
+# runs on every pull request. With no configuration at all it did not skip - it
+# reported `error during ci config` and left a failing status on the PR, which is
+# worse than no status at all, because a red check on every pull request trains
+# people to ignore red checks. The fix is a real configuration whose hooks pass, not
+# a file that exists only to silence the check.
+#
+# Two hooks that are commonly added are deliberately absent, and the reason is
+# recorded here so they are not re-added on autopilot:
+#
+#   trailing-whitespace  - 92 tracked files carry trailing whitespace, and in the
+#     Swift, shell, YAML, and Python sources it is incidental rather than a markdown
+#     hard line break. Cleaning it is a real improvement, but it is a 92-file
+#     mechanical diff that has nothing to do with a pre-commit configuration, and
+#     mixing the two makes a reviewer unable to see either. It is a separate change.
+#   end-of-file-fixer    - the same reasoning, two files, and one of them is a binary
+#     screenshot, which is not a defect to fix.
+#
+# The hooks below are the ones that catch mistakes in this repository specifically.
+# Three of the local hooks are the same gates the hosted runner executes, run early and
+# on the same code, so a defect is caught before a runner is spent on it. The fourth
+# candidate, the pyflakes gate, is absent for an environment reason recorded below.
+# The structural hooks are the standard pre-commit set for the file types this tree
+# contains.
+#
+# Every hook id here is pinned. pre-commit.ci reads this file from a pull request, so
+# a floating tag would let a pull request change what runs in CI - the same supply
+# chain argument that pins every action in `.github/workflows`.
+
+minimum_pre_commit_version: "3.0.0"
+default_stages: [pre-commit]
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      # A conflict marker left in a file is a defect that reaches main, and this
+      # repository resolved a merge conflict by hand within the last few commits.
+      #
+      # `--assume-in-merge` is load-bearing. Without it the hook reads the git
+      # directory, sees no MERGE_HEAD, and returns success without reading a single
+      # file - so it never fires on a `pre-commit run --all-files`, which is how
+      # pre-commit.ci invokes it, and how this was verified here. With it, the hook
+      # checks the files it is given, which is the behaviour that catches a marker
+      # that survived a conflict resolution.
+      - id: check-merge-conflict
+        args: ["--assume-in-merge"]
+      # macOS is case-insensitive by default and Linux is not, so a file differing
+      # only in case builds on one runner and not the other.
+      - id: check-case-conflict
+      # A workflow that does not parse never runs, and a workflow that does not run
+      # is not a gate. All three workflows in this repository parse today.
+      - id: check-yaml
+      - id: check-json
+      # A symlink that was committed as a symlink and was later replaced by a
+      # regular file. The hook reads `git status --porcelain=v2` and compares the
+      # file mode in HEAD (120000, a link) against the index.
+      #
+      # The scope is narrower than the name suggests, and deliberately not widened
+      # here. It does not detect a *newly added* broken symlink: the file it needs to
+      # inspect is one that is no longer a symlink, so filtering the input to
+      # `types: [symlink]` would exclude exactly the files the hook exists to look at.
+      # It also cannot be exercised in this tree, which has no symlinks at all, so
+      # unlike every other hook here it is not covered by the probe in
+      # `tools/ci/test_ci_checks.py`. It is kept because it is the standard
+      # pre-commit guard for that defect and costs nothing when dormant - it reports
+      # as skipped, not passed, when there is nothing to check.
+      - id: destroyed-symlinks
+      # Build products, archives, and derived data are the artifacts most likely to
+      # be committed by accident. The one deliberate large file, the screenshot, is
+      # 372 KB and well under this limit.
+      #
+      # `--enforce-all` is load-bearing. Without it the hook intersects the files it
+      # is given with `git diff --staged --diff-filter=A`, so it only ever inspects
+      # files newly added in this one commit. A file that was added in an earlier
+      # commit and has since grown - which is how a build product usually arrives,
+      # committed small and replaced by a later build - is never checked. The ceiling
+      # is what matters here, not the moment of adding, so every file is checked.
+      - id: check-added-large-files
+        args: ["--maxkb=2048", "--enforce-all"]
+      # Credentials in a repository are the failure this repository's own hygiene gate
+      # exists to prevent. This hook is a second, independent check with a different
+      # implementation, and an independent check is worth more than a second copy of
+      # the first one.
+      - id: detect-private-key
+
+  - repo: local
+    hooks:
+      # The hosted runner executes these three in order, on the full tree. Running
+      # them on a commit is the same work on the same code, reached earlier.
+      #
+      # `check-python-lint.sh` is deliberately NOT here, and the reason is
+      # environment, not preference. That gate resolves pyflakes only from a pinned
+      # route - it imports it from the current interpreter, or fetches pyflakes==3.2.0
+      # through `uvx` - and on a contributor's machine both exist. In the pre-commit.ci
+      # container neither does: the interpreter cannot import pyflakes and `uvx` is not
+      # on PATH, so the gate ran and refused:
+      #
+      #     check-python-lint: no pyflakes available: python3 cannot import it
+      #     check-python-lint:   and uvx is not on PATH to fetch pyflakes==3.2.0
+      #     check-python-lint: refusing to report success from a linter that did not run
+      #
+      # That refusal is the gate working. The wrong fixes are the two available here:
+      # declare the hook with pre-commit's own `language: python` and
+      # `additional_dependencies: [pyflakes==3.2.0]`, which works in that container and
+      # creates a second route to the same claim, so "pyflakes clean" stops having one
+      # meaning; or skip the gate when the tool is absent, which is a gate that reports
+      # success without running. `ios-ci` already builds a virtualenv with pyflakes==3.2.0
+      # and puts it on PATH before calling the script, and `run-tool-tests.sh` reaches
+      # the same script locally, so the lint gate is not lost - it is just not this
+      # file's job. `PreCommitConfigTests` holds the set at three so the gate cannot
+      # be added back here by accident.
+      - id: repository-hygiene
+        name: check the publishable tree for secrets, artifacts, and machine paths
+        entry: tools/ci/check-repository-hygiene.sh
+        language: script
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit, pre-push, manual]
+
+      - id: python-warnings
+        name: compile the tooling with warnings as errors
+        entry: tools/ci/check-python-warnings.sh
+        language: script
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit, pre-push, manual]
+
+      - id: shell-syntax
+        name: bash -n over the shell sources
+        entry: tools/ci/check-shell-syntax.sh
+        language: script
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit, pre-push, manual]
