@@ -4304,34 +4304,41 @@ class PrivacyAndOwnershipTests(unittest.TestCase):
                 )
 
     def test_the_protection_that_exists_is_stated_as_precisely_as_the_gap(self):
-        """Branch protection is partly real now, so "nothing enforces" is too strong.
+        """Branch protection is partly real now, so "nothing is protected" is too strong.
 
-        An active ruleset requires a pull request, forbids deletion and force-push, and
-        permits only a squash merge. A document that still says `CODEOWNERS` is "inert
-        until branch protection requires a review" is wrong about the first half while
-        being right about the second, and a reader cannot tell which half a given
-        sentence means. So each document has to name both: what the ruleset does, and
-        that no review is required and why.
+        An active ruleset on `main` requires a pull request, forbids deletion and
+        force-push, and permits only a squash merge. A document that still says
+        `CODEOWNERS` is "inert until branch protection requires a review" is right
+        about the review and wrong about the protection, and a reader cannot tell which
+        half any given sentence means. So each document has to name both, and the two
+        are asserted as two claims rather than one phrase.
 
-        The reason is the part that matters. There is one account with write access and
-        GitHub does not count the author's own approval, so a one-reviewer rule would
-        make the repository unmergeable. That is the opposite of protection, and writing
-        it down is what stops the rule being turned on and then worked around.
+        Three of these assertions exist because the first version of this test was too
+        weak in ways worth recording:
+
+        * "GitHub does not count the author's approval" explains *why* a review rule is
+          unusable. It does not say the rule is off, and a document could state the
+          explanation and then claim a review **is** required. The gap claim is the one
+          being protected, so it is matched on its own words.
+        * Calling the handles "placeholders" stopped being true when they became a real
+          account. A document repeating that is describing a different problem from the
+          one this repository has, which is the absence of a second approver.
+        * A blanket ban on "nothing currently enforces" was too broad: the sentence is
+          still true *of the review*. What is stale is the claim that nothing at all is
+          protected, and that is what the positive assertions above hold.
         """
         for name in ("SECURITY.md", "CODEOWNERS", "GOVERNANCE.md", "CONTRIBUTING.md"):
+            flattened = flat((REPO_ROOT / name).read_text(encoding="utf-8"))
             with self.subTest(document=name):
-                flattened = flat((REPO_ROOT / name).read_text(encoding="utf-8"))
-                for claim in (
-                    "requires a pull request",
-                    "squash",
-                ):
-                    self.assertIn(
-                        claim, flattened,
-                        f"{name} does not say what the active ruleset does",
-                    )
+                # What the ruleset does.
+                self.assertIn("active ruleset", flattened)
+                self.assertIn("requires a pull request", flattened)
+                self.assertIn("squash", flattened)
+                self.assertIn("force-push", flattened)
+                # What it does not do, on its own words.
                 self.assertRegex(
                     flattened,
-                    r"(does not require|not required|does not count the author)",
+                    r"(does not require a review|not required|is not enforced|is off)",
                     f"{name} does not say that no review is enforced",
                 )
                 self.assertRegex(
@@ -4339,32 +4346,94 @@ class PrivacyAndOwnershipTests(unittest.TestCase):
                     r"unmergeable|paralysis|blocks? every pull request",
                     f"{name} does not say why requiring a review is not an option yet",
                 )
-    def test_both_documents_say_no_review_is_enforced_yet(self):
-        # The honest consequence of one owner: `CODEOWNERS` is inert until branch
-        # protection requires a review, and requiring a review from the only possible
-        # reviewer would be a self-review. Both documents have to say so, because a
-        # reader of either one alone would otherwise believe a review is required.
-        for document, name in ((self.codeowners, "CODEOWNERS"), (self.security, "SECURITY.md")):
-            with self.subTest(document=name):
-                flattened = flat(document)
+                # What the gap actually is.
+                self.assertNotIn(
+                    "placeholder", flattened,
+                    f"{name} calls the CODEOWNERS handles placeholders; they name a "
+                    "real account, and the gap is the missing approver",
+                )
                 self.assertRegex(
                     flattened,
-                    r"branch protection|external gate",
-                    f"{name} does not say that required review is an open gate",
+                    r"independent approver|second pair of eyes|second maintainer",
+                    f"{name} does not say what the gap actually is",
                 )
-        # The phrasing changed when the ruleset was activated, and the assertion has to
-        # follow the truth rather than the wording: what must survive is that no review
-        # is required and that `CODEOWNERS` enforces nothing by itself. The first version
-        # of this assertion looked for "inert until branch protection", which was a true
-        # sentence until a ruleset existed and then stopped being one.
-        for document, name in ((self.codeowners, "CODEOWNERS"),
-                               (self.security, "SECURITY.md")):
+
+                # A document that states the gap correctly can still be wrong in the
+                # same paragraph, and the positive assertions above would not notice.
+                # This is the failure mode the second CodeRabbit review was about: a
+                # document that says "a review is required" *and* explains that no
+                # review is enforced. The explanation is what a reader quotes; the
+                # contradiction is what they act on. So every sentence that mentions
+                # review and a requirement must also carry a negation, a hypothetical,
+                # or an explicit statement of intent - otherwise it asserts a review
+                # that does not exist.
+                # Split per source line before splitting on sentence punctuation, and
+                # not the other way round. `flat()` collapses newlines, so a markdown
+                # heading - which carries no terminating full stop - would be glued to
+                # the sentence after it, and the negation in the heading would mask a
+                # contradiction in the body. That was a real miss: appending "A review
+                # is required before merging to main." directly under a heading that
+                # says the list "does not enforce a review" passed this check. Line
+                # structure is a stronger boundary than punctuation here.
+                lines = (REPO_ROOT / name).read_text(encoding="utf-8").splitlines()
+                sentences = [
+                    sentence
+                    for line in lines
+                    for sentence in re.split(r"(?<=[.!?])\s+", flat(line))
+                    if sentence.strip()
+                ]
+                for sentence in sentences:
+                    if "review" not in sentence:
+                        continue
+                    if not re.search(r"\brequir|\bmust be approved|\bapprove\b", sentence):
+                        continue
+                    # Scoped to the claim actually at issue: a review enforced on the
+                    # protected branch. A process rule that says a *future* change needs
+                    # a human-reviewed lockfile is a different sentence about a
+                    # different subject, and flagging it would be the check being wrong
+                    # rather than the document.
+                    if not re.search(
+                        r"\bmain\b|ruleset|branch protection|\bcode ?owners?\b"
+                        r"|\bmerge|protected|default branch",
+                        sentence,
+                        re.IGNORECASE,
+                    ):
+                        continue
+                    if re.search(
+                        r"\bnot\b|\bno\b|\bnothing\b|\bnever\b|\bwould\b|\bcannot\b"
+                        r"|\bstatement of intent\b|\bintent\b|\bintended\b|\bif\b|\buntil\b",
+                        sentence,
+                    ):
+                        continue
+                    self.fail(
+                        f"{name} asserts a review that is not enforced: {sentence[:160]!r}"
+                    )
+
+    def test_both_documents_say_no_review_is_enforced_yet(self):
+        """The review gap has to be named as an open gate, not just as a caveat.
+
+        This test previously asserted the literal phrase "inert until branch
+        protection requires a review", which was true when no ruleset existed and
+        became false the moment one did. Asserting a sentence about the *absence* of
+        protection is how the stale claim survived in the first place: the sentence
+        itself outlived the state it described. The state is asserted positively now,
+        by `test_the_protection_that_exists_is_stated_as_precisely_as_the_gap`, and
+        what remains here is the narrower job - both documents must tell a reader that
+        the missing review is a tracked gap rather than a settled fact.
+        """
+        for document, name in ((self.codeowners, "CODEOWNERS"), (self.security, "SECURITY.md")):
             with self.subTest(document=name):
                 self.assertRegex(
                     flat(document),
-                    r"(does not enforce anything by itself|enforces nothing by itself"
-                    r"|does not require a review)",
-                    f"{name} does not say that CODEOWNERS enforces nothing by itself",
+                    r"open (external )?gate|gate in|external gate",
+                    f"{name} does not point at the open gate for the missing review",
+                )
+                # The documents describe the same gap in the same terms, so a reader
+                # who sees one and not the other is not misled about the other.
+                self.assertRegex(
+                    flat(document),
+                    r"independent approver|second pair of eyes|second maintainer",
+                    f"{name} does not name the gap as the missing approver",
                 )
 
     def test_the_readme_figures_are_what_the_loaders_say(self):

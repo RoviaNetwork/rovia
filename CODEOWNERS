@@ -7,8 +7,9 @@
 # and `docs/development/release-readiness.md` tracks that requirement as an open
 # external gate until branch protection is turned on.
 #
-# The role distinction that mattered under placeholder handles — which paths are
-# security-sensitive and which are engine-sensitive — is not lost. It lives in
+# The role distinction that mattered under the earlier invented handles — which
+# paths are security-sensitive and which are engine-sensitive — is not lost. It
+# lives in
 # `SECURITY.md`, which states the criterion and the list, and
 # `tools/ci/test_ci_checks.py` checks that this file and that one agree in both
 # directions and that every path named in either exists in the tree.
@@ -74,6 +75,8 @@ exist would block every pull request.
 
 That is the whole of the protection, and it is worth reading plainly: a change can
 only reach `main` through a pull request, and no human being is obliged to look at it.
-The gap is an open external gate in `docs/development/release-readiness.md`, and it
-is the reason the next thing this project needs is a second maintainer rather than
-another test.
+The gap is not the handles — they are real and they resolve — it is the absence of an
+independent approver. It is an open external gate in
+`docs/development/release-readiness.md`, and it is the reason the next thing this
+project needs is a second maintainer rather than another test.
+
