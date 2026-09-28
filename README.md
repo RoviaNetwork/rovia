@@ -416,3 +416,5 @@ Third-party notices: [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 <p align="center">
 <sub>Pre-alpha software. No tunnel, no release, no App Store presence. Built to be audited.</sub>
 </p>
+
+<!-- gate probe -->
