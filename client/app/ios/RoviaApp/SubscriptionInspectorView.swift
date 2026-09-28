@@ -6,11 +6,15 @@ struct SubscriptionInspectorView: View {
     var body: some View {
         Group {
             if model.snapshot.content.subscription == nil {
-                ContentUnavailableView(
-                    "No subscription loaded",
-                    systemImage: "doc.text.magnifyingglass",
-                    description: Text("Rovia does not fetch subscriptions in this build. Load a local configuration to inspect parsed results offline.")
-                )
+                ContentUnavailableView {
+                    Label {
+                        Text("No subscription loaded")
+                    } icon: {
+                        RoviaLogoView(.emptyState)
+                    }
+                } description: {
+                    Text("Rovia does not fetch subscriptions in this build. Load a local configuration to inspect parsed results offline.")
+                }
                 .modifier(ConditionalAccessibilityIdentifier(
                     identifier: AppAccessibilityIdentifier.subscriptionEmpty
                 ))

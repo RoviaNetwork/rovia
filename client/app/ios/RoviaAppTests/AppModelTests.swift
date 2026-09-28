@@ -691,6 +691,45 @@ final class AppModelTests: XCTestCase {
         assertEqual(model.snapshot.selection.server, nil)
     }
 
+    func testVisibleServersScaleToThousands() async {
+        let count = 5_000
+        let ids = (0..<count).map { String(format: "perf-srv-%05d", $0) }
+        var content = AppContent()
+        content.servers = ids.map {
+            ServerSummary(
+                id: $0,
+                name: "Relay \($0)",
+                protocolLabel: "VLESS",
+                locationLabel: "Nowhere",
+                latency: .notMeasured,
+                health: .none,
+                groupIDs: ["perf-group"]
+            )
+        }
+        content.groups = [
+            ServerGroupSummary(
+                id: "perf-group",
+                name: "All",
+                modeLabel: "Manual",
+                policyLabel: "Manual selection",
+                memberIDs: ids
+            )
+        ]
+        content.profiles = [
+            ProfileSummary(id: "perf-profile", name: "P", sourceKindLabel: "Test", serverIDs: ids)
+        ]
+        content.defaultProfileID = "perf-profile"
+        content.defaultGroupID = "perf-group"
+        content.isSampleData = false
+        let model = await makePreparedModel(content: content)
+        let start = Date()
+        let visible = model.snapshot.visibleServers
+        let elapsed = Date().timeIntervalSince(start)
+        assertEqual(visible.count, count)
+        assertEqual(visible.map(\.id), ids, "group order with the profile filter applied")
+        print("visibleServers(\(count)) = \(String(format: "%.3f", elapsed))s")
+    }
+
     func testSwitchingProfileClearsAServerThatTheNewProfileDoesNotContain() async {
         let model = await makePreparedModel()
         let groupChange = await model.selectGroup("00000000-0000-0000-0000-000000000202")

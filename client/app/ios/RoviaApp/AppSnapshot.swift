@@ -1224,13 +1224,25 @@ struct AppSnapshot: Equatable, Sendable {
     }
 
     var visibleServers: [ServerSummary] {
-        let profileServerIDs = selectedProfileServerIDs
-        let allowed = content.servers.filter { profileServerIDs?.contains($0.id) ?? true }
+        // Index once instead of scanning `allowed` per member: the old
+        // `allowed.first { $0.id == memberID }` was O(group × servers) on
+        // every recompute. Order semantics are unchanged — group order when
+        // a group is selected, content order otherwise, profile filter
+        // applied in both cases.
         guard let groupID = selection.group, let group = content.group(id: groupID) else {
-            return allowed
+            guard let profileServerIDs = selectedProfileServerIDs else {
+                return content.servers
+            }
+            return content.servers.filter { profileServerIDs.contains($0.id) }
         }
+        guard let profileServerIDs = selectedProfileServerIDs else {
+            let byID = Dictionary(uniqueKeysWithValues: content.servers.map { ($0.id, $0) })
+            return group.memberIDs.compactMap { byID[$0] }
+        }
+        let byID = Dictionary(uniqueKeysWithValues: content.servers.map { ($0.id, $0) })
         return group.memberIDs.compactMap { memberID in
-            allowed.first { $0.id == memberID }
+            guard profileServerIDs.contains(memberID) else { return nil }
+            return byID[memberID]
         }
     }
 }

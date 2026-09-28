@@ -30,6 +30,8 @@
 		C10000000000000000000016 = {isa = PBXBuildFile; fileRef = B10000000000000000000018 /* CanonicalRouteBridge.swift */; };
 		C10000000000000000000017 = {isa = PBXBuildFile; productRef = E10000000000000000000005 /* RoviaConfig */; };
 		C10000000000000000000018 = {isa = PBXBuildFile; productRef = E10000000000000000000006 /* RoviaConfig */; };
+		C10000000000000000000019 = {isa = PBXBuildFile; fileRef = B10000000000000000000019 /* RoviaLogoView.swift */; };
+		C1000000000000000000001A = {isa = PBXBuildFile; fileRef = B1000000000000000000001A /* rovia-logo.png */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -67,6 +69,8 @@
 		B10000000000000000000015 = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RoviaAppTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		B10000000000000000000017 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModelTests.swift; sourceTree = "<group>"; };
 		B10000000000000000000018 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanonicalRouteBridge.swift; sourceTree = "<group>"; };
+		B10000000000000000000019 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoviaLogoView.swift; sourceTree = "<group>"; };
+		B1000000000000000000001A = {isa = PBXFileReference; lastKnownFileType = image.png; path = Assets/rovia-logo.png; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -136,6 +140,8 @@
 				B10000000000000000000013,
 				B10000000000000000000014,
 				B10000000000000000000018,
+				B10000000000000000000019,
+				B1000000000000000000001A,
 				B10000000000000000000003,
 				B10000000000000000000004,
 			);
@@ -282,6 +288,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C1000000000000000000001A,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -317,6 +324,7 @@
 				C1000000000000000000000E,
 				C1000000000000000000000F,
 				C10000000000000000000016,
+				C10000000000000000000019,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

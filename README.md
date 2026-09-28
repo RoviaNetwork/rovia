@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="client/app/ios/RoviaApp/Assets/rovia-logo.png" width="120" alt="Rovia logo">
+
 # Rovia
 
 **Explainable routing for a privacy-first network client.**
@@ -8,8 +10,8 @@ An open-source, engine-independent core for Apple platforms — built so that a 
 decision can be *shown*, not just applied.
 
 [![Status](https://img.shields.io/badge/status-pre--alpha-ff6b35?style=flat-square)](#status--what-works-and-what-does-not)
-[![CI](https://github.com/princeofscale/rovia/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/princeofscale/rovia/actions/workflows/ci.yml)
-[![Engine repro](https://github.com/princeofscale/rovia/actions/workflows/engine-repro.yml/badge.svg?branch=main)](https://github.com/princeofscale/rovia/actions/workflows/engine-repro.yml)
+[![CI](https://github.com/RoviaNetwork/rovia/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/RoviaNetwork/rovia/actions/workflows/ci.yml)
+[![Engine repro](https://github.com/RoviaNetwork/rovia/actions/workflows/engine-repro.yml/badge.svg?branch=main)](https://github.com/RoviaNetwork/rovia/actions/workflows/engine-repro.yml)
 [![License](https://img.shields.io/badge/license-MIT%20provisional-8a8a8a?style=flat-square)](LICENSE)
 [![Engine](https://img.shields.io/badge/engine-none%20enabled-dimgray?style=flat-square)](engines.lock.json)
 [![Platform](https://img.shields.io/badge/iOS-18%2B-0a84ff?style=flat-square&logo=apple&logoColor=white)](docs/development/ios.md)
@@ -156,6 +158,9 @@ engine**.
 ![The Rovia Overview screen on an iPad simulator: the tunnel engine is reported
 unavailable, Connect is disabled, and three sample servers carry latency and health
 badges over an explicit sample-data notice.](docs/assets/overview-ipad.png)
+
+![The Rovia Overview screen on an iPhone 17 Pro simulator, current build: the brand
+mark in the header, the engine reported unavailable, Connect disabled.](docs/assets/overview-iphone.png)
 
 <sub>
 A real screenshot of the current build, taken on an iPad simulator. It is the Overview
@@ -349,7 +354,7 @@ Requires macOS with Xcode and Swift 6.2 or later, and Python 3.11 or later for t
 tooling.
 
 ```bash
-git clone https://github.com/princeofscale/rovia.git
+git clone https://github.com/RoviaNetwork/rovia.git
 cd rovia
 
 # Domain packages — no simulator, no device.
