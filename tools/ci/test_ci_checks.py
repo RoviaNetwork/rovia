@@ -4599,6 +4599,56 @@ class PrivacyAndOwnershipTests(unittest.TestCase):
                         f"{name} asserts a review that is not enforced: {sentence[:160]!r}"
                     )
 
+    def test_a_required_check_is_never_described_as_ungovernable(self):
+        """Where a document says the required check is enforced, it must be qualified.
+
+        The required `swift-tests` check arrived with a sentence reading "a change
+        cannot reach `main` without its own gates having run". That is true of the
+        ordinary path and false in general: `gh pr merge --admin` exists, and a
+        ruleset can grant a bypass. It is the same class of claim this repository has
+        been removing everywhere else - a protection described as absolute where it
+        is conditional, which is worse than not describing it, because it is the kind
+        of sentence that stops anyone from checking.
+
+        So every document that claims the check is required has to name the ordinary
+        path, or name the administrator path, or both. Dropping the qualifier fails
+        here rather than in a review three weeks later.
+        """
+        for name in ("SECURITY.md", "CODEOWNERS", "GOVERNANCE.md", "CONTRIBUTING.md"):
+            flattened = flat((REPO_ROOT / name).read_text(encoding="utf-8"))
+            with self.subTest(document=name):
+                if "swift-tests" not in flattened:
+                    continue
+                self.assertTrue(
+                    "ordinary merge" in flattened or "--admin" in flattened,
+                    f"{name} states that the swift-tests check is enforced without "
+                    "qualifying the path. An administrator can merge with --admin and "
+                    "a ruleset can grant a bypass, so the claim is about the ordinary "
+                    "path only and has to say so",
+                )
+
+    def test_a_strict_check_is_described_as_strict_wherever_it_is_claimed(self):
+        """`strict_required_status_checks_policy: true` has a consequence worth writing.
+
+        Strict means the branch must be up to date with `main` when it merges, so a
+        green pull request becomes unmergeable because `main` moved. A contributor
+        hits that as a merge that stops being accepted, and the rule is the reason.
+        """
+        readiness = flat(
+            (REPO_ROOT / "docs/development/release-readiness.md").read_text(encoding="utf-8")
+        )
+        self.assertIn("strict", readiness)
+        self.assertIn("up to date with `main`", readiness)
+        for name in ("SECURITY.md", "GOVERNANCE.md", "CONTRIBUTING.md"):
+            flattened = flat((REPO_ROOT / name).read_text(encoding="utf-8"))
+            with self.subTest(document=name):
+                if "swift-tests" not in flattened:
+                    continue
+                self.assertIn(
+                    "up to date", flattened,
+                    f"{name} claims the strict check but not what strict means",
+                )
+
     def test_both_documents_say_no_review_is_enforced_yet(self):
         """The review gap has to be named as an open gate, not just as a caveat.
 
@@ -4889,10 +4939,14 @@ class PrivacyAndOwnershipTests(unittest.TestCase):
                 self.assertIsNotNone(
                     match, f"the record no longer states a test count in its {where}"
                 )
+                # Capitalised word, from the same table the rest of this file uses.
+                # The literal map that was here covered 5 through 7 and raised
+                # `KeyError: 8` the moment an eighth test joined the set - so the count
+                # a reader is told could only ever be verified for as long as nobody
+                # added a test. It fails with a sentence now instead of a traceback.
                 self.assertIn(
                     match.group(1),
-                    {str(len(holding)),
-                     {5: "Five", 6: "Six", 7: "Seven"}[len(holding)]},
+                    {str(len(holding)), word_for(len(holding)).capitalize()},
                     f"the record's {where} says {match.group(1)}, but "
                     f"{len(holding)} tests hold the disclosure",
                 )

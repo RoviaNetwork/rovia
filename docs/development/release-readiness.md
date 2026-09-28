@@ -115,13 +115,26 @@ No release has been made and none is planned until the rows below close.
 | 6 | **Required review, and environment approvals** | Branch protection is partly
   real. An active ruleset on `main` (<https://github.com/princeofscale/rovia/rules/24096965>)
   requires a pull request, forbids deletion and force-push, permits only a squash
-  merge, and requires the `swift-tests` status check to pass — so a pull request whose
-  CI is red or still running cannot be merged. The required check was added after
-  `required_approving_review_count: 0` was read as what it is: with no required status
-  check, "no review is enforced" also meant "no CI is enforced", and a pull request
-  could be merged without anything having run on it. Verified rather than assumed: a
-  throwaway pull request was opened, and an ordinary merge attempt was refused with
-  `BLOCKED` while `swift-tests` was still in progress.
+  merge, and requires the `swift-tests` status check to pass. The check is **strict**,
+  so the branch has to be up to date with `main` at the moment of the merge, and
+  `main` moving under a pull request is enough to make an otherwise green one
+  unmergeable. Together that means an ordinary merge cannot reach `main` with CI red
+  or not yet run.
+
+  Two limits on that claim, both stated because the difference is the point. A
+  repository administrator can merge with `gh pr merge --admin`, and a ruleset can
+  grant a bypass to an actor, so this is a property of the ordinary path rather than
+  of what any account can force. Whether `--admin` bypasses a required status check
+  specifically was **not** tested here; what was tested is that an ordinary
+  `gh pr merge` of a pull request whose `swift-tests` was still running was refused
+  with `BLOCKED`. On an earlier pull request, `--admin` was refused outright with
+  "1 review requesting changes by reviewers with write access" — so admin access did
+  not override a review there, and the two mechanisms are not equivalent.
+
+  The required check was added after `required_approving_review_count: 0` was read as
+  what it is: with no required status check, "no review is enforced" also meant "no CI
+  is enforced", and a pull request could be merged without anything having run on
+  it.
 
   A required *review* is deliberately **off**, and that is a decision rather than an
   oversight. The only account with write access is the repository owner, and GitHub

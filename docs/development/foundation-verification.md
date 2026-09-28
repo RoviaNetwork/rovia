@@ -99,14 +99,14 @@ Apple silicon or on a hosted runner.
 ### Python tool tests
 
 `./tools/ci/run-tool-tests.sh` ran every `tools/**/test_*.py` as its own
-process: **10 files, 621 tests, 0 failures**.
+process: **10 files, 623 tests, 0 failures**.
 
 | Test file | Tests | Seconds |
 | --- | --- | --- |
 | `tools/ci/test_app_dependencies.py` | 27 | 25.53 |
 | `tools/ci/test_audit_accessibility_identifiers.py` | 58 | 2.05 |
 | `tools/ci/test_check_repository_hygiene.py` | 26 | 6.27 |
-| `tools/ci/test_ci_checks.py` | 193 | 22.88 |
+| `tools/ci/test_ci_checks.py` | 195 | 22.88 |
 | `tools/ci/test_validate_schemas.py` | 61 | 105.12 |
 | `tools/ci/test_verify_engine_checksums.py` | 38 | 2.96 |
 | `tools/ci/test_verify_lockfiles.py` | 29 | 3.35 |
@@ -763,12 +763,12 @@ documents now say that instead of leaving a reader to infer it from the word
 all ten gates, each with why it is open and what would close it, and each naming a
 path in this repository that would have to change. It existed only in a planning
 ledger outside the repository before, which is not disclosure: nobody reviewing a
-change sees a ledger. Seven tests hold it, including one that requires each row's
+change sees a ledger. Eight tests hold it, including one that requires each row's
 title to be followed by an absence rather than a pass.
 
 | Thing | Before | After |
 | --- | --- | --- |
-| Tool tests | 364 | 621 |
+| Tool tests | 364 | 623 |
 | Security-sensitive paths listed | 14, one of them nonexistent | 19, all existing |
 | Ownership directions checked | 1 | 3 |
 | Engine license declared per candidate | none, defaulted to MIT | required, derived, and cross-checked |
@@ -1035,7 +1035,7 @@ leave a reader to find the rest in a planning ledger outside the repository.
 | Team-ID ahead of everything that signs | The release workflow carries `Require a resolved signing identity` at position 5 of 17, before the keychain, the certificate, the profiles, `Archive`, and `Export IPA` | `test_the_export_identity_gate_precedes_every_signing_step_in_the_workflow`, plus a test that `ci.md` documents it at the position the workflow has |
 | Derived engine licenses | `licenseDeclared` was MIT for every component. Each candidate in the lock now declares the license of the code it builds, the schema requires it, and the generator checks it against the upstream project the lock names — libXray MIT, Xray-core MPL-2.0, sing-box GPL-3.0-or-later — refusing a missing, unverifiable, or inconsistent license | 11 tests in `EngineLicenseTests`; 3 lock-schema probes; the schema enum and the generator table are required to be the same set |
 | Bidirectional ownership | `core/config/` was in neither ownership file; `core/persistence/` was in both and does not exist. `SECURITY.md` states the criterion, and the test checks three directions: sensitive implies owned by a security or engine handle, security-handled implies sensitive, and every path named exists | one test with three directions, plus a test for the stated criterion and one for the unresolved review identity |
-| In-repo readiness disclosure | The nine unexecuted gates lived only in a ledger outside the repository. `docs/development/release-readiness.md` is dated, names the path or workflow step that would have to change for each gate, and makes no claim about any of them | 7 tests, including that every named path exists and that no gate title is followed by a claim that it passed |
+| In-repo readiness disclosure | The nine unexecuted gates lived only in a ledger outside the repository. `docs/development/release-readiness.md` is dated, names the path or workflow step that would have to change for each gate, and makes no claim about any of them | 8 tests, including that every named path exists and that no gate title is followed by a claim that it passed |
 | Derived counts | Suite totals, gate mutation and shape counts, the refusal-table row count, the overclaim subject count, the readiness gate count, the sensitive path count, the probe counts, the license-test count, and the gate runtime range are each read from the thing they describe rather than restated | the loader, `SemanticProbeCountTests`, and per-area drift tests |
 
 **What the five correction passes changed in this record, rather than in the code.**
