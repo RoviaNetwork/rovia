@@ -162,6 +162,10 @@ badges over an explicit sample-data notice.](docs/assets/overview-ipad.png)
 ![The Rovia Overview screen on an iPhone 17 Pro simulator, current build: the brand
 mark in the header, the engine reported unavailable, Connect disabled.](docs/assets/overview-iphone.png)
 
+![The Subscriptions screen on an iPhone 17 Pro simulator: empty state with the
+brand mark and a prominent add action; pull-to-refresh, per-subscription refresh,
+rename, delete, and accepted/rejected counts appear once subscriptions exist.](docs/assets/subscriptions-iphone.png)
+
 <sub>
 A real screenshot of the current build, taken on an iPad simulator. It is the Overview
 screen of the app in this repository, running over the app's built-in sample data —
