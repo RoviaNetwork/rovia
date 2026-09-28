@@ -105,7 +105,9 @@ struct ServersView: View {
             systemImage: "list.bullet.rectangle",
             identifier: AppAccessibilityIdentifier.serversList
         ) {
-            VStack(alignment: .leading, spacing: 12) {
+            // LazyVStack: rows are built on scroll, not all upfront. With
+            // thousands of servers an eager VStack stalls the first frame.
+            LazyVStack(alignment: .leading, spacing: 12) {
                 if model.snapshot.visibleServers.isEmpty {
                     Text("No server matches \(model.snapshot.serverFilterDescription). Choose a different profile or group to see members.")
                         .font(.subheadline)

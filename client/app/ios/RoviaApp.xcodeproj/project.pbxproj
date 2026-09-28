@@ -32,6 +32,13 @@
 		C10000000000000000000018 = {isa = PBXBuildFile; productRef = E10000000000000000000006 /* RoviaConfig */; };
 		C10000000000000000000019 = {isa = PBXBuildFile; fileRef = B10000000000000000000019 /* RoviaLogoView.swift */; };
 		C1000000000000000000001A = {isa = PBXBuildFile; fileRef = B1000000000000000000001A /* rovia-logo.png */; };
+		C1000000000000000000001B = {isa = PBXBuildFile; productRef = E10000000000000000000008 /* RoviaSubscription */; };
+		C1000000000000000000001C = {isa = PBXBuildFile; productRef = E10000000000000000000009 /* RoviaSubscription */; };
+		C1000000000000000000001D = {isa = PBXBuildFile; productRef = E1000000000000000000000B /* RoviaApplePlatform */; };
+		C1000000000000000000001E = {isa = PBXBuildFile; productRef = E1000000000000000000000C /* RoviaApplePlatform */; };
+		C1000000000000000000001F = {isa = PBXBuildFile; fileRef = B1000000000000000000001B /* SubscriptionCoordinator.swift */; };
+		C10000000000000000000020 = {isa = PBXBuildFile; fileRef = B1000000000000000000001C /* SubscriptionCoordinatorTests.swift */; };
+		C10000000000000000000021 = {isa = PBXBuildFile; fileRef = B1000000000000000000001B /* SubscriptionCoordinator.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -71,6 +78,8 @@
 		B10000000000000000000018 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanonicalRouteBridge.swift; sourceTree = "<group>"; };
 		B10000000000000000000019 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoviaLogoView.swift; sourceTree = "<group>"; };
 		B1000000000000000000001A = {isa = PBXFileReference; lastKnownFileType = image.png; path = Assets/rovia-logo.png; sourceTree = "<group>"; };
+		B1000000000000000000001B = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubscriptionCoordinator.swift; sourceTree = "<group>"; };
+		B1000000000000000000001C = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubscriptionCoordinatorTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -81,6 +90,8 @@
 				C10000000000000000000005,
 				C10000000000000000000014,
 				C10000000000000000000017,
+				C1000000000000000000001B,
+				C1000000000000000000001D,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -98,6 +109,8 @@
 			files = (
 				C10000000000000000000015,
 				C10000000000000000000018,
+				C1000000000000000000001C,
+				C1000000000000000000001E,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -142,6 +155,7 @@
 				B10000000000000000000018,
 				B10000000000000000000019,
 				B1000000000000000000001A,
+				B1000000000000000000001B,
 				B10000000000000000000003,
 				B10000000000000000000004,
 			);
@@ -170,6 +184,7 @@
 			isa = PBXGroup;
 			children = (
 				B10000000000000000000017,
+				B1000000000000000000001C,
 			);
 			path = RoviaAppTests;
 			sourceTree = "<group>";
@@ -195,6 +210,8 @@
 			packageProductDependencies = (
 				E10000000000000000000002 /* RoviaRouting */,
 				E10000000000000000000005 /* RoviaConfig */,
+				E10000000000000000000008 /* RoviaSubscription */,
+				E1000000000000000000000B /* RoviaApplePlatform */,
 			);
 			productName = RoviaApp;
 			productReference = A10000000000000000000009;
@@ -233,6 +250,8 @@
 			packageProductDependencies = (
 				E10000000000000000000003 /* RoviaRouting */,
 				E10000000000000000000006 /* RoviaConfig */,
+				E10000000000000000000009 /* RoviaSubscription */,
+				E1000000000000000000000C /* RoviaApplePlatform */,
 			);
 			productName = RoviaAppTests;
 			productReference = B10000000000000000000015;
@@ -274,6 +293,8 @@
 			packageReferences = (
 				E10000000000000000000001 /* XCLocalSwiftPackageReference "core/routing" */,
 				E10000000000000000000004 /* XCLocalSwiftPackageReference "core/config" */,
+				E10000000000000000000007 /* XCLocalSwiftPackageReference "core/subscription" */,
+				E1000000000000000000000A /* XCLocalSwiftPackageReference "platform/apple" */,
 			);
 			targets = (
 				A10000000000000000000007,
@@ -325,6 +346,7 @@
 				C1000000000000000000000F,
 				C10000000000000000000016,
 				C10000000000000000000019,
+				C1000000000000000000001F,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -345,6 +367,8 @@
 				C10000000000000000000013,
 				C10000000000000000000011,
 				C10000000000000000000016,
+				C10000000000000000000020,
+				C10000000000000000000021,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -542,6 +566,14 @@
 			isa = XCLocalSwiftPackageReference;
 			relativePath = ../../../core/config;
 		};
+		E10000000000000000000007 /* XCLocalSwiftPackageReference "core/subscription" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../../../core/subscription;
+		};
+		E1000000000000000000000A /* XCLocalSwiftPackageReference "platform/apple" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../../../platform/apple;
+		};
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -564,6 +596,26 @@
 			isa = XCSwiftPackageProductDependency;
 			package = E10000000000000000000004 /* XCLocalSwiftPackageReference "core/config" */;
 			productName = RoviaConfig;
+		};
+		E10000000000000000000008 /* RoviaSubscription */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E10000000000000000000007 /* XCLocalSwiftPackageReference "core/subscription" */;
+			productName = RoviaSubscription;
+		};
+		E10000000000000000000009 /* RoviaSubscription */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E10000000000000000000007 /* XCLocalSwiftPackageReference "core/subscription" */;
+			productName = RoviaSubscription;
+		};
+		E1000000000000000000000B /* RoviaApplePlatform */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E1000000000000000000000A /* XCLocalSwiftPackageReference "platform/apple" */;
+			productName = RoviaApplePlatform;
+		};
+		E1000000000000000000000C /* RoviaApplePlatform */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E1000000000000000000000A /* XCLocalSwiftPackageReference "platform/apple" */;
+			productName = RoviaApplePlatform;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

@@ -9,7 +9,7 @@ public enum SubscriptionStoreError: Error, Equatable, Sendable {
 /// One persisted subscription: redacted metadata plus the last working
 /// server list. Secrets are never stored here — the import credential sink
 /// writes them to the Keychain (`KeychainSecretStore`), keyed per server.
-public struct StoredSubscription: Codable, Equatable, Sendable, Identifiable {
+public struct StoredSubscription: Equatable, Sendable, Identifiable {
     public let id: UUID
     public var name: String
     public var source: SubscriptionSource
@@ -17,6 +17,10 @@ public struct StoredSubscription: Codable, Equatable, Sendable, Identifiable {
     public var acceptedCount: Int
     public var rejectedCount: Int
     public var updatedAt: Date
+    /// Explicit opt-in to plain-HTTP fetch for this subscription only.
+    /// Decoded with a default so files written before this field exist
+    /// keep loading.
+    public var allowInsecure: Bool
 
     public init(
         id: UUID = UUID(),
@@ -25,7 +29,8 @@ public struct StoredSubscription: Codable, Equatable, Sendable, Identifiable {
         servers: [Server] = [],
         acceptedCount: Int = 0,
         rejectedCount: Int = 0,
-        updatedAt: Date = Date()
+        updatedAt: Date = Date(),
+        allowInsecure: Bool = false
     ) {
         self.id = id
         self.name = name
@@ -34,8 +39,46 @@ public struct StoredSubscription: Codable, Equatable, Sendable, Identifiable {
         self.acceptedCount = acceptedCount
         self.rejectedCount = rejectedCount
         self.updatedAt = updatedAt
+        self.allowInsecure = allowInsecure
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case name
+        case source
+        case servers
+        case acceptedCount
+        case rejectedCount
+        case updatedAt
+        case allowInsecure
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+        source = try container.decode(SubscriptionSource.self, forKey: .source)
+        servers = try container.decode([Server].self, forKey: .servers)
+        acceptedCount = try container.decode(Int.self, forKey: .acceptedCount)
+        rejectedCount = try container.decode(Int.self, forKey: .rejectedCount)
+        updatedAt = try container.decode(Date.self, forKey: .updatedAt)
+        allowInsecure = try container.decodeIfPresent(Bool.self, forKey: .allowInsecure) ?? false
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(name, forKey: .name)
+        try container.encode(source, forKey: .source)
+        try container.encode(servers, forKey: .servers)
+        try container.encode(acceptedCount, forKey: .acceptedCount)
+        try container.encode(rejectedCount, forKey: .rejectedCount)
+        try container.encode(updatedAt, forKey: .updatedAt)
+        try container.encode(allowInsecure, forKey: .allowInsecure)
     }
 }
+
+extension StoredSubscription: Codable {}
 
 /// File-backed subscription list. Refresh is atomic by construction: a
 /// failed download or an empty import throws before `replaceServers` runs,

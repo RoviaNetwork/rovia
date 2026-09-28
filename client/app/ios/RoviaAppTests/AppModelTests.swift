@@ -1,6 +1,9 @@
-import XCTest
+import Foundation
+import RoviaApplePlatform
 import RoviaConfig
 import RoviaRouting
+import RoviaSubscription
+import XCTest
 
 @MainActor
 final class AppModelTests: XCTestCase {
@@ -11,11 +14,12 @@ final class AppModelTests: XCTestCase {
     private func makeModel(
         tunnel: any TunnelControlling,
         content: AppContent = .sample,
-        loadError: (any Error)? = nil
+        loadError: (any Error)? = nil,
+        subscriptions: SubscriptionCoordinator? = nil
     ) -> (AppModel, CountingFixtureProvider) {
         let now = fixedNow
         let provider = CountingFixtureProvider(content: content, loadError: loadError)
-        let model = AppModel(tunnel: tunnel, fixtures: provider, now: { now })
+        let model = AppModel(tunnel: tunnel, fixtures: provider, subscriptions: subscriptions, now: { now })
         return (model, provider)
     }
 
@@ -728,6 +732,79 @@ final class AppModelTests: XCTestCase {
         assertEqual(visible.count, count)
         assertEqual(visible.map(\.id), ids, "group order with the profile filter applied")
         print("visibleServers(\(count)) = \(String(format: "%.3f", elapsed))s")
+    }
+
+    // MARK: - Stored subscriptions
+
+    func testSubscriptionAddPopulatesServers() async {
+        let box = ModelBodyBox(body: "\(ModelFixtures.vless)\n\(ModelFixtures.trojan)")
+        let (model, _, _) = makeSubscriptionModel(box: box)
+        assertTrue(await model.bootstrap())
+        let added = await model.addSubscription(
+            url: URL(string: "https://provider.example/sub")!,
+            name: "Provider"
+        )
+        assertTrue(added)
+        assertEqual(model.snapshot.content.servers.count, 2)
+        assertEqual(model.snapshot.lastSubscriptionResult?.accepted, 2)
+        assertEqual(model.snapshot.lastSubscriptionResult?.rejected.count, 0)
+        assertFalse(model.snapshot.isSampleData)
+    }
+
+    func testRefreshKeepsSelectedServer() async {
+        let box = ModelBodyBox(body: "")
+        let (model, coordinator, _) = makeSubscriptionModel(box: box)
+        box.body = "\(ModelFixtures.vless)\n\(ModelFixtures.trojan)"
+        assertTrue(await model.bootstrap())
+        assertTrue(await model.addSubscription(url: URL(string: "https://provider.example/sub")!, name: "P"))
+        let servers = model.snapshot.content.servers
+        assertEqual(servers.count, 2)
+        assertTrue(await model.selectServer(servers[0].id))
+        box.body = "\(ModelFixtures.trojan)\n\(ModelFixtures.vless)"
+        let subID = await coordinator.subscriptions()[0].id
+        assertTrue(await model.refreshSubscription(subID))
+        assertEqual(model.snapshot.selection.server, servers[0].id)
+    }
+
+    func testVanishedServerClearsSelection() async {
+        let box = ModelBodyBox(body: "")
+        let (model, coordinator, _) = makeSubscriptionModel(box: box)
+        box.body = "\(ModelFixtures.vless)\n\(ModelFixtures.trojan)"
+        assertTrue(await model.bootstrap())
+        assertTrue(await model.addSubscription(url: URL(string: "https://provider.example/sub")!, name: "P"))
+        let servers = model.snapshot.content.servers
+        assertTrue(await model.selectServer(servers[0].id))
+        box.body = ModelFixtures.trojan
+        let subID = await coordinator.subscriptions()[0].id
+        assertTrue(await model.refreshSubscription(subID))
+        assertEqual(model.snapshot.content.servers.count, 1)
+        assertEqual(model.snapshot.selection.server, nil)
+    }
+
+    func testBootstrapLoadsPersistedSubscriptions() async {
+        let box = ModelBodyBox(body: ModelFixtures.vless)
+        let (_, coordinator, dir) = makeSubscriptionModel(box: box)
+        try? await coordinator.loadPersisted()
+        _ = try? await coordinator.add(url: URL(string: "https://provider.example/sub")!, name: "P", allowInsecure: false)
+        let failing = ModelBodyBox(body: "")
+        let (relaunched, _, _) = makeSubscriptionModel(box: failing, directory: dir)
+        assertTrue(await relaunched.bootstrap())
+        assertEqual(relaunched.snapshot.content.servers.count, 1)
+        assertFalse(relaunched.snapshot.isSampleData)
+    }
+
+    private func makeSubscriptionModel(
+        box: ModelBodyBox,
+        directory: URL? = nil
+    ) -> (AppModel, SubscriptionCoordinator, URL) {
+        let dir = directory ?? FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let coordinator = SubscriptionCoordinator(
+            store: SubscriptionStore(directory: dir),
+            secrets: InMemorySecretStore(),
+            session: ModelStubSession(box: box)
+        )
+        let (model, _) = makeModel(tunnel: StubTunnelController(), content: .empty, subscriptions: coordinator)
+        return (model, coordinator, dir)
     }
 
     func testSwitchingProfileClearsAServerThatTheNewProfileDoesNotContain() async {
@@ -1784,4 +1861,30 @@ actor GateTunnelController: TunnelControlling {
             waiter.resume()
         }
     }
+}
+
+private final class ModelBodyBox: @unchecked Sendable {
+    var body: String
+    var status: Int
+
+    init(body: String, status: Int = 200) {
+        self.body = body
+        self.status = status
+    }
+}
+
+private struct ModelStubSession: SubscriptionHTTPSession {
+    let box: ModelBodyBox
+
+    func data(for request: URLRequest) async throws -> (Data, URLResponse) {
+        guard let url = request.url else { throw URLError(.badURL) }
+        let response = HTTPURLResponse(url: url, statusCode: box.status, httpVersion: nil, headerFields: nil)!
+        return (Data(box.body.utf8), response)
+    }
+}
+
+private enum ModelFixtures {
+    static let vless =
+        "vless://00000000-0000-0000-0000-000000000001@synthetic.example:443?encryption=none&security=tls&type=tcp"
+    static let trojan = "trojan://Model-Password-1@synthetic.example:443?security=tls"
 }

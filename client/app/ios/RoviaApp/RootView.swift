@@ -20,7 +20,7 @@ enum AppRoute: String, CaseIterable, Identifiable, Hashable {
         case .routingDebugger:
             "Routing Debugger"
         case .subscription:
-            "Subscription Inspector"
+            "Subscriptions"
         }
     }
 

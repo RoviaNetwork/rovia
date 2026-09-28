@@ -1108,6 +1108,8 @@ struct AppSnapshot: Equatable, Sendable {
     var evaluation: DebugEvaluation?
     var lastError: AppError?
     var isSampleData: Bool = true
+    /// The last add/refresh attempt: accepted/rejected counts for honest UI.
+    var lastSubscriptionResult: SubscriptionImportSummary?
 
     var canConnect: Bool {
         system == .ready && engine.allowsStart && !engine.isBusy
