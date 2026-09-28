@@ -211,10 +211,10 @@ Every entry in `tools/ci/local-packages.txt`, each with its own
 | `core/routing` | 44 | 0 |
 | `core/subscription` | 71 | 0 |
 | `engines/api` | 3 | 0 |
-| `engines/xray` | 8 | 0 |
+| `engines/xray` | 11 | 0 |
 | `engines/singbox` | 1 | 0 |
 | `platform/apple` | 5 | 0 |
-| **Total** | **196** | **0** |
+| **Total** | **199** | **0** |
 
 ### SBOM
 

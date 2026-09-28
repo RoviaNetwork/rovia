@@ -149,3 +149,74 @@ final class XrayConfigCompilerTests: XCTestCase {
         XCTAssertEqual(first, second)
     }
 }
+
+final class XraySecretSubstitutorTests: XCTestCase {
+    private func trojanConfig() throws -> Data {
+        let trojan = Server(
+            id: UUID(),
+            name: "Trojan server",
+            protocolKind: .trojan,
+            endpoint: Endpoint(host: "synthetic.example", port: 443),
+            credential: SecretReference(key: "subscription/test/trojan"),
+            transport: TransportOptions(kind: "tcp"),
+            tls: TLSOptions(serverName: "synthetic.example"),
+            tags: []
+        )
+        let config = CanonicalTunnelConfiguration(
+            schemaVersion: 1,
+            appConfig: AppConfig(
+                schemaVersion: 1,
+                subscriptions: [],
+                groups: [],
+                routing: RouteSet(rules: [], defaultAction: .direct),
+                dns: DNSPolicy(mode: .system),
+                privacy: PrivacyPolicy(),
+                servers: [trojan]
+            )
+        )
+        return try XrayConfigCompiler().compile(config)
+    }
+
+    func testCollectsKeysAndSubstitutes() throws {
+        let compiled = try trojanConfig()
+        XCTAssertEqual(try XraySecretSubstitutor.secretKeys(in: compiled), ["subscription/test/trojan"])
+        let substituted = try XraySecretSubstitutor.substituting(
+            ["subscription/test/trojan": Data("real-password".utf8)],
+            in: compiled
+        )
+        XCTAssertTrue(try XraySecretSubstitutor.secretKeys(in: substituted).isEmpty)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: substituted) as? [String: Any])
+        let outbounds = try XCTUnwrap(json["outbounds"] as? [[String: Any]])
+        let servers = try XCTUnwrap((outbounds[0]["settings"] as? [String: Any])?["servers"] as? [[String: Any]])
+        XCTAssertEqual(servers[0]["password"] as? String, "real-password")
+    }
+
+    func testUnknownKeyAndNonUTF8SecretThrow() throws {
+        let compiled = try trojanConfig()
+        XCTAssertThrowsError(
+            try XraySecretSubstitutor.substituting([:], in: compiled)
+        ) { error in
+            XCTAssertEqual(error as? XraySecretSubstitutionError, .unknownKey("subscription/test/trojan"))
+        }
+        XCTAssertThrowsError(
+            try XraySecretSubstitutor.substituting(
+                ["subscription/test/trojan": Data([0xC3, 0x28])],
+                in: compiled
+            )
+        ) { error in
+            XCTAssertEqual(error as? XraySecretSubstitutionError, .secretNotUTF8("subscription/test/trojan"))
+        }
+        XCTAssertThrowsError(try XraySecretSubstitutor.secretKeys(in: Data("not json".utf8))) { error in
+            XCTAssertEqual(error as? XraySecretSubstitutionError, .invalidJSON)
+        }
+    }
+
+    func testSubstitutionIsDeterministic() throws {
+        let compiled = try trojanConfig()
+        let secrets = ["subscription/test/trojan": Data("real-password".utf8)]
+        XCTAssertEqual(
+            try XraySecretSubstitutor.substituting(secrets, in: compiled),
+            try XraySecretSubstitutor.substituting(secrets, in: compiled)
+        )
+    }
+}
