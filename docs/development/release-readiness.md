@@ -39,11 +39,28 @@ cannot quietly lose a row or gain one that names nothing.
 ## Closed
 
 A gate leaves this list by being executed, with a result someone else can read.
-One has.
+Five have, four of them configured controls readable through the GitHub API rather
+than a run someone has to trust a screenshot for.
 
 | Gate | Closed | Evidence |
 | --- | --- | --- |
 | **Hosted CI execution** | 2026-09-27 | `.github/workflows/ci.yml` ran to
+| **Secret scanning** | 2026-09-28 | `GET /repos/princeofscale/rovia` returns
+  `security_and_analysis.secret_scanning.status = enabled`.
+| **Secret scanning push protection** | 2026-09-28 | Same response returns
+  `secret_scanning_push_protection.status = enabled`, so a push containing a
+  recognised credential is rejected rather than accepted and scanned later.
+| **Dependabot security updates and automated fixes** | 2026-09-28 |
+  `dependabot_security_updates.status = enabled` and
+  `GET /repos/princeofscale/rovia/automated-security-fixes` returns `enabled`.
+  Dependabot has also opened pull request #1 against the pinned
+  `actions/checkout` SHA, which is the first of these settings producing observable
+  work rather than a stored preference.
+| **Private vulnerability reporting** | 2026-09-28 |
+  `GET /repos/princeofscale/rovia/private-vulnerability-reporting` returns
+  `enabled`, so a reporter has a channel that does not require an account on
+  GitHub and does not require a public issue.
+
   completion on the real runners at commit `13981d5`:
   <https://github.com/princeofscale/rovia/actions/runs/36344718641> — nineteen
   steps, all green, 824 s. |
@@ -114,7 +131,7 @@ No release has been made and none is planned until the rows below close.
   maintainer with write access, and a GitHub organisation so that per-role teams can
   exist. Then `required_approving_review_count: 1` and `require_code_owner_review` can
   be turned on, and the `ios-production` environment configured with its reviewers. |
-| 7 | **Third-party advisories, dependency review, and secret scanning** | None is configured in this repository. The local packages have no external dependencies (`tools/ci/verify-lockfiles.sh` reports 7 local path dependencies and 0 locked externals), so there is nothing to scan today, and nothing would catch a dependency added tomorrow. | GitHub dependency review and secret scanning, or an equivalent pinned scanner. |
+| 7 | **Dependency review and an advisory-response process** | Secret scanning, push protection, Dependabot security updates, automated security fixes, and private vulnerability reporting are all enabled and readable through the API; that half is closed and is recorded in the `## Closed` section above. What is still open is narrower. GitHub dependency review — the check that inspects a pull request's dependency changes — has not been enabled, so nothing would stop a pull request that adds a dependency with a known advisory. There is also no written process for what happens when a Dependabot alert fires: no severity threshold, no response window, no named person. The local packages have no external dependencies (`tools/ci/verify-lockfiles.sh` reports 7 local path dependencies and 0 locked externals), so nothing is exposed today, and nothing would catch a dependency added tomorrow. | GitHub dependency review enabled on `main`, and a written advisory-response process with a severity threshold and a response window. |
 | 8 | **Upstream SPDX tooling** | `tools/reproducibility/check-sbom.py` checks this repository's own documented invariants. It is not a third-party SPDX validator, and no `spdx-tools` run has occurred. The `documentNamespace` host is a deliberate `.invalid` placeholder that will not resolve. | A run of a conformant SPDX validator against the generated document. |
 | 9 | **Android** | Not started. No path in this repository is Android code, so this row names no file: there is nothing here that would have to change, and claiming a path would be a fiction. No claim is made about any other platform. | A separate slice. |
 

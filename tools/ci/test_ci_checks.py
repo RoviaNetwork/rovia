@@ -4963,10 +4963,20 @@ class PrivacyAndOwnershipTests(unittest.TestCase):
     def test_the_readiness_disclosure_covers_the_gates_the_code_knows_about(self):
         # Source-derived: each of these is a gate this repository can see but not
         # run, named by the file that would have to change.
-        # Hosted CI execution is deliberately absent: it ran, and the run is recorded
-        # in that document's own `## Closed` section. A gate leaves this set by being
-        # executed, so the way to re-add it is to delete the evidence, not to edit this
-        # dict - which is the direction a reviewer would have to notice.
+        # Hosted CI execution and the four configured security controls are
+        # deliberately absent: they ran, or they are set, and the evidence is recorded
+        # in that document's own `## Closed` section with the API response that shows
+        # it. A gate leaves this set by being executed, so the way to re-add one is to
+        # delete the evidence, not to edit this dict - which is the direction a reviewer
+        # would have to notice.
+        #
+        # The advisories gate is here under a narrower name than it used to carry. It
+        # was "Third-party advisories, dependency review, and secret scanning", and it
+        # stayed open after secret scanning, push protection, Dependabot security
+        # updates, automated security fixes, and private vulnerability reporting had all
+        # been enabled, because the gate names a bundle and only part of the bundle
+        # moved. What is genuinely unclosed is dependency review and the absence of a
+        # written advisory-response process, and the gate says that.
         required = {
             "Signing, provisioning, and the Apple team identity":
                 "tools/release/ExportOptions.plist",
@@ -4975,7 +4985,7 @@ class PrivacyAndOwnershipTests(unittest.TestCase):
             "Physical-device VPN behaviour": "tools/ci/verify-simulator-install.sh",
             "A production engine": "engines.lock.json",
             "Required review, and environment approvals": "CODEOWNERS",
-            "Third-party advisories, dependency review, and secret scanning":
+            "Dependency review and an advisory-response process":
                 "tools/ci/verify-lockfiles.sh",
             "Upstream SPDX tooling": "tools/reproducibility/check-sbom.py",
             "Android": "engines.lock.json",
