@@ -167,8 +167,8 @@ every pull request, which is worse than no status, because a check that is alway
 red is a check people learn to ignore. Adding the file to silence that status
 would be the wrong fix, so the hooks are real and they pass on this tree.
 
-Eleven hooks, and four of them are the hosted runner's own gates run earlier and
-on the same code:
+Ten hooks, and three of them are the hosted runner's own gates run earlier and on
+the same code:
 
 | Hook | What it is |
 | --- | --- |
@@ -178,7 +178,7 @@ on the same code:
 | `check-added-large-files` | build products, archives, derived data, over 2 MB |
 | `detect-private-key` | key material, independently of the repository's own hygiene gate |
 | `destroyed-symlinks` | a committed symlink replaced by a regular file |
-| the four local hooks | `check-repository-hygiene.sh`, `check-python-lint.sh`, `check-python-warnings.sh`, `check-shell-syntax.sh` |
+| the three local hooks | `check-repository-hygiene.sh`, `check-python-warnings.sh`, `check-shell-syntax.sh` |
 
 Two arguments in that file are load-bearing, and both were absent in the version
 that was written first. They are asserted by `PreCommitConfigTests` in
@@ -193,6 +193,30 @@ that is absent - the configuration then reads as coverage:
   its input with `git diff --staged --diff-filter=A`, so it only sees files added
   in this one commit. A build product committed small and replaced by a later
   commit - the ordinary way one arrives - is never checked.
+
+`check-python-lint.sh` is the fourth hosted gate and is deliberately not a
+pre-commit hook, for an environment reason rather than a preference. That gate
+resolves pyflakes only from a pinned route: it imports pyflakes from the current
+interpreter, or fetches `pyflakes==3.2.0` through `uvx`. On a contributor's
+machine both routes exist. In the pre-commit.ci container neither does, and the
+gate runs and refuses:
+
+```text
+check-python-lint: no pyflakes available: python3 cannot import it
+check-python-lint:   and uvx is not on PATH to fetch pyflakes==3.2.0
+check-python-lint: refusing to report success from a linter that did not run
+```
+
+This is the same defect that failed the first hosted run - a hosted macOS runner
+has no `uvx` either - and the same discipline that fixed it there is the reason
+the hook is absent here. Both available fixes were rejected: declaring the hook
+with pre-commit's own `language: python` and `additional_dependencies:
+[pyflakes==3.2.0]` does work in that container, but it gives one claim two routes
+and "pyflakes clean" stops having a single meaning; and skipping the gate when the
+tool is absent is a gate that reports success without running. `ios-ci` builds a
+virtualenv with `pyflakes==3.2.0` and puts it on PATH before calling the script, and
+`run-tool-tests.sh` reaches the same script locally, so the lint gate still runs in
+both of the places that can actually run it.
 
 `trailing-whitespace` and `end-of-file-fixer` are deliberately absent. 92 tracked
 files carry trailing whitespace, and cleaning it is a 92-file mechanical diff

@@ -320,7 +320,7 @@ refuses earlier, on the thing that is actually missing.
 
 ## Working tree
 
-24 tracked top-level entries, 175 files. `build/` holds the
+25 tracked top-level entries, 178 files. `build/` holds the
 generated `SBOM.spdx.json` and is gitignored; the `.build` directories, the
 `__pycache__` directories, and the `.DS_Store` files are gitignored; derived data
 was kept outside the checkout. `git check-ignore` confirms

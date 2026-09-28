@@ -31,6 +31,7 @@ What is not written, and why:
 
 import argparse
 import re
+import subprocess
 import sys
 import unittest
 from pathlib import Path
@@ -71,6 +72,32 @@ def suite_runtimes():
         if len(cells) >= 3 and cells[2]:
             runtimes[SUITE_CELL.match(cells[0]).group(1)] = cells[2]
     return runtimes
+
+
+# The two figures in the record's `## Working tree` paragraph.
+#
+# These were not derived by anything, and they went stale silently: the record said
+# 175 files while the tree had 177, and the test that reads the entry count only
+# notices when it runs. A figure nobody re-derives is a figure that is wrong, and
+# the record already had one that was.
+TREE_ENTRIES = re.compile(
+    r"(\d+) tracked top-level entries, (\d+) files\."
+)
+
+
+def tree_counts():
+    """(top-level entries, tracked files) as a clone would contain them.
+
+    Read from `git ls-files`, which is the same source `test_ci_checks.py` uses for
+    the entry count, so the updater and the test cannot disagree about what the tree
+    is. A file that exists only in the working directory and is not yet tracked is
+    deliberately not counted: the paragraph describes what a clone holds.
+    """
+    result = subprocess.run(
+        ["git", "ls-files"], cwd=str(REPO_ROOT), capture_output=True, text=True, check=True
+    )
+    paths = [line for line in result.stdout.splitlines() if line.strip()]
+    return len({path.split("/")[0] for path in paths}), len(paths)
 
 
 def last_before_after_index(lines):
@@ -136,6 +163,26 @@ def apply(counts, runtimes=None):
         f"**{files} files, {total} tests, 0 failures**",
         updated_text,
     )
+    entries, tracked = tree_counts()
+    before = TREE_ENTRIES.search(updated_text)
+    if not before:
+        raise SystemExit(
+            "update-record-counts: the record's working-tree paragraph no longer "
+            "matches 'N tracked top-level entries, M files.', so these figures "
+            "cannot be kept current"
+        )
+    replacement = f"{entries} tracked top-level entries, {tracked} files."
+    if before.group(0) != replacement:
+        # The `changed` list is printed as "line N", and every other entry in it is a
+        # line index. This one is a character offset, because the substitution happens
+        # on the joined text after the per-line pass - which reported line 19987 for a
+        # record with fewer than 2000 lines. Convert here, or the diagnostic names a
+        # line that does not exist.
+        line_number = updated_text.count("\n", 0, before.start())
+        changed.append((line_number, before.group(0), replacement))
+        updated_text = (
+            updated_text[: before.start()] + replacement + updated_text[before.end() :]
+        )
     if missing_runtime:
         print(
             "update-record-counts: these suites have no recorded runtime and are "
@@ -172,8 +219,9 @@ def main(argv=None):
     if arguments.check:
         if updated != RECORD.read_text(encoding="utf-8"):
             sys.stderr.write(
-                "update-record-counts: the record's suite figures are not what the "
-                "loaders report. Run update-record-counts.py and commit the result.\n"
+                "update-record-counts: the record disagrees with the loaders and "
+                "with `git ls-files`. Run update-record-counts.py and commit the "
+                "result.\n"
             )
             for index, before, after in changed:
                 sys.stderr.write(f"  line {index + 1}: {after}\n")

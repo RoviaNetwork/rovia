@@ -87,10 +87,14 @@ the change hard to review, which is the only reason anyone reads it.
 ## Before you commit
 
 `pre-commit` is configured in `.pre-commit-config.yaml`, and pre-commit.ci runs the
-same configuration on every pull request. Eleven hooks, of which four are the same
-gates the hosted runner executes — the publishable-tree hygiene check, the pinned
-pyflakes gate, the warnings-are-errors compile, and the shell syntax check — so the
-defects they catch are found before a runner is spent on them.
+same configuration on every pull request. Ten hooks, of which three are the same
+gates the hosted runner executes — the publishable-tree hygiene check, the
+warnings-are-errors compile, and the shell syntax check — so the defects they catch
+are found before a runner is spent on them. The pinned pyflakes gate is the fourth
+hosted gate and is not among them: it resolves pyflakes from the current interpreter
+or through `uvx`, and the pre-commit.ci container has neither, so it would run and
+refuse rather than pass quietly. Run `./tools/ci/run-tool-tests.sh` for the pyflakes
+gate, or let `ios-ci` run it.
 
 ```text
 pre-commit run --all-files

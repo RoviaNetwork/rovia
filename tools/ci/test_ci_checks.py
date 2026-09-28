@@ -2474,13 +2474,31 @@ class PreCommitConfigTests(unittest.TestCase):
         The point of the local hooks is to reach the same defects earlier, not to add
         a second opinion. A pre-commit-only gate is a gate nobody runs in CI, and a
         CI-only gate is one nobody runs before committing.
+
+        Three of the runner's four gates are here. The fourth, the pyflakes gate, is
+        deliberately absent and the set is asserted at three so it cannot be added back
+        by accident: it resolves pyflakes only from a pinned route, and the
+        pre-commit.ci container has neither an interpreter that can import pyflakes nor
+        `uvx` on PATH, so it runs and refuses. Re-adding it here would either give the
+        same claim two meanings or produce a gate that reports success without running.
+        The gate is not lost - `ios-ci` builds a virtualenv with pyflakes==3.2.0 and puts
+        it on PATH before calling the script, and `run-tool-tests.sh` reaches it locally.
         """
+        self.assertIn(
+            "refusing to report success from a linter that did not run", self.text,
+            "the reason the pyflakes gate is absent is not recorded in the config, so "
+            "the next person to add it back has to rediscover it by reading a run log",
+        )
+        # No attempt is made here to assert the absence of the file name: the
+        # configuration has to *mention* the script to explain why it is not wired,
+        # and a test that forbade the mention would forbid the explanation. The
+        # `entry:` set above is the assertion that matters - a hook is wired by
+        # naming an entry, so an entry outside that set is not wired.
         declared = set(re.findall(r"^\s*entry:\s*(\S+)\s*$", self.text, re.MULTILINE))
         self.assertEqual(
             declared,
             {
                 "tools/ci/check-repository-hygiene.sh",
-                "tools/ci/check-python-lint.sh",
                 "tools/ci/check-python-warnings.sh",
                 "tools/ci/check-shell-syntax.sh",
             },
