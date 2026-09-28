@@ -825,6 +825,16 @@ final class AppModelTests: XCTestCase {
         assertEqual(model.snapshot.content.servers.count, 5)
     }
 
+    func testStaleRefreshSkipsFreshSubscriptions() async {
+        let box = ModelBodyBox(body: ModelFixtures.vless)
+        let (model, _, _) = makeSubscriptionModel(box: box)
+        assertTrue(await model.bootstrap())
+        assertTrue(await model.addSubscription(url: URL(string: "https://provider.example/sub")!, name: "P"))
+        assertEqual(box.calls, 1)
+        assertTrue(await model.refreshStaleSubscriptions())
+        assertEqual(box.calls, 1)
+    }
+
     private func makeSubscriptionModel(
         box: ModelBodyBox,
         directory: URL? = nil
@@ -1898,6 +1908,7 @@ actor GateTunnelController: TunnelControlling {
 private final class ModelBodyBox: @unchecked Sendable {
     var body: String
     var status: Int
+    var calls: Int = 0
 
     init(body: String, status: Int = 200) {
         self.body = body
@@ -1909,6 +1920,7 @@ private struct ModelStubSession: SubscriptionHTTPSession {
     let box: ModelBodyBox
 
     func data(for request: URLRequest) async throws -> (Data, URLResponse) {
+        box.calls += 1
         guard let url = request.url else { throw URLError(.badURL) }
         let response = HTTPURLResponse(url: url, statusCode: box.status, httpVersion: nil, headerFields: nil)!
         return (Data(box.body.utf8), response)

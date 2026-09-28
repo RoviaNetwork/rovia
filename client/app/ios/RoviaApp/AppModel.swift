@@ -66,6 +66,7 @@ enum AppAction: Hashable, Sendable {
     case renameSubscription(UUID, String)
     case removeSubscription(UUID)
     case probeServers
+    case refreshStaleSubscriptions(TimeInterval)
 
     var label: String {
         switch self {
@@ -99,6 +100,8 @@ enum AppAction: Hashable, Sendable {
             "Remove a subscription"
         case .probeServers:
             "Measure server latency"
+        case .refreshStaleSubscriptions:
+            "Refresh subscriptions updated over an hour ago"
         }
     }
 }
@@ -239,6 +242,15 @@ final class AppModel {
         await perform(.probeServers)
     }
 
+    /// Foreground auto-refresh: subscriptions whose last successful update
+    /// is older than `maxAge` are re-fetched. No background modes, no timer
+    /// draining the battery — the OS suspends us anyway, so refresh happens
+    /// when the user returns, plus manual refresh anytime.
+    @discardableResult
+    func refreshStaleSubscriptions(maxAge: TimeInterval = 3600) async -> Bool {
+        await perform(.refreshStaleSubscriptions(maxAge))
+    }
+
     @discardableResult
     func perform(_ action: AppAction) async -> Bool {
         guard inFlightActions.insert(action).inserted else { return false }
@@ -275,6 +287,8 @@ final class AppModel {
             return await removeStoredSubscription(id)
         case .probeServers:
             return await probeServers()
+        case let .refreshStaleSubscriptions(maxAge):
+            return await refreshStale(maxAge: maxAge)
         }
     }
 
@@ -684,6 +698,29 @@ final class AppModel {
             return server.withLatency(LatencyState(milliseconds: ms, observedAt: measuredAt))
         }
         updateDerivedMeasurements()
+        return true
+    }
+
+    private func refreshStale(maxAge: TimeInterval) async -> Bool {
+        guard snapshot.system == .ready, let coordinator = subscriptions else { return false }
+        let cutoff = now().addingTimeInterval(-max(60, maxAge))
+        let stale = await coordinator.subscriptions().filter { $0.updatedAt < cutoff }
+        guard !stale.isEmpty else { return true }
+        var last: SubscriptionImportSummary?
+        for record in stale {
+            do {
+                last = try await coordinator.refresh(id: record.id)
+            } catch let error as SubscriptionCoordinatorError {
+                if case let .nothingAccepted(accepted, rejected) = error {
+                    last = SubscriptionImportSummary(
+                        subscriptionID: record.id,
+                        accepted: accepted,
+                        rejected: rejected
+                    )
+                }
+            } catch {}
+        }
+        await resyncSubscriptions(lastResult: last)
         return true
     }
 

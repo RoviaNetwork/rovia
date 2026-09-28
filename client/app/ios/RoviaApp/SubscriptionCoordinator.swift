@@ -160,6 +160,29 @@ final class SubscriptionCoordinator {
         return try await importAndStore(lines: document.lines, record: record, isFirstImport: false)
     }
 
+    /// Refreshes every URL subscription. Pasted/single-link records have no
+    /// URL to re-fetch and are reported with their current counts. A failed
+    /// record keeps its last working servers (see `refresh`); the returned
+    /// summaries let the UI show per-subscription results honestly.
+    func refreshAll() async -> [SubscriptionImportSummary] {
+        var summaries: [SubscriptionImportSummary] = []
+        for record in await store.subscriptions() {
+            guard record.source.kind == .url else { continue }
+            do {
+                summaries.append(try await refresh(id: record.id))
+            } catch let error as SubscriptionCoordinatorError {
+                if case let .nothingAccepted(accepted, rejected) = error {
+                    summaries.append(SubscriptionImportSummary(
+                        subscriptionID: record.id,
+                        accepted: accepted,
+                        rejected: rejected
+                    ))
+                }
+            } catch {}
+        }
+        return summaries
+    }
+
     func rename(id: UUID, name: String) async throws {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { throw SubscriptionCoordinatorError.invalidInput }

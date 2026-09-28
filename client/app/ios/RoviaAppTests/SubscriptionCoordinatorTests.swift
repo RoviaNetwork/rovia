@@ -241,6 +241,23 @@ final class SubscriptionCoordinatorTests: XCTestCase {
         XCTAssertNil(try secrets.read(for: urlKey))
     }
 
+    func testRefreshAllSkipsPastedSubscriptions() async throws {
+        let box = CoordinatorBodyBox(body: coordinatorVLESS)
+        let (coordinator, _, _, _) = makeCoordinator(handler: { request in
+            (Data(box.body.utf8), coordinatorHTTPResponse(url: request.url!, status: 200))
+        })
+        try await coordinator.loadPersisted()
+        _ = try await coordinator.add(
+            url: URL(string: "https://provider.example/sub")!,
+            name: "URL",
+            allowInsecure: false
+        )
+        _ = try await coordinator.addSingleLink(coordinatorTrojan, name: "Single")
+        let summaries = await coordinator.refreshAll()
+        XCTAssertEqual(summaries.count, 1)
+        XCTAssertEqual(summaries[0].accepted, 1)
+    }
+
     func testLegacyFileWithoutAllowInsecureLoads() async throws {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
