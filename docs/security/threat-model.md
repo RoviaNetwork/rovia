@@ -53,25 +53,26 @@ drift apart.
 **Planned, not implemented**
 
 - Golden routing fixtures shared with Android. Android is not started, so there is
-  no second platform to share them with. `release-readiness.md` row 10.
+  no second platform to share them with. `release-readiness.md` row 9.
 - Fuzz targets for share-link and subscription parsing. There is no fuzz target in
   the tree and no fuzzing step in any workflow. No row of `release-readiness.md`
-  covers this one: that disclosure lists the ten gates that are open, and fuzzing
-  is not among them, so citing a row here would be citing a gate that is about
+  covers this one: that disclosure lists the gates that are open, and fuzzing is
+  not among them, so citing a row here would be citing a gate that is about
   something else.
-- CI secret scanning and workflow review. No workflow has ever run, so neither has
-  anything to scan. `release-readiness.md` row 1. `CODEOWNERS` lists the paths a
-  review would cover, and the handles in it are placeholders, so no review is
-  currently required on any path. `release-readiness.md` row 7.
+- CI secret scanning and workflow review. The workflow has now run, so there is
+  something to scan, and nothing scans it. `release-readiness.md` row 7.
+  `CODEOWNERS` lists the paths a review would cover, and the handles in it are
+  placeholders, so no review is currently required on any path.
+  `release-readiness.md` row 6.
 - Dependency review and advisory monitoring. SBOM generation does exist and runs,
   but dependency review, advisory monitoring, and secret scanning are not
-  configured. `release-readiness.md` row 8.
+  configured. `release-readiness.md` row 7.
 - Physical-device tunnel tests for lifecycle, IPv4, IPv6, and reconnect behaviour.
   Simulator install and launch are checked; a simulator process staying alive says
-  nothing about a tunnel. `release-readiness.md` row 5.
+  nothing about a tunnel. `release-readiness.md` row 4.
 - Independent reproducibility check for the engine artifact. No engine is built, so
   there is no artifact to reproduce, and the verifier refuses rather than claiming
-  it. `release-readiness.md` row 6.
+  it. `release-readiness.md` row 5.
 
 ## Residual risks
 

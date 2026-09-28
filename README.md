@@ -410,7 +410,7 @@ Third-party notices: [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 | [`docs/legal/app-store-distribution.md`](docs/legal/app-store-distribution.md) | Distribution constraints and the pre-submission checklist. |
 | [`docs/development/ci.md`](docs/development/ci.md) | Every gate, its order, and what it proves. |
 | [`docs/development/foundation-verification.md`](docs/development/foundation-verification.md) | The dated verification record, with derived figures. |
-| [`docs/development/release-readiness.md`](docs/development/release-readiness.md) | The ten open external gates. |
+| [`docs/development/release-readiness.md`](docs/development/release-readiness.md) | The nine open external gates, and the one that has closed. |
 | [`docs/development/control-api.md`](docs/development/control-api.md) | The host ⇄ extension message contract. |
 
 <p align="center">

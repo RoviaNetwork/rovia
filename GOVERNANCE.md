@@ -67,7 +67,7 @@ verification record, and meaningful governance changes are kept in the repositor
 Private security reports stay private until a coordinated disclosure decision is made.
 
 What is **not** claimed: that this is a mature project, that it has been reviewed by
-anyone outside the maintainer, or that the ten external gates in the readiness document
+anyone outside the maintainer, or that the nine external gates in the readiness document
 have been closed. The Status section of the README is the authoritative summary.
 
 ## Community expectations

@@ -1114,10 +1114,26 @@ class SemanticProbeCountTests(unittest.TestCase):
         readiness = (ROOT / "docs/development/release-readiness.md").read_text(
             encoding="utf-8"
         )
+        # The open-gate table, numbered from 1 with no gaps. The count is what it is
+        # rather than a fixed number: hosted CI moved into the document's `## Closed`
+        # section when it ran, which is a gate leaving the list by being executed. The
+        # contiguity and the `## Closed` section are the real invariants — a fixed total
+        # would fail here every time a gate is properly closed.
         rows = re.findall(r"^\| (\d+) \| \*\*", readiness, re.M)
-        self.assertEqual(len(rows), 10, "the readiness disclosure no longer has ten gates")
-        self.assertEqual(rows, [str(number) for number in range(1, 11)])
-        self.assertIn("canonical list of **ten** gates", self.record())
+        self.assertTrue(rows, "the readiness disclosure has no numbered gate rows")
+        self.assertEqual(
+            rows, [str(number) for number in range(1, len(rows) + 1)],
+            "the open-gate rows are not numbered contiguously from 1",
+        )
+        self.assertIn("## Closed", readiness,
+                      "a gate left the open list without a Closed section recording it")
+        number_words = {
+            8: "eight", 9: "nine", 10: "ten", 11: "eleven", 12: "twelve",
+        }
+        self.assertIn(
+            f"canonical list of **{number_words.get(len(rows), len(rows))}** gates",
+            self.record(),
+        )
         self.assertIn("own account of the same ground in **nine** entries", self.record())
         section = (
             (ROOT / "docs/development/foundation-verification.md")

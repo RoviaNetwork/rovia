@@ -501,7 +501,7 @@ elsewhere, so the nested and flat views cannot diverge unnoticed.
 
 None of the following was run, and no claim is made about any of them. The same
 list is held as a dated, in-repository disclosure in
-`docs/development/release-readiness.md`, which is the canonical list of **ten**
+`docs/development/release-readiness.md`, which is the canonical list of **nine**
 gates and the copy a reviewer sees. This section is the run record's own account
 of the same ground in **nine** entries: it groups signing, provisioning, archive,
 and export into one item where the readiness document separates the signing
@@ -1035,7 +1035,7 @@ leave a reader to find the rest in a planning ledger outside the repository.
 | Team-ID ahead of everything that signs | The release workflow carries `Require a resolved signing identity` at position 5 of 17, before the keychain, the certificate, the profiles, `Archive`, and `Export IPA` | `test_the_export_identity_gate_precedes_every_signing_step_in_the_workflow`, plus a test that `ci.md` documents it at the position the workflow has |
 | Derived engine licenses | `licenseDeclared` was MIT for every component. Each candidate in the lock now declares the license of the code it builds, the schema requires it, and the generator checks it against the upstream project the lock names — libXray MIT, Xray-core MPL-2.0, sing-box GPL-3.0-or-later — refusing a missing, unverifiable, or inconsistent license | 11 tests in `EngineLicenseTests`; 3 lock-schema probes; the schema enum and the generator table are required to be the same set |
 | Bidirectional ownership | `core/config/` was in neither ownership file; `core/persistence/` was in both and does not exist. `SECURITY.md` states the criterion, and the test checks three directions: sensitive implies owned by a security or engine handle, security-handled implies sensitive, and every path named exists | one test with three directions, plus a test for the stated criterion and one for the unresolved review identity |
-| In-repo readiness disclosure | The ten unexecuted gates lived only in a ledger outside the repository. `docs/development/release-readiness.md` is dated, names the path or workflow step that would have to change for each gate, and makes no claim about any of them | 7 tests, including that every named path exists and that no gate title is followed by a claim that it passed |
+| In-repo readiness disclosure | The nine unexecuted gates lived only in a ledger outside the repository. `docs/development/release-readiness.md` is dated, names the path or workflow step that would have to change for each gate, and makes no claim about any of them | 7 tests, including that every named path exists and that no gate title is followed by a claim that it passed |
 | Derived counts | Suite totals, gate mutation and shape counts, the refusal-table row count, the overclaim subject count, the readiness gate count, the sensitive path count, the probe counts, the license-test count, and the gate runtime range are each read from the thing they describe rather than restated | the loader, `SemanticProbeCountTests`, and per-area drift tests |
 
 **What the five correction passes changed in this record, rather than in the code.**

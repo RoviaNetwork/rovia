@@ -378,10 +378,15 @@ same list is held as a dated, in-repository disclosure in
 `docs/development/release-readiness.md`, which is where a reviewer should look
 rather than at this summary.
 
-- **GitHub Actions execution.** The three workflows are written, YAML-parsed,
-  and their policies asserted by tests, but no run has occurred. Runner-specific
-  behaviour (`$RUNNER_TEMP`, `GITHUB_OUTPUT`, `GITHUB_ENV`, the `macos-15` image,
-  and the installed `check-jsonschema`) is unverified.
+- **Hosted CI has run, and is no longer an external gate.** `.github/workflows/ci.yml`
+  completed on the real runners at commit `13981d5`:
+  <https://github.com/princeofscale/rovia/actions/runs/36344718641>. The first five
+  runs failed on four real defects this repository could not see locally — a context
+  GitHub does not provide in a workflow-level `env:`, a shell variable it does not
+  expand there, a dependency on `uvx` that a hosted runner does not have, and two
+  tests that read files the repository does not publish. `docs/development/release-readiness.md`
+  lists what a run found and what is still open.
+  The remaining external gates are:
 - **Signing, provisioning, archive, and export.** No certificate import,
   `xcodebuild archive`, `-exportArchive`, TestFlight, or App Store submission has
   been performed, so the release gate's happy path is only exercised against a

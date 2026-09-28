@@ -2144,12 +2144,15 @@ class WorkflowPolicyTests(unittest.TestCase):
                     f"what the disclosure says",
                 )
         # And the row that carries the numbers must be the archive/export row,
-        # identified by its title rather than by the prose in its last column.
+        # identified by its title. Not by its number: hosted CI moved into the
+        # document's `## Closed` section, every open row moved down by one, and this
+        # test raised a bare StopIteration because it still asked for row 3. A row
+        # number in a test is the same hazard as a row number in prose, which is why the
+        # numbers inside the row are read from the workflow and the row itself is found
+        # by its title.
         title = "**Archive and export**"
         row = next(
-            line
-            for line in readiness.splitlines()
-            if line.startswith("| 3 |") and title in line
+            line for line in readiness.splitlines() if title in line and line.startswith("| ")
         )
         self.assertIn(
             f"Steps {names.index('Archive') + 1} and {names.index('Export IPA') + 1}",
@@ -3036,13 +3039,19 @@ class PrivacyAndOwnershipTests(unittest.TestCase):
                     "to be reproducible",
                 )
 
+    # The readiness rows each planned control cites, against the current numbering.
+    # Hosted CI moved into the document's `## Closed` section, so every open row moved
+    # down by one and the citations moved with them. Each entry here is re-pointed by
+    # what the control is about rather than by arithmetic, because a mechanical shift is
+    # how a citation ends up naming a gate that is about something else - which is
+    # precisely what this table exists to prevent, so it has to be held the same way.
     UNEXECUTED_CONTROLS = {
-        "Golden routing fixtures shared with Android": ("10",),
+        "Golden routing fixtures shared with Android": ("9",),
         "Fuzz targets for share-link and subscription parsing": None,
-        "CI secret scanning and workflow review": ("1", "7"),
-        "Dependency review and advisory monitoring": ("8",),
-        "Physical-device tunnel tests for lifecycle": ("5",),
-        "Independent reproducibility check for the engine artifact": ("6",),
+        "CI secret scanning and workflow review": ("7", "6"),
+        "Dependency review and advisory monitoring": ("7",),
+        "Physical-device tunnel tests for lifecycle": ("4",),
+        "Independent reproducibility check for the engine artifact": ("5",),
     }
 
     ROW_CITATION = re.compile(r"release-readiness\.md` row (\d+)")
@@ -4758,7 +4767,11 @@ class PrivacyAndOwnershipTests(unittest.TestCase):
     def test_every_unexecuted_gate_is_disclosed_and_named_by_a_real_path(self):
         gates = self.readiness_gates()
         self.assertEqual([number for number, _ in gates], list(range(1, len(gates) + 1)))
-        self.assertGreaterEqual(len(gates), 10)
+        self.assertGreaterEqual(
+            len(gates), 9,
+            "the disclosure has fewer rows than it had; a gate leaves the list by being "
+            "executed, and the executed one is recorded in the document's Closed section",
+        )
         body = self.readiness_document()
         for number, title in gates:
             with self.subTest(gate=number, title=title):
@@ -4792,8 +4805,11 @@ class PrivacyAndOwnershipTests(unittest.TestCase):
     def test_the_readiness_disclosure_covers_the_gates_the_code_knows_about(self):
         # Source-derived: each of these is a gate this repository can see but not
         # run, named by the file that would have to change.
+        # Hosted CI execution is deliberately absent: it ran, and the run is recorded
+        # in that document's own `## Closed` section. A gate leaves this set by being
+        # executed, so the way to re-add it is to delete the evidence, not to edit this
+        # dict - which is the direction a reviewer would have to notice.
         required = {
-            "GitHub Actions execution": ".github/workflows/ci.yml",
             "Signing, provisioning, and the Apple team identity":
                 "tools/release/ExportOptions.plist",
             "Archive and export": ".github/workflows/release-ios.yml",
@@ -5632,7 +5648,6 @@ class PrivacyAndOwnershipTests(unittest.TestCase):
                 self.assertTrue((REPO_ROOT / path).is_file(), f"{path} does not exist")
         ci = (REPO_ROOT / "docs/development/ci.md").read_text(encoding="utf-8")
         for external_gate in (
-            "GitHub Actions execution",
             "Signing, provisioning, archive, and export",
             "A physical-device VPN",
             "A production engine",
