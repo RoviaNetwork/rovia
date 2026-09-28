@@ -1,4 +1,5 @@
 import Foundation
+import Network
 import XCTest
 @testable import RoviaConfig
 @testable import RoviaSubscription
@@ -382,5 +383,59 @@ private func XCTAssertThrowsAsync<T>(
         XCTFail("expected throw: \(message)", file: file, line: line)
     } catch {
         verify(error)
+    }
+}
+
+
+private func startLoopbackListener() async throws -> (NWListener, Int) {
+    final class ReadyBox: @unchecked Sendable { var done = false }
+    let listener = try NWListener(using: .tcp, on: 0)
+    listener.newConnectionHandler = { $0.start(queue: .global()) }
+    let box = ReadyBox()
+    await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+        listener.stateUpdateHandler = { state in
+            if case .ready = state, !box.done {
+                box.done = true
+                continuation.resume()
+            }
+        }
+        listener.start(queue: .global())
+    }
+    return (listener, Int(try XCTUnwrap(listener.port?.rawValue)))
+}
+
+
+
+final class LatencyProberTests: XCTestCase {
+    func testLoopbackConnectReportsMilliseconds() async throws {
+        let (listener, port) = try await startLoopbackListener()
+        defer { listener.cancel() }
+        let measured = await LatencyProber.probe(host: "127.0.0.1", port: port, timeout: 3)
+        XCTAssertNotNil(measured)
+    }
+
+    func testRefusedPortReportsNil() async {
+        let measured = await LatencyProber.probe(host: "127.0.0.1", port: 1, timeout: 3)
+        XCTAssertNil(measured)
+    }
+
+    func testUnroutableHostTimesOut() async {
+        let start = Date()
+        let measured = await LatencyProber.probe(host: "192.0.2.1", port: 443, timeout: 1)
+        XCTAssertNil(measured)
+        XCTAssertLessThan(Date().timeIntervalSince(start), 5)
+    }
+
+    func testProbeAllPreservesOrderWithBoundedConcurrency() async throws {
+        let (listener, port) = try await startLoopbackListener()
+        defer { listener.cancel() }
+        let results = await LatencyProber.probeAll(
+            [(host: "127.0.0.1", port: port), (host: "127.0.0.1", port: 1)],
+            maxConcurrent: 1,
+            timeout: 3
+        )
+        XCTAssertEqual(results.count, 2)
+        XCTAssertNotNil(results[0])
+        XCTAssertNil(results[1])
     }
 }

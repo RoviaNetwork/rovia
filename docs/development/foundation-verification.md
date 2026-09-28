@@ -209,12 +209,12 @@ Every entry in `tools/ci/local-packages.txt`, each with its own
 | --- | --- | --- |
 | `core/config` | 64 | 0 |
 | `core/routing` | 44 | 0 |
-| `core/subscription` | 67 | 0 |
+| `core/subscription` | 71 | 0 |
 | `engines/api` | 3 | 0 |
-| `engines/xray` | 2 | 0 |
+| `engines/xray` | 8 | 0 |
 | `engines/singbox` | 1 | 0 |
 | `platform/apple` | 5 | 0 |
-| **Total** | **186** | **0** |
+| **Total** | **196** | **0** |
 
 ### SBOM
 
@@ -256,7 +256,7 @@ fresh UUID and that file is not expected to match byte for byte.
 
 | Command | Result |
 | --- | --- |
-| `xcodebuild -project client/app/ios/RoviaApp.xcodeproj -scheme RoviaApp -configuration Debug -destination "platform=iOS Simulator,id=1AA6273F-…" -derivedDataPath "$TMPDIR"/rovia-derived-data test` | `Executed 75 tests, with 0 failures`, `** TEST SUCCEEDED **` |
+| `xcodebuild -project client/app/ios/RoviaApp.xcodeproj -scheme RoviaApp -configuration Debug -destination "platform=iOS Simulator,id=1AA6273F-…" -derivedDataPath "$TMPDIR"/rovia-derived-data test` | `Executed 77 tests, with 0 failures`, `** TEST SUCCEEDED **` |
 | the same, `-configuration Release -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build` | `** BUILD SUCCEEDED **` |
 | the same, `-configuration Debug`, unsigned, generic simulator destination | `** BUILD SUCCEEDED **` |
 | `./tools/ci/verify-bundle-metadata.sh …/Debug-iphonesimulator/Rovia.app --expect-version 0.1.0` | `io.rovia.client version 0.1.0 (1) executable Rovia, RoviaTunnel io.rovia.client.tunnel embedded` |
@@ -272,7 +272,7 @@ invalidates. What is load-bearing is that it is outside the checkout, which is w
 runner loses access to its own bundle and the run times out before a single test
 executes, which is a failure that looks like a hang rather than a misconfiguration.
 
-The 75 tests are the `RoviaAppTests` suite: the model behaviour the slice has
+The 77 tests are the `RoviaAppTests` suite: the model behaviour the slice has
 always gated, plus four tests that hold the app to the canonical route model —
 one that runs `RouteEvaluator.explain` for every sample input and requires the
 debugger's display model to agree with it field for field, one that requires
@@ -285,7 +285,8 @@ selected server, a vanished server clears the selection, bootstrap loads
 persisted subscriptions) and ten coordinator tests (fetch, decode, import with
 honest counts, atomic refresh, stable IDs across reorder, the HTTP policy,
 rename and remove with secret cleanup, and a legacy file without the insecure
-flag).
+flag) and two probe tests (measured latency lands on the servers, and probing
+without a coordinator changes nothing).
 
 The app and the test target both link `RoviaRouting` and `RoviaConfig` as local
 Swift packages. Two build facts are part of that evidence: the Debug
@@ -330,7 +331,7 @@ refuses earlier, on the thing that is actually missing.
 
 ## Working tree
 
-25 tracked top-level entries, 188 files. `build/` holds the
+25 tracked top-level entries, 196 files. `build/` holds the
 generated `SBOM.spdx.json` and is gitignored; the `.build` directories, the
 `__pycache__` directories, and the `.DS_Store` files are gitignored; derived data
 was kept outside the checkout. `git check-ignore` confirms

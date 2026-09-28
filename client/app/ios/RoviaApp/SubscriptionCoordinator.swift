@@ -20,8 +20,18 @@ struct SubscriptionImportSummary: Equatable, Sendable {
     let rejected: [RejectedSubscriptionLine]
 }
 
-private enum SecretKeys {
-    static func subscriptionURL(_ id: UUID) -> String {
+/// An import job that may cross to a detached task. Unchecked because
+/// `ShareLinkCredentialSink` is not marked `@Sendable` (marking the
+/// package-wide typealias would break every existing call site that captures
+/// test recorders); the concrete closures built by `credentialSink` capture
+/// only the `Sendable` secret store and a UUID, so no shared mutable state
+/// crosses here.
+private struct DetachedImport: @unchecked Sendable {
+    let lines: [String]
+    let sink: ShareLinkCredentialSink
+}
+
+private enum SecretKeys {    static func subscriptionURL(_ id: UUID) -> String {
         "subscription/\(id.uuidString.lowercased())/url"
     }
 
@@ -181,6 +191,20 @@ final class SubscriptionCoordinator {
         }
     }
 
+    /// Non-secret endpoints for latency probing, keyed by the summary ID
+    /// (`ServerSummary.id`). Hosts and ports are not secrets — the redacted
+    /// display values already carry the port — but credentials never leave
+    /// the Keychain through here.
+    func endpoints() async -> [String: (host: String, port: Int)] {
+        var result: [String: (host: String, port: Int)] = [:]
+        for record in await store.subscriptions() {
+            for server in record.servers {
+                result[server.id.uuidString.lowercased()] = (server.endpoint.host, server.endpoint.port)
+            }
+        }
+        return result
+    }
+
     /// Projects every stored subscription into content the existing
     /// selection, group, and routing UI already understands: one profile
     /// and one group per subscription, servers with stable IDs.
@@ -254,10 +278,16 @@ final class SubscriptionCoordinator {
         record: StoredSubscription,
         isFirstImport: Bool
     ) async throws -> SubscriptionImportSummary {
-        let result = SubscriptionImporter.importLines(
-            lines,
-            credentialSink: credentialSink(subscriptionID: record.id)
-        )
+        // Parsing thousands of links costs ~2s per 5000 on an i3 and must
+        // never run on the MainActor: the importer is pure, so it runs
+        // detached. The sink only captures the thread-safe secret store and
+        // a UUID, which is what makes the unchecked boundary below honest —
+        // and it is the only unchecked boundary in this file.
+        let sink = credentialSink(subscriptionID: record.id)
+        let job = DetachedImport(lines: lines, sink: sink)
+        let result = await Task.detached(priority: .userInitiated) {
+            SubscriptionImporter.importLines(job.lines, credentialSink: job.sink)
+        }.value
         guard !result.accepted.isEmpty else {
             if isFirstImport {
                 var empty = record

@@ -15,11 +15,12 @@ final class AppModelTests: XCTestCase {
         tunnel: any TunnelControlling,
         content: AppContent = .sample,
         loadError: (any Error)? = nil,
-        subscriptions: SubscriptionCoordinator? = nil
+        subscriptions: SubscriptionCoordinator? = nil,
+        probeLatency: (@Sendable (String, Int) async -> Int?)? = nil
     ) -> (AppModel, CountingFixtureProvider) {
         let now = fixedNow
         let provider = CountingFixtureProvider(content: content, loadError: loadError)
-        let model = AppModel(tunnel: tunnel, fixtures: provider, subscriptions: subscriptions, now: { now })
+        let model = AppModel(tunnel: tunnel, fixtures: provider, subscriptions: subscriptions, probeLatency: probeLatency, now: { now })
         return (model, provider)
     }
 
@@ -791,6 +792,37 @@ final class AppModelTests: XCTestCase {
         assertTrue(await relaunched.bootstrap())
         assertEqual(relaunched.snapshot.content.servers.count, 1)
         assertFalse(relaunched.snapshot.isSampleData)
+    }
+
+    func testProbeVisibleServersUpdatesLatency() async {
+        let box = ModelBodyBox(body: "\(ModelFixtures.vless)\n\(ModelFixtures.trojan)")
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let coordinator = SubscriptionCoordinator(
+            store: SubscriptionStore(directory: dir),
+            secrets: InMemorySecretStore(),
+            session: ModelStubSession(box: box)
+        )
+        let (model, _) = makeModel(
+            tunnel: StubTunnelController(),
+            content: .empty,
+            subscriptions: coordinator,
+            probeLatency: { _, _ in 42 }
+        )
+        assertTrue(await model.bootstrap())
+        assertTrue(await model.addSubscription(url: URL(string: "https://provider.example/sub")!, name: "P"))
+        assertTrue(model.snapshot.content.servers.allSatisfy { $0.latency.milliseconds == nil })
+        assertTrue(await model.probeVisibleServers())
+        let probed = model.snapshot.content.servers
+        assertEqual(probed.count, 2)
+        assertTrue(probed.allSatisfy { $0.latency.milliseconds == 42 })
+        assertEqual(probed[0].latency.quality, .good)
+    }
+
+    func testProbeWithoutCoordinatorLeavesContentAlone() async {
+        let (model, _) = makeModel(tunnel: StubTunnelController(), probeLatency: { _, _ in 42 })
+        assertTrue(await model.bootstrap())
+        assertTrue(await model.probeVisibleServers())
+        assertEqual(model.snapshot.content.servers.count, 5)
     }
 
     private func makeSubscriptionModel(

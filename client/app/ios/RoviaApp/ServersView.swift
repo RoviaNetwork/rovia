@@ -24,6 +24,7 @@ struct ServersView: View {
                     groupCard
                     profileCard
                     serverList
+                    latencyButton
                     SampleDataNotice(identifier: AppAccessibilityIdentifier.serversScreen + ".notice")
                 }
             }
@@ -119,6 +120,23 @@ struct ServersView: View {
                 }
             }
         }
+    }
+
+    private var latencyButton: some View {
+        let isProbing = model.inFlightActions.contains(.probeServers)
+        return Button {
+            Task { await model.probeVisibleServers() }
+        } label: {
+            if isProbing {
+                Label("Measuring…", systemImage: "speedometer")
+            } else {
+                Label("Check latency", systemImage: "speedometer")
+            }
+        }
+        .buttonStyle(.bordered)
+        .disabled(isProbing || model.snapshot.visibleServers.isEmpty)
+        .accessibilityHint("Opens a TCP connection to each listed server and shows the handshake time. Bounded and cancellable by leaving the screen.")
+        .accessibilityIdentifier(AppAccessibilityIdentifier.serversScreen + ".checkLatency")
     }
 
     private func serverRow(_ server: ServerSummary) -> some View {

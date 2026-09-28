@@ -65,6 +65,7 @@ enum AppAction: Hashable, Sendable {
     case refreshSubscription(UUID)
     case renameSubscription(UUID, String)
     case removeSubscription(UUID)
+    case probeServers
 
     var label: String {
         switch self {
@@ -96,6 +97,8 @@ enum AppAction: Hashable, Sendable {
             "Rename a subscription"
         case .removeSubscription:
             "Remove a subscription"
+        case .probeServers:
+            "Measure server latency"
         }
     }
 }
@@ -120,17 +123,20 @@ final class AppModel {
     private let tunnel: any TunnelControlling
     private let fixtures: any FixtureProviding
     private let subscriptions: SubscriptionCoordinator?
+    private let probeLatency: (@Sendable (String, Int) async -> Int?)?
     private let now: @Sendable () -> Date
 
     init(
         tunnel: any TunnelControlling = UnavailableTunnelController(),
         fixtures: any FixtureProviding = StaticFixtureProvider(),
         subscriptions: SubscriptionCoordinator? = nil,
+        probeLatency: (@Sendable (String, Int) async -> Int?)? = nil,
         now: @escaping @Sendable () -> Date = { Date() }
     ) {
         self.tunnel = tunnel
         self.fixtures = fixtures
         self.subscriptions = subscriptions
+        self.probeLatency = probeLatency
         self.now = now
     }
 
@@ -229,6 +235,11 @@ final class AppModel {
     }
 
     @discardableResult
+    func probeVisibleServers() async -> Bool {
+        await perform(.probeServers)
+    }
+
+    @discardableResult
     func perform(_ action: AppAction) async -> Bool {
         guard inFlightActions.insert(action).inserted else { return false }
         defer { inFlightActions.remove(action) }
@@ -262,6 +273,8 @@ final class AppModel {
             return await renameStoredSubscription(id, name: name)
         case let .removeSubscription(id):
             return await removeStoredSubscription(id)
+        case .probeServers:
+            return await probeServers()
         }
     }
 
@@ -633,6 +646,45 @@ final class AppModel {
             snapshot.lastError = .unknown(code: "subscription.decode.failed")
         }
         reconcileSelection()
+    }
+
+    /// TCP-connect latency for the visible servers. Bounded twice: at most
+    /// 100 servers per run and 6 concurrent handshakes, so a huge list
+    /// cannot open thousands of sockets. Unreachable servers keep their old
+    /// state — the UI shows "Not measured", never a fake number.
+    private func probeServers() async -> Bool {
+        guard snapshot.system == .ready else { return false }
+        let candidates = Array(snapshot.visibleServers.prefix(100))
+        guard !candidates.isEmpty else { return true }
+        let endpoints = await subscriptions?.endpoints() ?? [:]
+        let measuredAt = now()
+        var results: [String: Int] = [:]
+        if let probeLatency {
+            for server in candidates {
+                if let endpoint = endpoints[server.id] {
+                    if let ms = await probeLatency(endpoint.host, endpoint.port) {
+                        results[server.id] = ms
+                    }
+                }
+            }
+        } else {
+            let targets = candidates.compactMap { server -> (id: String, host: String, port: Int)? in
+                guard let endpoint = endpoints[server.id] else { return nil }
+                return (server.id, endpoint.host, endpoint.port)
+            }
+            let values = await LatencyProber.probeAll(targets.map { (host: $0.host, port: $0.port) })
+            for (target, ms) in zip(targets, values) {
+                if let ms {
+                    results[target.id] = ms
+                }
+            }
+        }
+        snapshot.content.servers = snapshot.content.servers.map { server in
+            guard let ms = results[server.id] else { return server }
+            return server.withLatency(LatencyState(milliseconds: ms, observedAt: measuredAt))
+        }
+        updateDerivedMeasurements()
+        return true
     }
 
     /// Keeps the selected server across refreshes (stable importer IDs) and

@@ -528,6 +528,18 @@ struct ServerSummary: Equatable, Sendable, Identifiable {
     var healthConfidence: HealthConfidence {
         health.confidence
     }
+
+    func withLatency(_ latency: LatencyState) -> ServerSummary {
+        ServerSummary(
+            id: id,
+            name: name,
+            protocolLabel: protocolLabel,
+            locationLabel: locationLabel,
+            latency: latency,
+            health: health,
+            groupIDs: groupIDs
+        )
+    }
 }
 
 struct ServerGroupSummary: Equatable, Sendable, Identifiable {
