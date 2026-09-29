@@ -186,6 +186,62 @@ def binary_component(
     }
 
 
+REMOTE_PIN_PATTERN = re.compile(
+    r"isa = XCRemoteSwiftPackageReference;"
+    r".*?repositoryURL = \"(?P<url>[^\"]+)\";"
+    r".*?kind = (?P<kind>\w+);"
+    r".*?version = (?P<version>[^;]+);",
+    re.S,
+)
+
+
+def remote_pins(project_text: str) -> list[dict]:
+    """Pinned remote packages from the Xcode project, in file order."""
+    pins = []
+    for match in REMOTE_PIN_PATTERN.finditer(project_text):
+        pins.append(
+            {
+                "url": match.group("url"),
+                "kind": match.group("kind"),
+                "version": match.group("version").strip(),
+            }
+        )
+    return pins
+
+
+def remote_package_component(url: str, version: str) -> dict:
+    """One SBOM component per pinned remote repository.
+
+    Local packages are components by product name; a remote repository is one
+    component at the repository granularity, because the pin (and the
+    Package.resolved revision behind it) is per repository, not per product.
+    """
+    name = url.rstrip("/").rsplit("/", 1)[-1].removesuffix(".git")
+    return {
+        "SPDXID": "SPDXRef-Package-" + name,
+        "name": name,
+        "versionInfo": version,
+        "supplier": "Organization: RoviaNetwork",
+        "primaryPackagePurpose": "LIBRARY",
+        "downloadLocation": url,
+        "filesAnalyzed": False,
+        "licenseConcluded": NOASSERTION,
+        "licenseDeclared": NOASSERTION,
+        "copyrightText": NOASSERTION,
+        "comment": (
+            "Pinned remote Swift package. The exact version is held by the Xcode "
+            "project and tools/ci/core-pin.txt; see THIRD_PARTY_NOTICES.md for licenses."
+        ),
+        "externalRefs": [
+            {
+                "referenceCategory": "PACKAGE-MANAGER",
+                "referenceType": "purl",
+                "referenceLocator": f"pkg:github/{url.split('github.com/')[-1].removesuffix('.git')}@{version}",
+            }
+        ],
+    }
+
+
 def engine_license(name: str, entry: dict) -> str:
     """The SPDX identifier for an engine, or a refusal.
 
@@ -383,6 +439,17 @@ def build_document(
         component = engine_component(name, entry)
         engine_ids.append(component["SPDXID"])
         components.append(component)
+
+    project_text = (root / "client/app/ios/RoviaApp.xcodeproj/project.pbxproj").read_text(
+        encoding="utf-8"
+    )
+    for pin in remote_pins(project_text):
+        if pin["kind"] != "exactVersion":
+            raise SystemExit(
+                f"remote {pin['url']} is not pinned to an exact version; "
+                "the SBOM refuses a floating dependency"
+            )
+        components.append(remote_package_component(pin["url"], pin["version"]))
 
     relationships = [
         {

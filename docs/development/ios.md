@@ -38,10 +38,10 @@ message channels: `print`, `os_log`, `OSLog`, `Logger`, `logger`, `debugPrint`,
 `dump`, `NSLog`, and `sendProviderMessage`.
 
 Each rule is proven by a mutation: the test copies the repository, breaks that one
-property, and requires the check to fail. **47 mutations plus 7 legitimate
-shapes**, of which 9 are package-dependency mutations, 16 write a second route
+property, and requires the check to fail. **50 mutations plus 7 legitimate
+shapes**, of which 12 are package-dependency mutations, 16 write a second route
 evaluator, 20 give a raw trace somewhere to live, and 2 are contract deletions.
-The 7 shapes must *not* be flagged, and they are not part of the 47: they are the
+The 7 shapes must *not* be flagged, and they are not part of the 50: they are the
 cases the check has to leave alone, because a gate that cries wolf is a gate
 people turn off. The suite copies the tree 69 times, which is most of its
 20–90 seconds across the runs recorded in this repository's verification record, which is a measurement on one x86_64 Mac and not a bound. That figure is measured by counting `Workspace` instantiations, one per copy,
@@ -73,23 +73,22 @@ Two build settings matter for that dependency:
 
 ## Local package tests
 
-Every entry in `tools/ci/local-packages.txt`, which is the same list the lockfile
+The one entry in `tools/ci/local-packages.txt`, which is the same list the lockfile
 verifier, the SBOM generator, and the release workflow all read:
 
 ```text
-swift test --package-path core/config
-swift test --package-path core/routing
-swift test --package-path core/subscription
-swift test --package-path engines/api
-swift test --package-path engines/xray
-swift test --package-path engines/singbox
 swift test --package-path platform/apple
 ```
 
-The last three were missing from this list, which is how a reader could conclude
-the engine adapters and the Apple platform layer were untested. They are not: the
-engine adapters carry the adapter-boundary tests, and `platform/apple` carries the
-Keychain and App Group store tests. `tools/ci/test_ci_docs.py` requires this list
+The canonical core (`core/config`, `core/routing`, `core/subscription`,
+`engines/api`) and the engine adapters (`engines/xray`, `engines/singbox`)
+used to be listed here. They moved to RoviaNetwork/rovia-core and
+RoviaNetwork/rovia-engine, where their own CI runs their suites, and they
+enter this repository only as pinned SPM dependencies: `rovia-core` at exact
+`0.1.0` in the Xcode project, held by the dependency gate, the SBOM, and
+`tools/ci/core-pin.txt`.
+`platform/apple` carries the Keychain and App Group store tests.
+`tools/ci/test_ci_docs.py` requires this list
 to match the file, so a package added to `local-packages.txt` cannot be left out of
 the documented commands.
 

@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import ast
 import contextlib
+import os
 import re
 import subprocess
 import sys
@@ -748,3 +749,32 @@ def word_for(number: int) -> str:
     if number not in words:
         raise AssertionError(f"no word for {number}; the record would have to state the digits")
     return words[number]
+
+
+def core_root() -> Path:
+    """The pinned rovia-core sources the text gates read.
+
+    A versioned tarball resolved by tools/ci/fetch-core.sh, never a sibling
+    checkout: the build takes core as an SPM pin, and the gates take the same
+    revision as files. CI exports ROVIA_CORE_ROOT; local runs without it fail
+    with the command that fixes them rather than with a missing directory.
+    """
+    raw = os.environ.get("ROVIA_CORE_ROOT")
+    if raw:
+        candidate = Path(raw)
+    else:
+        cache = Path(os.environ.get("XDG_CACHE_HOME", str(Path.home() / ".cache")))
+        candidate = cache / "rovia-core" / pinned_core_tag()
+    if (candidate / "core" / "config" / "Package.swift").is_file():
+        return candidate
+    raise AssertionError(
+        "no pinned rovia-core checkout: run tools/ci/fetch-core.sh "
+        "(or export ROVIA_CORE_ROOT) so the text gates read the pinned revision"
+    )
+
+
+def pinned_core_tag() -> str:
+    for line in (REPO_ROOT / "tools/ci/core-pin.txt").read_text(encoding="utf-8").splitlines():
+        if line.startswith("ROVIA_CORE_TAG="):
+            return line.split("=", 1)[1].strip()
+    raise AssertionError("tools/ci/core-pin.txt names no ROVIA_CORE_TAG")

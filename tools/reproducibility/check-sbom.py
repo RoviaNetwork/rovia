@@ -102,6 +102,28 @@ SPDX_RELATIONSHIP_TYPES = frozenset(
     }
 )
 PACKAGE_NAME = re.compile(r'name:\s*"([^"]+)"')
+REMOTE_PIN_PATTERN = re.compile(
+    r"isa = XCRemoteSwiftPackageReference;"
+    r".*?repositoryURL = \"(?P<url>[^\"]+)\";"
+    r".*?kind = (?P<kind>\w+);"
+    r".*?version = (?P<version>[^;]+);",
+    re.S,
+)
+
+
+def remote_pins(project_text: str) -> list[dict]:
+    """Pinned remote packages from the Xcode project. Mirrors the generator;
+    both read the project rather than a second list, so they cannot drift."""
+    pins = []
+    for match in REMOTE_PIN_PATTERN.finditer(project_text):
+        pins.append(
+            {
+                "url": match.group("url"),
+                "kind": match.group("kind"),
+                "version": match.group("version").strip(),
+            }
+        )
+    return pins
 # A namespace has to identify one document. These are the fixed placeholders the
 # project used before namespaces carried a run identifier; reusing one makes two
 # documents indistinguishable to anything that stores them.
@@ -248,15 +270,16 @@ def problems(document) -> list[str]:
 
 
 def check_package_coverage(document, root: Path) -> list[str]:
-    """Confirm every package listed in tools/ci/local-packages.txt is present."""
+    """Confirm every local package and every pinned remote is present."""
     listing = root / PACKAGE_LIST
     if not listing.is_file():
         return [f"the local package list is missing: {PACKAGE_LIST}"]
     found: list[str] = []
+    packages = [
+        package for package in document.get("packages", []) if isinstance(package, dict)
+    ]
     identifiers = {
-        str(package.get("SPDXID", "")).removeprefix("SPDXRef-Package-")
-        for package in document.get("packages", [])
-        if isinstance(package, dict)
+        str(package.get("SPDXID", "")).removeprefix("SPDXRef-Package-") for package in packages
     }
     for line in listing.read_text(encoding="utf-8").splitlines():
         relative = line.strip()
@@ -271,6 +294,17 @@ def check_package_coverage(document, root: Path) -> list[str]:
             found.append(f"{relative}/Package.swift does not declare a package name")
         elif match.group(1) not in identifiers:
             found.append(f"{relative} ({match.group(1)}) is missing from the SBOM")
+    project = root / "client/app/ios/RoviaApp.xcodeproj/project.pbxproj"
+    for pin in remote_pins(project.read_text(encoding="utf-8")):
+        name = pin["url"].rstrip("/").rsplit("/", 1)[-1].removesuffix(".git")
+        matches = [
+            package
+            for package in packages
+            if package.get("downloadLocation") == pin["url"]
+            and str(package.get("versionInfo", "")) == pin["version"]
+        ]
+        if not matches:
+            found.append(f"pinned remote {name}@{pin['version']} is missing from the SBOM")
     return found
 
 

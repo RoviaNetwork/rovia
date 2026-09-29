@@ -18,6 +18,7 @@ from test_ci_toolchain import PythonLintGateTests, swiftpm_counts, swiftpm_total
 from ci_check_support import (
     PACKAGE_LIST,
     app_test_count,
+    core_root,
     local_packages,
     word_for,
     DATED_SUMMARY_MARKER,
@@ -585,10 +586,13 @@ class PrivacyAndOwnershipTests(unittest.TestCase):
         self.assertIn("no engine is bundled in this build", flat(privacy).lower())
 
     def test_the_documented_package_list_matches_the_package_list_file(self):
-        # ios.md listed four of the seven entries, which read as though the engine
-        # adapters and the Apple platform layer were untested. They are not.
+        # ios.md once listed four of seven entries, which read as though the engine
+        # adapters and the Apple platform layer were untested. After the split the
+        # list holds the one package still local (platform/apple); core and the
+        # engines moved out and enter as pinned remotes, which the project gate
+        # holds instead.
         entries = local_packages()
-        self.assertEqual(len(entries), 7, f"the package list has {len(entries)} entries")
+        self.assertEqual(len(entries), 1, f"the package list has {len(entries)} entries")
         commands = re.findall(r"swift test --package-path ([\w./-]+)",
                               (REPO_ROOT / "docs/development/ios.md").read_text(
                                   encoding="utf-8"
@@ -604,7 +608,7 @@ class PrivacyAndOwnershipTests(unittest.TestCase):
         # The per-package rows were transcribed from a run while only the total was
         # bound, so a package could gain tests and its row would stay as it was.
         counts = swiftpm_counts()
-        self.assertEqual(len(counts), 7, f"the package list yielded {sorted(counts)}")
+        self.assertEqual(len(counts), 1, f"the package list yielded {sorted(counts)}")
         record = (REPO_ROOT / "docs/development/foundation-verification.md").read_text(
             encoding="utf-8"
         )
@@ -1450,7 +1454,7 @@ class PrivacyAndOwnershipTests(unittest.TestCase):
         self.assertIn("reported as a boolean", self.privacy)
         self.assertIn("never holds the value that was evaluated", self.privacy)
         diagnostic = (
-            REPO_ROOT / "core/routing/Sources/RoviaRouting/RoutingDiagnostic.swift"
+            core_root() / "core/routing/Sources/RoviaRouting/RoutingDiagnostic.swift"
         ).read_text(encoding="utf-8")
         self.assertIn("public var host: String { \"redacted\" }", diagnostic)
 
@@ -1494,7 +1498,7 @@ class PrivacyAndOwnershipTests(unittest.TestCase):
         self.assertIn("It is not `Codable`", self.privacy)
         # The debugger shows the redacted diagnostic; it does not hold the input.
         self.assertIn("never holds the value that was evaluated", self.privacy)
-        evaluator = (REPO_ROOT / "core/routing/Sources/RoviaRouting/RouteEvaluator.swift").read_text(
+        evaluator = (core_root() / "core/routing/Sources/RoviaRouting/RouteEvaluator.swift").read_text(
             encoding="utf-8"
         )
         self.assertIn("public func explain(", evaluator)
@@ -1612,8 +1616,7 @@ class PrivacyAndOwnershipTests(unittest.TestCase):
         # handle *names*, and there is one handle now: see
         # `test_ownership_alone_is_not_a_security_signal` for why the direction was
         # dropped and what holds the reason instead.
-        for path in ("core/config/", "core/routing/", "core/subscription/",
-                     "client/app/ios/", "client/app/ios/RoviaTunnel/",
+        for path in ("client/app/ios/", "client/app/ios/RoviaTunnel/",
                      "tools/build-engine/", "tools/release/", "tools/ci/",
                      ".github/workflows/", "engines.lock.json"):
             with self.subTest(path=path):

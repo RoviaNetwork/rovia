@@ -5,10 +5,9 @@
 # entry, and .github/workflows/ci.yml tests every entry. A package that exists
 # in the tree but is missing from this list fails
 # tools/ci/test_verify_lockfiles.py, so the list cannot silently drift.
-core/config
-core/routing
-core/subscription
-engines/api
-engines/xray
-engines/singbox
+#
+# The canonical core (config, subscription, routing) and the engine contracts
+# moved to RoviaNetwork/rovia-core; the adapters to RoviaNetwork/rovia-engine.
+# Both enter this repository only as pinned SPM dependencies (exact versions),
+# never as sibling checkouts, so they are not listed here.
 platform/apple

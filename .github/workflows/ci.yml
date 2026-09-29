@@ -84,6 +84,15 @@ jobs:
           ./tools/ci/verify-third-party-notices.sh
       - name: Check shell syntax
         run: ./tools/ci/check-shell-syntax.sh
+      # The text gates read core sources from the pinned revision, not from a
+      # sibling checkout: fetch-core.sh downloads the tagged tarball named in
+      # core-pin.txt, verifies its SHA-256, and exports the directory
+      # for every later step.
+      - name: Fetch pinned rovia-core sources for the text gates
+        run: |
+          ROVIA_CORE_ROOT="$(./tools/ci/fetch-core.sh)"
+          test -n "$ROVIA_CORE_ROOT"
+          echo "ROVIA_CORE_ROOT=$ROVIA_CORE_ROOT" >> "$GITHUB_ENV"
       - name: Run tool tests
         run: ./tools/ci/run-tool-tests.sh
       - name: Audit accessibility identifiers

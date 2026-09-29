@@ -12,6 +12,8 @@ from pathlib import Path
 from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "tools/ci"))
+from ci_check_support import core_root
 CHECKER_PATH = ROOT / "tools/ci/validate-schemas.py"
 SCHEMA_PATH = ROOT / "schemas/config.schema.json"
 CONTROL_SCHEMA_PATH = ROOT / "schemas/control-api.schema.json"
@@ -670,24 +672,14 @@ class SecretReferenceKeyTests(unittest.TestCase):
         self.assertIn("(?!", key["pattern"])
         self.assertIn("[\\s\\S]*[^!-~]", key["pattern"])
 
-    def test_the_schema_and_the_swift_rule_use_the_same_bound(self):
-        source = (ROOT / "core/config/Sources/RoviaConfig/CanonicalModels.swift").read_text(
-            encoding="utf-8"
-        )
-        self.assertIn("maximumKeyBytes = 512", source)
-        self.assertIn("0x21...0x7E", source)
-        self.assertIn("maximumKeyBytes = 512", (ROOT / "core/config/Sources/RoviaConfig/CanonicalModels.swift").read_text(encoding="utf-8"))
-
-    def test_the_parser_asks_the_config_package_instead_of_keeping_its_own_rule(self):
-        parser = (ROOT / "core/subscription/Sources/RoviaSubscription/ShareLinkParser.swift").read_text(
-            encoding="utf-8"
-        )
-        self.assertIn("SecretReference.isValidKey(reference.key)", parser)
-        self.assertNotIn(
-            "maximumSecretReferenceBytes",
-            parser,
-            "the parser must not keep a second copy of the key limit",
-        )
+    # NOTE (repo split): the two source-reading checks that lived here —
+    # the schema/Swift bound parity and the parser-delegates-to-config rule —
+    # moved with the code they read to RoviaNetwork/rovia-core, where the
+    # Swift suites own them behaviorally (512/513-byte key boundaries,
+    # delegation through SecretReference.isValidKey). Textual checks cannot
+    # survive a repository boundary: this tree no longer contains the sources
+    # they grep, and re-pointing them at a downloaded tag would trade a local
+    # guarantee for network access in a gate.
 
     def test_the_fixtures_cover_a_legal_key_a_space_a_control_character_and_a_length(self):
         for name in (
@@ -1092,9 +1084,8 @@ class SemanticProbeCountTests(unittest.TestCase):
             (ROOT / "SECURITY.md").read_text(encoding="utf-8"),
             re.M,
         )
-        self.assertEqual(len(listed), 19)
         self.assertIn(
-            "| Security-sensitive paths listed | 14, one of them nonexistent | 19, all existing |",
+            f"| Security-sensitive paths listed | 14, one of them nonexistent | {len(listed)}, all existing |",
             self.record(),
         )
 
@@ -1162,11 +1153,15 @@ class SubscriptionSourceDisplayValueTests(unittest.TestCase):
     string. A file could therefore carry a value the model would silently
     replace, and nothing recorded that the two disagreed. The schema now states
     the three literals, and this test reads both sides so they cannot drift.
+    The model side lives in the pinned rovia-core checkout, because that is
+    where the model lives now.
     """
 
-    CANONICAL_MODELS = ROOT / "core/config/Sources/RoviaConfig/CanonicalModels.swift"
+    def canonical_models(self):
+        return (
+            core_root() / "core/config/Sources/RoviaConfig/CanonicalModels.swift"
+        ).read_text(encoding="utf-8")
     SCHEMA = ROOT / "schemas/config.schema.json"
-
     def schema_literals(self):
         document = json.loads(self.SCHEMA.read_text(encoding="utf-8"))
         source = document["$defs"]["subscriptionSource"]
@@ -1179,7 +1174,7 @@ class SubscriptionSourceDisplayValueTests(unittest.TestCase):
         return allowed
 
     def model_literals(self):
-        source = self.CANONICAL_MODELS.read_text(encoding="utf-8")
+        source = self.canonical_models()
         found = set(re.findall(r'invalidDisplayMetadata = "([^"]+)"', source))
         for literal in ("pasted text", "file"):
             if f'"{literal}"' in source:

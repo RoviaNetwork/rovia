@@ -339,7 +339,7 @@ class LiveCountDerivationTests(unittest.TestCase):
                 "package manifests",
                 "test_the_local_package_manifest_count_comes_from_the_package_list",
                 f"`{local_package_manifest_count()} local package manifests verified",
-                "`1 local package manifests verified`",
+                "`2 local package manifests verified`",
             ),
             (
                 "tracked entries",
