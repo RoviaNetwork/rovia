@@ -1,0 +1,61 @@
+name: engine-proof
+on:
+  pull_request:
+    paths:
+      - 'engines.lock.json'
+      - 'schemas/engine-lock.schema.json'
+      - 'tools/build-engine/**'
+      - 'tools/reproducibility/**'
+      - 'tools/ci/verify-engine-checksums.sh'
+      - '.github/workflows/engine-proof.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'engines.lock.json'
+      - 'schemas/engine-lock.schema.json'
+      - 'tools/build-engine/**'
+      - 'tools/reproducibility/**'
+      - 'tools/ci/verify-engine-checksums.sh'
+      - '.github/workflows/engine-proof.yml'
+permissions:
+  contents: read
+concurrency:
+  group: engine-proof-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  prove-engine-build:
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Resolve the engine lock in foundation mode
+        id: engine
+        run: ./tools/ci/verify-engine-checksums.sh --mode foundation --lock "$ROVIA_ENGINE_LOCK" --github-output "$GITHUB_OUTPUT"
+        env:
+          ROVIA_ENGINE_LOCK: engines.lock.json
+      - name: Validate the engine lock schema
+        run: |
+          python3 -m venv .ci-schema-validator
+          .ci-schema-validator/bin/python -m pip install --disable-pip-version-check check-jsonschema==0.38.2
+          .ci-schema-validator/bin/check-jsonschema \
+            --check-metaschema --quiet --color never schemas/engine-lock.schema.json
+          .ci-schema-validator/bin/check-jsonschema \
+            --schemafile schemas/engine-lock.schema.json --color never "$ROVIA_ENGINE_LOCK"
+        env:
+          ROVIA_ENGINE_LOCK: engines.lock.json
+      - name: Prove a real engine build or record its absence
+        # Never skipped: unlike engine-repro (which skips build+verify when no
+        # engine is enabled and stays green without building anything), this
+        # job always reports. With no enabled engine it passes vacuously but
+        # says so explicitly; with an enabled engine the stub must actually
+        # build and verify, otherwise this job fails.
+        run: |
+          if [ "${{ steps.engine.outputs.enabled }}" != "true" ]; then
+            echo "engine-proof: no production engine enabled — proof vacuous, foundation acceptance only"
+            exit 0
+          fi
+          ./tools/build-engine/xray/build-apple.sh
+          ./tools/reproducibility/verify-xray.sh
+          ./tools/ci/verify-engine-checksums.sh --mode release --lock "$ROVIA_ENGINE_LOCK"
+        env:
+          ROVIA_ENGINE_LOCK: engines.lock.json

@@ -1,10 +1,17 @@
 import Foundation
 import NetworkExtension
+import RoviaXray
 
 final class PacketTunnelProvider: NEPacketTunnelProvider {
-    private static let engineAvailability: EngineAvailability = .unavailable(
-        reason: "No production engine is enabled in this foundation build."
-    )
+    /// Sourced from the real linked engine, not a hardcoded string: the
+    /// adapter reports `not-enabled` until prepare/start are wired to
+    /// LibXray (tun fd + signed device still pending, see below).
+    private static var engineAvailability: EngineAvailability {
+        let adapter = XrayAdapter()
+        return .unavailable(
+            reason: "Engine \(adapter.descriptor.id) \(adapter.descriptor.version): prepare/start not wired to LibXray yet."
+        )
+    }
 
     override func startTunnel(
         options: [String: NSObject]?,
