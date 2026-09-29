@@ -5,5 +5,5 @@
 # they read a tarball of this tag — a versioned input, never a sibling
 # checkout. tools/ci/fetch-core.sh resolves it; a test holds the tag here
 # equal to the version in the project file.
-ROVIA_CORE_TAG=v0.2.0
-ROVIA_CORE_TARBALL_SHA256=17af5afa9f222288bda55a4eb92381fa1e45c0217a82e6235113640adde66bd8
+ROVIA_CORE_TAG=v0.2.1
+ROVIA_CORE_TARBALL_SHA256=740b4a1ac03340f13e767746326af85e25d01bdcecacf852dc57c5c75654773b
