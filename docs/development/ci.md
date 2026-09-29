@@ -50,7 +50,7 @@ settings the dependency needs.
 
 That gate is a mutation suite, not a list of names. It breaks one property at a
 time on a temporary copy of the repository and requires the matching check to
-fail: **47 mutations plus 7 legitimate shapes** — 9 package-dependency
+fail: **50 mutations plus 7 legitimate shapes** — 12 package-dependency
 mutations, 16 ways of writing a second route evaluator (including a computed
 property, a closure, and a `contains { $0.matches(…) }`), 20 ways of giving a raw
 trace somewhere to live through a store, a serialiser, or one of the nine leak

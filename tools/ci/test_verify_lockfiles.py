@@ -81,7 +81,7 @@ class VerifyLockfilesTests(unittest.TestCase):
         else:
             path.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
 
-    def add_external_dependency(self, relative: str = "core/config", form: str = "url") -> None:
+    def add_external_dependency(self, relative: str = "platform/apple", form: str = "url") -> None:
         declarations = {
             "url": '.package(url: "https://github.com/apple/swift-argument-parser", from: "1.5.0")',
             "url-named": '.package(name: "ArgumentParser", url: "https://github.com/apple/swift-argument-parser", from: "1.5.0")',
@@ -162,11 +162,11 @@ class VerifyLockfilesTests(unittest.TestCase):
     # -- package manifests -------------------------------------------------
 
     def test_missing_package_manifest_is_refused(self):
-        (self.root / "core/routing/Package.swift").unlink()
-        gate.assert_refused(self, self.run_lockfiles(), "core/routing/Package.swift")
+        (self.root / "platform/apple/Package.swift").unlink()
+        gate.assert_refused(self, self.run_lockfiles(), "platform/apple/Package.swift")
 
     def test_package_manifest_without_a_name_is_refused(self):
-        (self.root / "core/routing/Package.swift").write_text(
+        (self.root / "platform/apple/Package.swift").write_text(
             '// swift-tools-version: 6.0\nimport PackageDescription\n', encoding="utf-8"
         )
         gate.assert_refused(self, self.run_lockfiles(), "name")
@@ -187,7 +187,7 @@ class VerifyLockfilesTests(unittest.TestCase):
                 shutil.rmtree(self.root, ignore_errors=True)
                 self.setUp()
                 self.add_external_dependency(form=form)
-                self.write_resolved("core/config", self.pinned_resolved())
+                self.write_resolved("platform/apple", self.pinned_resolved())
                 gate.assert_accepted(self, self.run_lockfiles())
 
     def test_local_path_dependencies_are_not_external(self):
@@ -210,7 +210,7 @@ class VerifyLockfilesTests(unittest.TestCase):
                     self.assertIn("path:", declaration)
 
     def test_an_unrecognised_dependency_form_is_refused(self):
-        manifest = self.root / "core/config/Package.swift"
+        manifest = self.root / "platform/apple/Package.swift"
         manifest.write_text(
             '// swift-tools-version: 6.0\n'
             "import PackageDescription\n"
@@ -240,7 +240,7 @@ class VerifyLockfilesTests(unittest.TestCase):
 
     def test_a_package_call_in_a_line_comment_is_ignored(self):
         self.write_manifest_with_comments(
-            "core/config",
+            "platform/apple",
             '    // Example only, never shipped: .package(url: "https://example.invalid/left-pad", from: "1.0.0")\n'
             '    // .package(magic: true)\n',
         )
@@ -250,7 +250,7 @@ class VerifyLockfilesTests(unittest.TestCase):
 
     def test_a_package_call_in_a_block_comment_is_ignored(self):
         self.write_manifest_with_comments(
-            "core/config",
+            "platform/apple",
             "    /*\n"
             '     .package(url: "https://example.invalid/left-pad", from: "1.0.0")\n'
             "     .package(id: \"example.invalid.left-pad\", exact: \"1.0.0\")\n"
@@ -263,7 +263,7 @@ class VerifyLockfilesTests(unittest.TestCase):
 
     def test_a_nested_block_comment_is_ignored_to_its_end(self):
         self.write_manifest_with_comments(
-            "core/config",
+            "platform/apple",
             "    /* outer /* inner .package(url: \"https://example.invalid/a\", from: \"1.0.0\") */\n"
             '     still a comment: .package(magic: true) */\n',
         )
@@ -273,7 +273,7 @@ class VerifyLockfilesTests(unittest.TestCase):
 
     def test_a_declaration_after_a_block_comment_is_still_read(self):
         self.write_manifest_with_comments(
-            "core/config",
+            "platform/apple",
             "    /* a comment mentioning .package(magic: true) */\n"
             '    dependencies: [.package(url: "https://github.com/apple/swift-argument-parser", from: "1.5.0")],\n',
         )
@@ -284,12 +284,12 @@ class VerifyLockfilesTests(unittest.TestCase):
         # truncates the manifest at the first URL and stops reading declarations.
         self.add_external_dependency(form="url")
         gate.assert_refused(self, self.run_lockfiles(), "Package.resolved")
-        self.write_resolved("core/config", self.pinned_resolved())
+        self.write_resolved("platform/apple", self.pinned_resolved())
         gate.assert_accepted(self, self.run_lockfiles())
 
     def test_a_scheme_in_a_commented_string_is_not_read_as_a_dependency(self):
         self.write_manifest_with_comments(
-            "core/config",
+            "platform/apple",
             '    // see "https://example.invalid/left-pad" for the package we removed\n',
         )
         result = self.run_lockfiles()
@@ -303,7 +303,7 @@ class VerifyLockfilesTests(unittest.TestCase):
     def test_external_dependency_with_a_branch_revision_is_refused(self):
         self.add_external_dependency()
         self.write_resolved(
-            "core/config",
+            "platform/apple",
             {
                 "pins": [
                     {
@@ -321,7 +321,7 @@ class VerifyLockfilesTests(unittest.TestCase):
     def test_external_dependency_with_a_version_range_is_refused(self):
         self.add_external_dependency()
         self.write_resolved(
-            "core/config",
+            "platform/apple",
             {
                 "pins": [
                     {
@@ -338,22 +338,22 @@ class VerifyLockfilesTests(unittest.TestCase):
 
     def test_external_dependency_with_a_pinned_revision_passes(self):
         self.add_external_dependency()
-        self.write_resolved("core/config", self.pinned_resolved())
+        self.write_resolved("platform/apple", self.pinned_resolved())
         gate.assert_accepted(self, self.run_lockfiles())
 
     def test_resolved_file_with_invalid_json_is_refused(self):
         self.add_external_dependency()
-        self.write_resolved("core/config", "{oops")
+        self.write_resolved("platform/apple", "{oops")
         gate.assert_refused(self, self.run_lockfiles(), "Package.resolved")
 
     def test_resolved_file_without_pins_is_refused(self):
         self.add_external_dependency()
-        self.write_resolved("core/config", {"pins": [], "version": 3})
+        self.write_resolved("platform/apple", {"pins": [], "version": 3})
         gate.assert_refused(self, self.run_lockfiles(), "pins")
 
     def test_pinned_external_dependencies_are_announced(self):
         self.add_external_dependency()
-        self.write_resolved("core/config", self.pinned_resolved())
+        self.write_resolved("platform/apple", self.pinned_resolved())
         result = self.run_lockfiles()
         gate.assert_accepted(self, result)
         self.assertIn("swift-argument-parser", result.stdout)

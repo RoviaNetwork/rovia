@@ -778,15 +778,3 @@ def pinned_core_tag() -> str:
         if line.startswith("ROVIA_CORE_TAG="):
             return line.split("=", 1)[1].strip()
     raise AssertionError("tools/ci/core-pin.txt names no ROVIA_CORE_TAG")
-
-
-def core_sources_root(root: Path) -> Path:
-    """Where the checks read core sources from.
-
-    The workspace carries a mutated copy under core/; anywhere else the
-    pinned checkout is read. Mutation tests depend on the first, clean runs
-    on the second, and neither may silently read the other.
-    """
-    if (root / "core" / "config" / "Package.swift").is_file():
-        return root
-    return core_root()

@@ -76,14 +76,13 @@ the source, not a gate.
 
 from __future__ import annotations
 
-import os
 import re
 import shutil
 import tempfile
 import unittest
 from pathlib import Path
 
-from ci_check_support import core_root, core_sources_root, pinned_core_tag
+from ci_check_support import core_root, pinned_core_tag
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -122,8 +121,6 @@ CANONICAL_RETURN_TYPES = (
     "routingdecisiontrace",
 )
 REDACTED_TYPE = "RoutingDiagnostic"
-# Every tree that could hold a secret-shaped value and keep it.
-PERSISTENCE_ROOTS = ("core", "client", "platform", "engines")
 
 # Where a raw trace would leave the process. Every one of these is a channel a
 # hostname can travel down, so a body that accepts a trace and reaches for one of
@@ -236,7 +233,7 @@ class Project:
             # Match the declaration, not the use-site comment: product
             # dependencies name their package in a comment carrying the same
             # words but no fields of their own.
-            if "isa = XCRemoteSwiftPackageReference;" not in body:
+            if f"isa = {REMOTE_REFERENCE_ISA};" not in body:
                 continue
             url = REPOSITORY_URL_PATTERN.search(body)
             kind = REQUIREMENT_KIND_PATTERN.search(body)

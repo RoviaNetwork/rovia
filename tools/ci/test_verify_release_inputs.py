@@ -311,18 +311,18 @@ class ReleaseInputsTests(unittest.TestCase):
         self.edit_manifest(runner="unavailable")
         gate.assert_refused(self, self.verify(), "runner identity")
 
-    def test_sbom_missing_a_local_package_is_refused(self):
+    def test_sbom_missing_a_pinned_remote_is_refused(self):
         document = json.loads(self.sbom.read_text(encoding="utf-8"))
         document["packages"] = [
             package
             for package in document["packages"]
-            if package["SPDXID"] != "SPDXRef-Package-RoviaRouting"
+            if package["SPDXID"] != "SPDXRef-Package-rovia-core"
         ]
         self.sbom.write_text(json.dumps(document), encoding="utf-8")
         self.edit_manifest(sbom__sha256=gate.sha256_file(self.sbom))
         result = self.verify()
         self.assertEqual(result.returncode, 1, gate.combined(result))
-        self.assertIn("core/routing", gate.combined(result))
+        self.assertIn("rovia-core", gate.combined(result))
 
     def test_manifest_with_an_unknown_schema_version_is_refused(self):
         self.edit_manifest(schemaVersion=1)

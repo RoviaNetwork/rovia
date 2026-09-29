@@ -12,6 +12,8 @@ from pathlib import Path
 from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "tools/ci"))
+from ci_check_support import core_root
 CHECKER_PATH = ROOT / "tools/ci/validate-schemas.py"
 SCHEMA_PATH = ROOT / "schemas/config.schema.json"
 CONTROL_SCHEMA_PATH = ROOT / "schemas/control-api.schema.json"
@@ -1082,9 +1084,8 @@ class SemanticProbeCountTests(unittest.TestCase):
             (ROOT / "SECURITY.md").read_text(encoding="utf-8"),
             re.M,
         )
-        self.assertEqual(len(listed), 19)
         self.assertIn(
-            "| Security-sensitive paths listed | 14, one of them nonexistent | 19, all existing |",
+            f"| Security-sensitive paths listed | 14, one of them nonexistent | {len(listed)}, all existing |",
             self.record(),
         )
 
@@ -1152,11 +1153,15 @@ class SubscriptionSourceDisplayValueTests(unittest.TestCase):
     string. A file could therefore carry a value the model would silently
     replace, and nothing recorded that the two disagreed. The schema now states
     the three literals, and this test reads both sides so they cannot drift.
+    The model side lives in the pinned rovia-core checkout, because that is
+    where the model lives now.
     """
 
-    CANONICAL_MODELS = ROOT / "core/config/Sources/RoviaConfig/CanonicalModels.swift"
+    def canonical_models(self):
+        return (
+            core_root() / "core/config/Sources/RoviaConfig/CanonicalModels.swift"
+        ).read_text(encoding="utf-8")
     SCHEMA = ROOT / "schemas/config.schema.json"
-
     def schema_literals(self):
         document = json.loads(self.SCHEMA.read_text(encoding="utf-8"))
         source = document["$defs"]["subscriptionSource"]
@@ -1169,7 +1174,7 @@ class SubscriptionSourceDisplayValueTests(unittest.TestCase):
         return allowed
 
     def model_literals(self):
-        source = self.CANONICAL_MODELS.read_text(encoding="utf-8")
+        source = self.canonical_models()
         found = set(re.findall(r'invalidDisplayMetadata = "([^"]+)"', source))
         for literal in ("pasted text", "file"):
             if f'"{literal}"' in source:

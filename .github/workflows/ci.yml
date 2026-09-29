@@ -86,7 +86,7 @@ jobs:
         run: ./tools/ci/check-shell-syntax.sh
       # The text gates read core sources from the pinned revision, not from a
       # sibling checkout: fetch-core.sh downloads the tagged tarball named in
-      # tools/ci/core-pin.txt, verifies its SHA-256, and exports the directory
+      # core-pin.txt, verifies its SHA-256, and exports the directory
       # for every later step.
       - name: Fetch pinned rovia-core sources for the text gates
         run: |

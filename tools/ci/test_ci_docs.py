@@ -586,10 +586,13 @@ class PrivacyAndOwnershipTests(unittest.TestCase):
         self.assertIn("no engine is bundled in this build", flat(privacy).lower())
 
     def test_the_documented_package_list_matches_the_package_list_file(self):
-        # ios.md listed four of the seven entries, which read as though the engine
-        # adapters and the Apple platform layer were untested. They are not.
+        # ios.md once listed four of seven entries, which read as though the engine
+        # adapters and the Apple platform layer were untested. After the split the
+        # list holds the one package still local (platform/apple); core and the
+        # engines moved out and enter as pinned remotes, which the project gate
+        # holds instead.
         entries = local_packages()
-        self.assertEqual(len(entries), 7, f"the package list has {len(entries)} entries")
+        self.assertEqual(len(entries), 1, f"the package list has {len(entries)} entries")
         commands = re.findall(r"swift test --package-path ([\w./-]+)",
                               (REPO_ROOT / "docs/development/ios.md").read_text(
                                   encoding="utf-8"
@@ -605,7 +608,7 @@ class PrivacyAndOwnershipTests(unittest.TestCase):
         # The per-package rows were transcribed from a run while only the total was
         # bound, so a package could gain tests and its row would stay as it was.
         counts = swiftpm_counts()
-        self.assertEqual(len(counts), 7, f"the package list yielded {sorted(counts)}")
+        self.assertEqual(len(counts), 1, f"the package list yielded {sorted(counts)}")
         record = (REPO_ROOT / "docs/development/foundation-verification.md").read_text(
             encoding="utf-8"
         )

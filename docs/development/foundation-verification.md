@@ -90,8 +90,8 @@ Apple silicon or on a hosted runner.
 
 | Command | Result |
 | --- | --- |
-| `./tools/ci/check-shell-syntax.sh` | `17 shell scripts parse` |
-| `./tools/ci/verify-lockfiles.sh` | `7 local package manifests verified, 0 with locked external dependencies, 7 local path dependencies` |
+| `./tools/ci/check-shell-syntax.sh` | `18 shell scripts parse` |
+| `./tools/ci/verify-lockfiles.sh` | `1 local package manifests verified, 0 with locked external dependencies, 0 local path dependencies` |
 | `./tools/ci/verify-third-party-notices.sh` | accepted, no output |
 | `./tools/release/verify-tag.sh v0.1.0` | `v0.1.0 is a valid release tag` |
 | `./tools/release/verify-tag.sh 0.1.0` | refused: `expected vMAJOR.MINOR.PATCH[-PRERELEASE][+BUILD] with no leading zeros` |
@@ -203,23 +203,20 @@ concatenated at runtime is outside what a static constant audit can see.
 ### SwiftPM packages
 
 Every entry in `tools/ci/local-packages.txt`, each with its own
-`swift test --package-path`:
+`swift test --package-path`. The canonical core and the engine adapters moved
+to RoviaNetwork/rovia-core and RoviaNetwork/rovia-engine, where their own CI
+runs their suites; what remains here is the platform layer, and the app target
+itself exercises the pinned core through the Xcode build and `RoviaAppTests`.
 
 | Package | Tests | Failures |
 | --- | --- | --- |
-| `core/config` | 64 | 0 |
-| `core/routing` | 44 | 0 |
-| `core/subscription` | 73 | 0 |
-| `engines/api` | 3 | 0 |
-| `engines/xray` | 11 | 0 |
-| `engines/singbox` | 1 | 0 |
 | `platform/apple` | 5 | 0 |
-| **Total** | **201** | **0** |
+| **Total** | **5** | **0** |
 
 ### SBOM
 
 `python3 tools/reproducibility/generate-sbom.py . build/SBOM.spdx.json` wrote
-`9 components`; `python3 tools/reproducibility/check-sbom.py
+`4 components`; `python3 tools/reproducibility/check-sbom.py
 build/SBOM.spdx.json --repository .` accepted it.
 
 | Field | Value |
@@ -229,8 +226,8 @@ build/SBOM.spdx.json --repository .` accepted it.
 | `creationInfo.created` | `2026-09-26T01:30:20Z` |
 | `creationInfo.creators` | `Tool: rovia-sbom-0.2.0`, `Organization: Rovia contributors` |
 | `documentNamespace` | a fresh UUID per run; a fixed `--namespace-id` fixes the namespace, and **on its own it does not reproduce the bytes** — see the correction below |
-| Components | 9: the app, the Packet Tunnel extension, and the 7 local packages |
-| Relationships | 9: 1 `DESCRIBES`, 1 `CONTAINS`, 7 `STATIC_LINK` |
+| Components | 4: the app, the Packet Tunnel extension, the local platform package, and the pinned rovia-core |
+| Relationships | 4: 1 `DESCRIBES`, 1 `CONTAINS`, 2 `STATIC_LINK` |
 | Engines listed | none, because the lock approves and enables none |
 | File | 9 126 bytes, SHA-256 `59211b910ca002208ddaae496b14cedadcacebb1c6a49254a97b6357f93b9038` for this run's namespace |
 
@@ -305,7 +302,7 @@ the bundle launches. Neither is evidence of a tunnel.
 
 | Check | Result |
 | --- | --- |
-| `pyyaml` 6.0.2 over `.github/workflows/*.yml` | all three parse: `ci.yml` 1 job / 17 steps, `engine-repro.yml` 1 job / 6 steps, `release-ios.yml` 1 job / 17 steps; every one declares `permissions: contents: read` |
+| `pyyaml` 6.0.2 over `.github/workflows/*.yml` | all three parse: `ci.yml` 1 job / 18 steps, `engine-repro.yml` 1 job / 6 steps, `release-ios.yml` 1 job / 17 steps; every one declares `permissions: contents: read` |
 | `./tools/ci/check-python-lint.sh` | `3.2.0 Python 3.14.4 on Darwin, 14 files`, `no findings`; invoked by `run-tool-tests.sh`, followed by the warnings gate |
 | `./tools/ci/check-python-warnings.sh` | `Python 3.14.7, 14 files, warnings are errors`, `no warnings`; the last step of `run-tool-tests.sh` |
 | `bash -n` over every script in the tree | the same script count as the shell-syntax gate above, no syntax error |
@@ -336,7 +333,7 @@ refuses earlier, on the thing that is actually missing.
 
 ## Working tree
 
-23 tracked top-level entries, 162 files. `build/` holds the
+23 tracked top-level entries, 164 files. `build/` holds the
 generated `SBOM.spdx.json` and is gitignored; the `.build` directories, the
 `__pycache__` directories, and the `.DS_Store` files are gitignored; derived data
 was kept outside the checkout. `git check-ignore` confirms
@@ -452,7 +449,7 @@ searched for `IPv4Range`, `normalizeHost`, `firstMatchingMatcher`, and
 `func evaluate(` — a snapshot of the defect that a rename walks straight past.
 It now reads every *body* in the app sources: function declarations, computed
 properties, closures bound to a name, and closures passed to a higher-order
-function. **47 mutations plus 7 legitimate shapes**: 9 package-dependency
+function. **50 mutations plus 7 legitimate shapes**: 12 package-dependency
 mutations, 16 ways of writing a second route evaluator (including the original
 code restored verbatim, a file of its own, a computed property, a closure, and a
 `contains { $0.matches(…) }`), 20 ways of giving a raw trace somewhere to live —
@@ -460,7 +457,7 @@ through a store, a serialiser, or one of the nine leak channels `print`, `os_log
 `OSLog`, `Logger`, `logger`, `debugPrint`, `dump`, `NSLog`, and
 `sendProviderMessage` — and 2 contract deletions. The 7 legitimate shapes are the
 cases that look like a violation and must not be flagged, and they are not part of
-the 47: adding one makes the gate no stricter. Each mutation is applied to a
+the 50: adding one makes the gate no stricter. Each mutation is applied to a
 temporary copy of the repository and the matching check must fail. The suite runs
 27 tests and makes 69 copies of the tree. That figure is **measured**, by
 counting `Workspace` instantiations — one per copy — rather than counting `shutil.copytree` calls, which recurse: the same run makes 6486 `copytree` calls and 69 outermost ones, and quoting the unqualified number would be wrong by two orders of magnitude. Measuring it costs the 20–90 seconds across the runs recorded in this repository's verification record, which is a measurement on one x86_64 Mac and not a bound. The width of that range is machine load and the number of mutation cases, not a property of the gate: the suite copies the tree once per case, so adding cases adds time, and a loaded machine stretches the rest. The observation in the table above sits inside it:
@@ -671,15 +668,15 @@ than the coverage was, which is the error being fixed. The count itself is
 corrected in the dated summary below, not here, so this narrative keeps the
 wording the pass had.
 
-**D2 — the composition is "47 mutations plus 7 legitimate shapes".** Every
+**D2 — the composition is "50 mutations plus 7 legitimate shapes".** Every
 document said "45 mutations, 7 of which are shapes", which folds the shapes into
 the mutation count: they are the cases the check has to leave alone, and adding
 one makes the gate no stricter rather than stricter. The count test now requires
 the composition phrase and fails if the "N of which are shapes" phrasing returns.
 It also required each group's number to appear next to its label, because
 `assertIn(str(len(table)), record)` was satisfied by any `2` or `9` in the file.
-All three documents now state 9 package-dependency mutations, 16 second route
-evaluator mutations, 20 raw-trace mutations, 2 contract deletions, 47 in total,
+All three documents now state 12 package-dependency mutations, 16 second route
+evaluator mutations, 20 raw-trace mutations, 2 contract deletions, 50 in total,
 7 legitimate shapes, and 69 tree copies (measured, not derived) — the copy count
 having moved from 67 with the two channel mutations below. Phrases are compared with whitespace collapsed,
 so a formatter wrapping a sentence cannot fail the test.
@@ -784,7 +781,7 @@ title to be followed by an absence rather than a pass.
 | Thing | Before | After |
 | --- | --- | --- |
 | Tool tests | 364 | 627 |
-| Security-sensitive paths listed | 14, one of them nonexistent | 19, all existing |
+| Security-sensitive paths listed | 14, one of them nonexistent | 15, all existing |
 | Ownership directions checked | 1 | 3 |
 | Engine license declared per candidate | none, defaulted to MIT | required, derived, and cross-checked |
 | Refusal rows derived from the gates | 0 | 7 |
