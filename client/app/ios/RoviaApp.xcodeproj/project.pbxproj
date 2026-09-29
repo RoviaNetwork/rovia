@@ -39,6 +39,7 @@
 		C1000000000000000000001F = {isa = PBXBuildFile; fileRef = B1000000000000000000001B /* SubscriptionCoordinator.swift */; };
 		C10000000000000000000020 = {isa = PBXBuildFile; fileRef = B1000000000000000000001C /* SubscriptionCoordinatorTests.swift */; };
 		C10000000000000000000021 = {isa = PBXBuildFile; fileRef = B1000000000000000000001B /* SubscriptionCoordinator.swift */; };
+		C10000000000000000000022 = {isa = PBXBuildFile; productRef = E1000000000000000000000E /* RoviaXray */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -100,6 +101,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				C10000000000000000000006,
+				C10000000000000000000022,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -292,6 +294,7 @@
 			projectRoot = "";
 			packageReferences = (
 				E10000000000000000000001 /* XCRemoteSwiftPackageReference "rovia-core" */,
+				E1000000000000000000000D /* XCRemoteSwiftPackageReference "rovia-engine" */,
 				E1000000000000000000000A /* XCLocalSwiftPackageReference "platform/apple" */,
 			);
 			targets = (
@@ -571,6 +574,14 @@
 				version = 0.2.1;
 			};
 		};
+		E1000000000000000000000D /* XCRemoteSwiftPackageReference "rovia-engine" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/RoviaNetwork/rovia-engine";
+			requirement = {
+				kind = exactVersion;
+				version = 0.2.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -613,6 +624,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = E1000000000000000000000A /* XCLocalSwiftPackageReference "platform/apple" */;
 			productName = RoviaApplePlatform;
+		};
+		E1000000000000000000000E /* RoviaXray */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E1000000000000000000000D /* XCRemoteSwiftPackageReference "rovia-engine" */;
+			productName = RoviaXray;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
