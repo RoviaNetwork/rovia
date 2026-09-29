@@ -2142,3 +2142,41 @@ extension AppModelTests {
         assertTrue(model.snapshot.lastError == nil)
     }
 }
+
+extension AppModelTests {
+    func testDeepLinkQueuesWithoutNetwork() async {
+        let (model, _, _) = makeSubscriptionModel(box: ModelBodyBox(body: ""))
+        assertTrue(model.pendingImport == nil)
+        model.queueDeepLink(text: "https://provider.example/sub", name: "P")
+        assertEqual(model.pendingImport?.text, "https://provider.example/sub")
+        assertEqual(model.pendingImport?.name, "P")
+        model.discardPendingImport()
+        assertTrue(model.pendingImport == nil)
+    }
+
+    func testFailedProbeClearsStaleNumber() async {
+        let box = ModelBodyBox(body: ModelFixtures.vless)
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let coordinator = SubscriptionCoordinator(
+            store: SubscriptionStore(directory: dir),
+            secrets: InMemorySecretStore(),
+            session: ModelStubSession(box: box)
+        )
+        final class ProbeCounter: @unchecked Sendable { var calls = 0 }
+        let counter = ProbeCounter()
+        let (model, _) = makeModel(
+            tunnel: StubTunnelController(), content: .empty,
+            subscriptions: coordinator,
+            probeLatency: { _, _ in
+                counter.calls += 1
+                return counter.calls == 1 ? 42 : nil
+            }
+        )
+        assertTrue(await model.bootstrap())
+        assertTrue(await model.addSubscription(url: URL(string: "https://provider.example/sub")!, name: "P"))
+        assertTrue(await model.probeVisibleServers())
+        assertTrue(model.snapshot.content.servers.allSatisfy { $0.latency.milliseconds == 42 })
+        assertTrue(await model.probeVisibleServers())
+        assertTrue(model.snapshot.content.servers.allSatisfy { $0.latency.milliseconds == nil })
+    }
+}

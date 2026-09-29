@@ -117,6 +117,10 @@ final class AppModel {
     /// Stored subscriptions for the management UI. Updated on every
     /// subscription mutation and on bootstrap.
     private(set) var storedSubscriptions: [StoredSubscription] = []
+    /// A deep link waiting for explicit user confirmation. Stored, never
+    /// acted on: an external URL must not trigger a silent add or a network
+    /// request, including when it arrives before bootstrap finishes.
+    var pendingImport: PendingImport?
     /// Favorite servers, persisted across launches. IDs are stable across
     /// refreshes, so a favorite survives subscription updates; a favorite
     /// whose server disappeared simply matches nothing.
@@ -157,6 +161,14 @@ final class AppModel {
         self.selectionStorage = selectionStorage ?? UserDefaults(suiteName: "rovia.test.\(UUID().uuidString)")!
         self.now = now
         self.favoriteServerIDs = Set(favoritesStorage.stringArray(forKey: Self.favoritesKey) ?? [])
+    }
+
+    func queueDeepLink(text: String, name: String?) {
+        pendingImport = PendingImport(text: text, name: name)
+    }
+
+    func discardPendingImport() {
+        pendingImport = nil
     }
 
     private static let favoritesKey = "rovia.favoriteServerIDs"
@@ -791,12 +803,17 @@ final class AppModel {
         let endpoints = await subscriptions?.endpoints() ?? [:]
         let measuredAt = now()
         var results: [String: Int] = [:]
+        // Every attempted server lands here, measured or not: a failed
+        // re-measurement clears the number below, so a stale millisecond
+        // value never looks fresh. Servers with no known endpoint are not
+        // attempted and keep their previous state.
+        var attempted: Set<ServerID> = []
         if let probeLatency {
             for server in candidates {
-                if let endpoint = endpoints[server.id] {
-                    if let ms = await probeLatency(endpoint.host, endpoint.port) {
-                        results[server.id] = ms
-                    }
+                guard let endpoint = endpoints[server.id] else { continue }
+                attempted.insert(server.id)
+                if let ms = await probeLatency(endpoint.host, endpoint.port) {
+                    results[server.id] = ms
                 }
             }
         } else {
@@ -806,13 +823,17 @@ final class AppModel {
             }
             let values = await LatencyProber.probeAll(targets.map { (host: $0.host, port: $0.port) })
             for (target, ms) in zip(targets, values) {
+                attempted.insert(target.id)
                 if let ms {
                     results[target.id] = ms
                 }
             }
         }
         snapshot.content.servers = snapshot.content.servers.map { server in
-            guard let ms = results[server.id] else { return server }
+            guard attempted.contains(server.id) else { return server }
+            guard let ms = results[server.id] else {
+                return server.withLatency(.notMeasured)
+            }
             return server.withLatency(LatencyState(milliseconds: ms, observedAt: measuredAt))
         }
         updateDerivedMeasurements()

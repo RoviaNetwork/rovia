@@ -1109,6 +1109,19 @@ enum PrimaryTunnelAction: Equatable, Sendable {
     case busy
 }
 
+/// A deep-link import awaiting explicit confirmation in the preview sheet.
+struct PendingImport: Equatable, Sendable, Identifiable {
+    let id: UUID
+    let text: String
+    let name: String?
+
+    init(text: String, name: String?) {
+        self.id = UUID()
+        self.text = text
+        self.name = name
+    }
+}
+
 /// Tells the UI which subscription state it is looking at.
 enum SubscriptionContentState: Equatable, Sendable {
     /// Fixture/sample content (tests, previews, explicit demo mode).

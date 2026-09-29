@@ -19,9 +19,12 @@ struct SubscriptionInspectorView: View {
 
     var body: some View {
         Group {
-            if model.storedSubscriptions.isEmpty {
+            switch model.snapshot.contentSource {
+            case .unavailable:
+                unavailableState
+            case .none:
                 emptyState
-            } else {
+            case .live, .allRejected, .sample:
                 subscriptionList
             }
         }
@@ -74,10 +77,38 @@ struct SubscriptionInspectorView: View {
         ))
     }
 
+    // MARK: - Unavailable store
+
+    private var unavailableState: some View {
+        ContentUnavailableView {
+            Label("Subscriptions unavailable", systemImage: "exclamationmark.triangle")
+        } description: {
+            Text("The stored subscriptions could not be read. Nothing was deleted or overwritten.")
+        } actions: {
+            Button("Try again") {
+                Task { await model.bootstrap() }
+            }
+            .buttonStyle(.borderedProminent)
+            .accessibilityIdentifier(AppAccessibilityIdentifier.subscriptionScreen + ".retry")
+        }
+        .modifier(ConditionalAccessibilityIdentifier(
+            identifier: AppAccessibilityIdentifier.subscriptionEmpty
+        ))
+    }
+
     // MARK: - List
 
     private var subscriptionList: some View {
         List {
+            if model.snapshot.contentSource == .allRejected {
+                Section {
+                    Text("Subscriptions are stored, but every entry was rejected. Check a row's reasons, fix the source, and refresh.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .accessibilityIdentifier(AppAccessibilityIdentifier.subscriptionScreen + ".allRejected")
+            }
             if let result = model.snapshot.lastSubscriptionResult {
                 Section {
                     resultBanner(result)
@@ -308,5 +339,97 @@ struct SubscriptionInspectorView: View {
             get: { renameTarget != nil },
             set: { if !$0 { renameTarget = nil } }
         )
+    }
+}
+
+/// Confirms an inbound deep link before anything happens: no silent add,
+/// no network request from opening a URL. Shows what the link holds (URL
+/// host redacted, single-link scheme, or container line count) and lets
+/// the user name it, add it, or dismiss it.
+struct ImportPreviewSheet: View {
+    let model: AppModel
+    let pending: PendingImport
+
+    @State private var nameText: String = ""
+    @Environment(\.dismiss) private var dismiss
+
+    private enum Preview {
+        case url(host: String)
+        case single(scheme: String)
+        case container(lines: Int, base64: Bool)
+        case invalid
+    }
+
+    private var preview: Preview {
+        switch SubscriptionInputClassifier.classify(pending.text) {
+        case .subscriptionURL(let url):
+            return .url(host: url.host ?? "unknown host")
+        case .singleShareLink(let scheme):
+            return .single(scheme: scheme.rawValue)
+        case .pastedText:
+            guard let data = pending.text.data(using: .utf8),
+                  let document = try? SubscriptionDocumentDecoder.decode(data)
+            else {
+                return .invalid
+            }
+            return .container(lines: document.lines.count, base64: document.wasBase64)
+        case .none:
+            return .invalid
+        }
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Link") {
+                    switch preview {
+                    case .url(let host):
+                        Text("Subscription URL at \(host)")
+                    case .single(let scheme):
+                        Text("Single \(scheme) server")
+                    case .container(let lines, let base64):
+                        Text(base64 ? "Subscription list (\(lines) servers)" : "\(lines) pasted lines")
+                    case .invalid:
+                        Text("This link holds nothing importable.")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                Section("Name") {
+                    TextField("Subscription name", text: $nameText)
+                }
+                Section {
+                    Button("Add subscription") {
+                        let name = nameText.trimmingCharacters(in: .whitespacesAndNewlines)
+                        Task {
+                            await model.addSubscriptionText(
+                                pending.text,
+                                name: name.isEmpty ? (pending.name ?? "Imported subscription") : name
+                            )
+                            model.discardPendingImport()
+                        }
+                        dismiss()
+                    }
+                    .disabled(!canAdd)
+                }
+            }
+            .navigationTitle("Import subscription")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        model.discardPendingImport()
+                        dismiss()
+                    }
+                }
+            }
+            .onAppear {
+                nameText = pending.name ?? ""
+            }
+        }
+    }
+
+    private var canAdd: Bool {
+        if case .invalid = preview { return false }
+        return true
     }
 }
