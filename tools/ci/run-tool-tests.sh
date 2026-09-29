@@ -75,6 +75,7 @@ fi
 fetch_script="$script_root/tools/ci/fetch-core.sh"
 if [[ -z "${ROVIA_CORE_ROOT:-}" ]]; then
   ROVIA_CORE_ROOT=$("$fetch_script")
+  test -n "${ROVIA_CORE_ROOT:-}" || exit 1
   export ROVIA_CORE_ROOT
 fi
 

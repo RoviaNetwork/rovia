@@ -90,7 +90,9 @@ jobs:
       # for every later step.
       - name: Fetch pinned rovia-core sources for the text gates
         run: |
-          echo "ROVIA_CORE_ROOT=$(./tools/ci/fetch-core.sh)" >> "$GITHUB_ENV"
+          ROVIA_CORE_ROOT="$(./tools/ci/fetch-core.sh)"
+          test -n "$ROVIA_CORE_ROOT"
+          echo "ROVIA_CORE_ROOT=$ROVIA_CORE_ROOT" >> "$GITHUB_ENV"
       - name: Run tool tests
         run: ./tools/ci/run-tool-tests.sh
       - name: Audit accessibility identifiers

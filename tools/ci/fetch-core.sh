@@ -46,8 +46,8 @@ fi
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 archive="$tmp/core.tar.gz"
-gh api "repos/RoviaNetwork/rovia-core/tarball/$tag" > "$archive" \
-  || fail "could not download rovia-core $tag (need 'gh auth login')"
+curl -sfSL "https://github.com/RoviaNetwork/rovia-core/archive/refs/tags/$tag.tar.gz" \
+  -o "$archive" || fail "could not download rovia-core $tag"
 actual_sha=$(shasum -a 256 "$archive" | cut -d' ' -f1)
 test "$actual_sha" = "$expected_sha" \
   || fail "tarball SHA mismatch for $tag: got $actual_sha"
