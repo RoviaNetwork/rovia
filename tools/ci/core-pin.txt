@@ -1,0 +1,9 @@
+# Pinned rovia-core revision for gates that read core sources.
+#
+# The app ships core as an SPM dependency pinned in the Xcode project
+# (exactVersion); the text gates below need the same sources on disk, so
+# they read a tarball of this tag — a versioned input, never a sibling
+# checkout. tools/ci/fetch-core.sh resolves it; a test holds the tag here
+# equal to the version in the project file.
+ROVIA_CORE_TAG=v0.1.0
+ROVIA_CORE_TARBALL_SHA256=8c5fae54b1842cc3cb34ccf14d021f9638d1bbedb3ed89f08393913cd96b1b73

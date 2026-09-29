@@ -99,7 +99,7 @@ Apple silicon or on a hosted runner.
 ### Python tool tests
 
 `./tools/ci/run-tool-tests.sh` ran every `tools/**/test_*.py` as its own
-process: **14 files, 628 tests, 0 failures**.
+process: **14 files, 627 tests, 0 failures**.
 
 | Test file | Tests | Seconds |
 | --- | --- | --- |
@@ -111,11 +111,11 @@ process: **14 files, 628 tests, 0 failures**.
 | `tools/ci/test_ci_workflows.py` | 22 | not measured |
 | `tools/ci/test_ci_counts.py` | 18 | not measured |
 | `tools/ci/test_ci_docs.py` | 83 | not measured |
-| `tools/ci/test_validate_schemas.py` | 61 | 105.12 |
+| `tools/ci/test_validate_schemas.py` | 59 | 105.12 |
 | `tools/ci/test_verify_engine_checksums.py` | 38 | 2.96 |
 | `tools/ci/test_verify_lockfiles.py` | 29 | 3.35 |
 | `tools/ci/test_verify_release_inputs.py` | 99 | 95.48 |
-| `tools/reproducibility/test_generate_sbom.py` | 63 | 10.33 |
+| `tools/reproducibility/test_generate_sbom.py` | 64 | 10.33 |
 | `tools/reproducibility/test_manifest.py` | 27 | 11.34 |
 
 `tools/ci/test_app_dependencies.py` is the gate on the iOS app's dependency on
@@ -336,7 +336,7 @@ refuses earlier, on the thing that is actually missing.
 
 ## Working tree
 
-25 tracked top-level entries, 199 files. `build/` holds the
+23 tracked top-level entries, 162 files. `build/` holds the
 generated `SBOM.spdx.json` and is gitignored; the `.build` directories, the
 `__pycache__` directories, and the `.DS_Store` files are gitignored; derived data
 was kept outside the checkout. `git check-ignore` confirms
@@ -783,7 +783,7 @@ title to be followed by an absence rather than a pass.
 
 | Thing | Before | After |
 | --- | --- | --- |
-| Tool tests | 364 | 628 |
+| Tool tests | 364 | 627 |
 | Security-sensitive paths listed | 14, one of them nonexistent | 19, all existing |
 | Ownership directions checked | 1 | 3 |
 | Engine license declared per candidate | none, defaulted to MIT | required, derived, and cross-checked |

@@ -670,24 +670,14 @@ class SecretReferenceKeyTests(unittest.TestCase):
         self.assertIn("(?!", key["pattern"])
         self.assertIn("[\\s\\S]*[^!-~]", key["pattern"])
 
-    def test_the_schema_and_the_swift_rule_use_the_same_bound(self):
-        source = (ROOT / "core/config/Sources/RoviaConfig/CanonicalModels.swift").read_text(
-            encoding="utf-8"
-        )
-        self.assertIn("maximumKeyBytes = 512", source)
-        self.assertIn("0x21...0x7E", source)
-        self.assertIn("maximumKeyBytes = 512", (ROOT / "core/config/Sources/RoviaConfig/CanonicalModels.swift").read_text(encoding="utf-8"))
-
-    def test_the_parser_asks_the_config_package_instead_of_keeping_its_own_rule(self):
-        parser = (ROOT / "core/subscription/Sources/RoviaSubscription/ShareLinkParser.swift").read_text(
-            encoding="utf-8"
-        )
-        self.assertIn("SecretReference.isValidKey(reference.key)", parser)
-        self.assertNotIn(
-            "maximumSecretReferenceBytes",
-            parser,
-            "the parser must not keep a second copy of the key limit",
-        )
+    # NOTE (repo split): the two source-reading checks that lived here —
+    # the schema/Swift bound parity and the parser-delegates-to-config rule —
+    # moved with the code they read to RoviaNetwork/rovia-core, where the
+    # Swift suites own them behaviorally (512/513-byte key boundaries,
+    # delegation through SecretReference.isValidKey). Textual checks cannot
+    # survive a repository boundary: this tree no longer contains the sources
+    # they grep, and re-pointing them at a downloaded tag would trade a local
+    # guarantee for network access in a gate.
 
     def test_the_fixtures_cover_a_legal_key_a_space_a_control_character_and_a_length(self):
         for name in (

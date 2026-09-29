@@ -291,9 +291,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			packageReferences = (
-				E10000000000000000000001 /* XCLocalSwiftPackageReference "core/routing" */,
-				E10000000000000000000004 /* XCLocalSwiftPackageReference "core/config" */,
-				E10000000000000000000007 /* XCLocalSwiftPackageReference "core/subscription" */,
+				E10000000000000000000001 /* XCRemoteSwiftPackageReference "rovia-core" */,
 				E1000000000000000000000A /* XCLocalSwiftPackageReference "platform/apple" */,
 			);
 			targets = (
@@ -558,53 +556,52 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
-		E10000000000000000000001 /* XCLocalSwiftPackageReference "core/routing" */ = {
-			isa = XCLocalSwiftPackageReference;
-			relativePath = ../../../core/routing;
-		};
-		E10000000000000000000004 /* XCLocalSwiftPackageReference "core/config" */ = {
-			isa = XCLocalSwiftPackageReference;
-			relativePath = ../../../core/config;
-		};
-		E10000000000000000000007 /* XCLocalSwiftPackageReference "core/subscription" */ = {
-			isa = XCLocalSwiftPackageReference;
-			relativePath = ../../../core/subscription;
-		};
 		E1000000000000000000000A /* XCLocalSwiftPackageReference "platform/apple" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = ../../../platform/apple;
 		};
 /* End XCLocalSwiftPackageReference section */
 
+/* Begin XCRemoteSwiftPackageReference section */
+		E10000000000000000000001 /* XCRemoteSwiftPackageReference "rovia-core" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/RoviaNetwork/rovia-core";
+			requirement = {
+				kind = exactVersion;
+				version = 0.1.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
 /* Begin XCSwiftPackageProductDependency section */
 		E10000000000000000000002 /* RoviaRouting */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = E10000000000000000000001 /* XCLocalSwiftPackageReference "core/routing" */;
+			package = E10000000000000000000001 /* XCRemoteSwiftPackageReference "rovia-core" */;
 			productName = RoviaRouting;
 		};
 		E10000000000000000000003 /* RoviaRouting */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = E10000000000000000000001 /* XCLocalSwiftPackageReference "core/routing" */;
+			package = E10000000000000000000001 /* XCRemoteSwiftPackageReference "rovia-core" */;
 			productName = RoviaRouting;
 		};
 		E10000000000000000000005 /* RoviaConfig */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = E10000000000000000000004 /* XCLocalSwiftPackageReference "core/config" */;
+			package = E10000000000000000000001 /* XCRemoteSwiftPackageReference "rovia-core" */;
 			productName = RoviaConfig;
 		};
 		E10000000000000000000006 /* RoviaConfig */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = E10000000000000000000004 /* XCLocalSwiftPackageReference "core/config" */;
+			package = E10000000000000000000001 /* XCRemoteSwiftPackageReference "rovia-core" */;
 			productName = RoviaConfig;
 		};
 		E10000000000000000000008 /* RoviaSubscription */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = E10000000000000000000007 /* XCLocalSwiftPackageReference "core/subscription" */;
+			package = E10000000000000000000001 /* XCRemoteSwiftPackageReference "rovia-core" */;
 			productName = RoviaSubscription;
 		};
 		E10000000000000000000009 /* RoviaSubscription */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = E10000000000000000000007 /* XCLocalSwiftPackageReference "core/subscription" */;
+			package = E10000000000000000000001 /* XCRemoteSwiftPackageReference "rovia-core" */;
 			productName = RoviaSubscription;
 		};
 		E1000000000000000000000B /* RoviaApplePlatform */ = {

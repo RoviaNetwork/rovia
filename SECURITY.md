@@ -30,10 +30,6 @@ Changes under these areas are intended to require maintainer review, which is a
 statement of intent rather than a control:
 
 - `platform/apple/`
-- `engines/`
-- `core/config/`
-- `core/subscription/`
-- `core/routing/`
 - `client/app/ios/`
 - `client/app/ios/RoviaTunnel/`
 - `tools/ci/`
@@ -58,14 +54,20 @@ A path is security-sensitive when a change to it can change what the product doe
 with a credential, a destination, a packet, or a signed artifact. That is a
 property of the code, not of its name, and it is what decides membership:
 
-- `core/config/` is on the list because it holds `SecretReference`, the
+- `core/config/` used to be on this list because it holds `SecretReference`, the
   `ConfigValidation` rules that bound a secret key, and the raw
   `RoutingDecisionTrace` — the three types a reviewer has to be able to trust.
-  Its absence from this list was a defect, not a judgement: the most
-  credential-adjacent code in the repository was the one path with no owner.
+  It moved with `core/subscription/` and `core/routing/` to
+  RoviaNetwork/rovia-core, so this repository no longer names it: a path that
+  is not in the tree reads as coverage. The boundary moved with the code, and
+  it is now the pin — `client/app/ios/RoviaApp.xcodeproj` (exactVersion),
+  `tools/ci/core-pin.txt`, and the resolved `Package.resolved` — that decides
+  which revision of `SecretReference`, `ConfigValidation`, and
+  `RoutingDecisionTrace` this product ships. A pin change is a credential-
+  adjacent change and is reviewed as one.
 - `core/persistence/` was on the list and does not exist. Listing a path that is
   not in the tree is worse than omitting one, because it reads as coverage. Every
-  path here is checked for existence by `tools/ci/test_ci_checks.py`, so a
+  path here is checked for existence by `tools/ci/test_ci_docs.py`, so a
   directory that is removed cannot leave its entry behind.
 - `client/app/ios/` covers the host application, and `client/app/ios/RoviaTunnel/`
   is listed separately because the Packet Tunnel extension is the half that holds

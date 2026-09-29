@@ -9,6 +9,11 @@
 # Usage:
 #   run-tool-tests.sh [--root PATH] [pattern]
 #
+# The text gates read core sources from the pinned revision
+# (tools/ci/core-pin.txt). When ROVIA_CORE_ROOT is unset this script fetches
+# it once into the local cache; CI sets the variable explicitly after its own
+# fetch step, so the two cannot disagree about where the sources came from.
+#
 # Exit status: 0 all tests passed, 1 a test file failed, 2 usage error.
 set -euo pipefail
 
@@ -65,6 +70,12 @@ done
 
 if [[ -n "$pattern_argument" ]]; then
   pattern="$pattern_argument"
+fi
+
+fetch_script="$script_root/tools/ci/fetch-core.sh"
+if [[ -z "${ROVIA_CORE_ROOT:-}" ]]; then
+  ROVIA_CORE_ROOT=$("$fetch_script")
+  export ROVIA_CORE_ROOT
 fi
 
 files=()

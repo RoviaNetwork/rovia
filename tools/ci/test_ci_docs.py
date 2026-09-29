@@ -18,6 +18,7 @@ from test_ci_toolchain import PythonLintGateTests, swiftpm_counts, swiftpm_total
 from ci_check_support import (
     PACKAGE_LIST,
     app_test_count,
+    core_root,
     local_packages,
     word_for,
     DATED_SUMMARY_MARKER,
@@ -1450,7 +1451,7 @@ class PrivacyAndOwnershipTests(unittest.TestCase):
         self.assertIn("reported as a boolean", self.privacy)
         self.assertIn("never holds the value that was evaluated", self.privacy)
         diagnostic = (
-            REPO_ROOT / "core/routing/Sources/RoviaRouting/RoutingDiagnostic.swift"
+            core_root() / "core/routing/Sources/RoviaRouting/RoutingDiagnostic.swift"
         ).read_text(encoding="utf-8")
         self.assertIn("public var host: String { \"redacted\" }", diagnostic)
 
@@ -1494,7 +1495,7 @@ class PrivacyAndOwnershipTests(unittest.TestCase):
         self.assertIn("It is not `Codable`", self.privacy)
         # The debugger shows the redacted diagnostic; it does not hold the input.
         self.assertIn("never holds the value that was evaluated", self.privacy)
-        evaluator = (REPO_ROOT / "core/routing/Sources/RoviaRouting/RouteEvaluator.swift").read_text(
+        evaluator = (core_root() / "core/routing/Sources/RoviaRouting/RouteEvaluator.swift").read_text(
             encoding="utf-8"
         )
         self.assertIn("public func explain(", evaluator)
@@ -1612,8 +1613,7 @@ class PrivacyAndOwnershipTests(unittest.TestCase):
         # handle *names*, and there is one handle now: see
         # `test_ownership_alone_is_not_a_security_signal` for why the direction was
         # dropped and what holds the reason instead.
-        for path in ("core/config/", "core/routing/", "core/subscription/",
-                     "client/app/ios/", "client/app/ios/RoviaTunnel/",
+        for path in ("client/app/ios/", "client/app/ios/RoviaTunnel/",
                      "tools/build-engine/", "tools/release/", "tools/ci/",
                      ".github/workflows/", "engines.lock.json"):
             with self.subTest(path=path):

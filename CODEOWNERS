@@ -1,17 +1,18 @@
 # Ownership
 #
-# One owner: @princeofscale. There is no GitHub organization behind this repository
-# yet, and GitHub teams only exist inside an organization, so a per-role team handle
-# would be a name that resolves to nothing — which reads as a review requirement and
-# enforces none. A single real account is honest: GitHub can require review by it,
-# and `docs/development/release-readiness.md` tracks that requirement as an open
+# One owner: @princeofscale. The RoviaNetwork organization exists and holds
+# rovia, rovia-core, rovia-engine, and .github; per-role team handles do not
+# exist yet, so a team handle would be a name that resolves to nothing — which
+# reads as a review requirement and enforces none. A single real account is
+# honest: GitHub can require review by it, and
+# `docs/development/release-readiness.md` tracks that requirement as an open
 # external gate until branch protection is turned on.
 #
 # The role distinction that mattered under the earlier invented handles — which
 # paths are security-sensitive and which are engine-sensitive — is not lost. It
 # lives in
 # `SECURITY.md`, which states the criterion and the list, and
-# `tools/ci/test_ci_checks.py` checks that this file and that one agree in both
+# `tools/ci/test_ci_docs.py` checks that this file and that one agree in both
 # directions and that every path named in either exists in the tree.
 
 # Everything, by default
@@ -22,14 +23,14 @@
 /client/app/ios/ @princeofscale
 /client/app/ios/RoviaTunnel/ @princeofscale
 
-# Engine adapters and build inputs
-/engines/ @princeofscale
+# Engine lock: the release pin for the engine this client may ship
 /engines.lock.json @princeofscale
 
-# Secret, parser, and routing boundaries
-/core/config/ @princeofscale
-/core/subscription/ @princeofscale
-/core/routing/ @princeofscale
+# The canonical core and the adapters moved to RoviaNetwork/rovia-core and
+# RoviaNetwork/rovia-engine. Their ownership lives in those repositories;
+# what is owned here is the pin that decides which revision ships
+# (the Xcode project, tools/ci/core-pin.txt, and Package.resolved, covered
+# by the client and tools entries).
 
 # Verification tooling: a change here can weaken a release gate
 /tools/ci/ @princeofscale
@@ -55,7 +56,7 @@
 ## What this file does and does not do
 
 Every path listed as security-sensitive in `SECURITY.md` is owned here, and every
-path named in either file exists in the tree. `tools/ci/test_ci_checks.py` checks
+path named in either file exists in the tree. `tools/ci/test_ci_docs.py` checks
 both directions, so a security-sensitive path with no owner, and a path that is
 listed but is not in the tree, are each a failure.
 

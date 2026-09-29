@@ -76,11 +76,14 @@ the source, not a gate.
 
 from __future__ import annotations
 
+import os
 import re
 import shutil
 import tempfile
 import unittest
 from pathlib import Path
+
+from ci_check_support import core_root, core_sources_root, pinned_core_tag
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -88,11 +91,22 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 # the path each one has, relative to the directory holding the Xcode project.
 CANONICAL_PACKAGES = ("RoviaConfig", "RoviaRouting", "RoviaSubscription", "RoviaApplePlatform")
 LOCAL_PACKAGE_PATHS = {
-    "RoviaConfig": "../../../core/config",
-    "RoviaRouting": "../../../core/routing",
-    "RoviaSubscription": "../../../core/subscription",
     "RoviaApplePlatform": "../../../platform/apple",
 }
+# Remote packages enter the project only pinned: exact repository URL and an
+# exact version, read from the project, never a sibling checkout. The tag must
+# agree with tools/ci/core-pin.txt, which is what the text gates fetch.
+REMOTE_PACKAGES = {
+    "rovia-core": {
+        "url": "https://github.com/RoviaNetwork/rovia-core",
+        "version": "0.1.0",
+        "products": ("RoviaConfig", "RoviaRouting", "RoviaSubscription"),
+    },
+}
+# Local references that must never come back: core and engines moved to
+# RoviaNetwork/rovia-core and RoviaNetwork/rovia-engine. A sibling checkout
+# would silently shadow the pinned revision the release ships.
+FORBIDDEN_LOCAL_PATH_PREFIXES = ("../../../core", "../../../engines")
 LINKED_TARGETS = ("RoviaApp", "RoviaAppTests")
 APP_SOURCE_DIRECTORIES = ("client/app/ios",)
 RAW_TRACE_TYPES = ("RoutingDecisionTrace", "RuleEvaluation")
@@ -164,6 +178,7 @@ def list_pattern(key: str) -> re.Pattern:
     """
     return re.compile(rf"\b{key} = \((?P<body>.*?)\n\t\t*\);", re.S)
 LOCAL_REFERENCE_ISA = "XCLocalSwiftPackageReference"
+REMOTE_REFERENCE_ISA = "XCRemoteSwiftPackageReference"
 PRODUCT_DEPENDENCY_ISA = "XCSwiftPackageProductDependency"
 FILE_REFERENCE_ISA = "PBXFileReference"
 BUILD_FILE_ISA = "PBXBuildFile"
@@ -171,6 +186,9 @@ PHASE_FILES = re.compile(r"\bfiles = \((?P<body>.*?)\n\t\t*\);", re.S)
 BUILD_PHASES_PATTERN = re.compile(r"\bbuildPhases = \((?P<body>.*?)\n\t\t*\);", re.S)
 ISA_PATTERN = re.compile(r"\bisa = (?P<isa>\w+);")
 RELATIVE_PATH_PATTERN = re.compile(r"\brelativePath = (?P<path>[^;]+);")
+REPOSITORY_URL_PATTERN = re.compile(r'\brepositoryURL = "(?P<url>[^"]+)";')
+REQUIREMENT_KIND_PATTERN = re.compile(r"\bkind = (?P<kind>\w+);")
+REQUIREMENT_VERSION_PATTERN = re.compile(r"\bversion = (?P<version>[^;]+);")
 PRODUCT_NAME_PATTERN = re.compile(r"\bproductName = (?P<product>\w+);")
 PACKAGE_FIELD_PATTERN = re.compile(r"\bpackage = (?P<package>[0-9A-F]{24})")
 BUILD_FILE_REF = re.compile(r"\b(?P<what>fileRef|productRef) = (?P<ref>[0-9A-F]{24})")
@@ -213,6 +231,21 @@ class Project:
             for identifier, body in self.objects.items()
             if LOCAL_REFERENCE_ISA in body and RELATIVE_PATH_PATTERN.search(body)
         }
+        self.remote_references = {}
+        for identifier, body in self.objects.items():
+            # Match the declaration, not the use-site comment: product
+            # dependencies name their package in a comment carrying the same
+            # words but no fields of their own.
+            if "isa = XCRemoteSwiftPackageReference;" not in body:
+                continue
+            url = REPOSITORY_URL_PATTERN.search(body)
+            kind = REQUIREMENT_KIND_PATTERN.search(body)
+            version = REQUIREMENT_VERSION_PATTERN.search(body)
+            self.remote_references[identifier] = {
+                "url": url.group("url") if url else None,
+                "kind": kind.group("kind") if kind else None,
+                "version": version.group("version").strip() if version else None,
+            }
         self.product_dependencies = {}
         for identifier, body in self.objects.items():
             product = PRODUCT_NAME_PATTERN.search(body)
@@ -691,7 +724,13 @@ def project_text(root: Path) -> str:
 
 
 def package_dependency_problems(root: Path) -> list[str]:
-    """The app target and the test target must both link both local packages."""
+    """The app target and the test target must link every canonical package.
+
+    Local packages by path, remote packages by exact URL and version. A core
+    product that stops pointing at the pinned remote — or a sibling checkout
+    of core or engines reintroduced as a local reference — is a release
+    integrity failure, not a build convenience.
+    """
     problems: list[str] = []
     project = Project(project_text(root))
     project_directory = root / "client/app/ios"
@@ -702,6 +741,39 @@ def package_dependency_problems(root: Path) -> list[str]:
             problems.append(f"the project does not reference the local package {package} at {relative}")
         if not (project_directory / relative / "Package.swift").is_file():
             problems.append(f"the package path {relative} does not resolve to a Package.swift")
+    for path in sorted(paths):
+        if path.startswith(FORBIDDEN_LOCAL_PATH_PREFIXES):
+            problems.append(
+                f"the project references {path}, but core and engines live in their own "
+                "repositories and enter here only as pinned SPM dependencies"
+            )
+
+    remote_ids = set(project.remote_references)
+    for name, expected in REMOTE_PACKAGES.items():
+        # The Xcode pin is a bare version, the git tag carries its `v`:
+        # v0.1.0 the tag, 0.1.0 the pin. Compared after that prefix, so a
+        # real drift still fails and the naming convention cannot hide it.
+        if expected["version"] != pinned_core_tag().removeprefix("v"):
+            problems.append(
+                f"the {name} pin {expected['version']} disagrees with tools/ci/core-pin.txt"
+            )
+    for name, expected in REMOTE_PACKAGES.items():
+        matches = [
+            identifier
+            for identifier, reference in project.remote_references.items()
+            if reference["url"] == expected["url"]
+        ]
+        if not matches:
+            problems.append(f"the project has no remote reference to {expected['url']}")
+            continue
+        for identifier in matches:
+            reference = project.remote_references[identifier]
+            if reference["kind"] != "exactVersion" or reference["version"] != expected["version"]:
+                problems.append(
+                    f"the {name} reference is not pinned to exactly {expected['version']}"
+                )
+            if identifier not in project.package_references:
+                problems.append(f"the {name} remote reference is declared but not attached to the project")
 
     for identifier, reference in project.local_references.items():
         if identifier not in project.package_references:
@@ -709,14 +781,27 @@ def package_dependency_problems(root: Path) -> list[str]:
                 f"the local package {reference['path']} is declared but not attached to the project"
             )
     if not project.package_references:
-        problems.append("the project attaches no local package reference")
+        problems.append("the project attaches no package reference at all")
 
+    remote_products: dict[str, set[str]] = {}
+    for name, expected in REMOTE_PACKAGES.items():
+        remote_products[name] = set(expected["products"])
     for identifier, dependency in project.product_dependencies.items():
         if dependency["product"] not in CANONICAL_PACKAGES:
             continue
-        if dependency["package"] is None or dependency["package"] not in project.local_references:
+        if dependency["package"] is None:
+            problems.append(f"the {dependency['product']} product dependency points at no package")
+            continue
+        if dependency["package"] in project.local_references:
+            if dependency["product"] != "RoviaApplePlatform":
+                problems.append(
+                    f"the {dependency['product']} product dependency points at a local package; "
+                    "only RoviaApplePlatform may"
+                )
+            continue
+        if dependency["package"] not in remote_ids:
             problems.append(
-                f"the {dependency['product']} product dependency points at no local package"
+                f"the {dependency['product']} product dependency points at no known package"
             )
 
     for target in LINKED_TARGETS:
@@ -771,29 +856,48 @@ def duplicate_evaluator_problems(root: Path) -> list[str]:
     return problems
 
 
+def core_sources_root(root: Path) -> Path:
+    """Where the checks read core sources from.
+
+    The workspace carries a mutated copy under core/; anywhere else the
+    pinned checkout is read. Mutation tests depend on the first, clean runs
+    on the second, and neither may silently read the other.
+    """
+    if (root / "core" / "config" / "Package.swift").is_file():
+        return root
+    return core_root()
+
+
 def raw_trace_problems(root: Path) -> list[str]:
     problems: list[str] = []
-    for directory in PERSISTENCE_ROOTS:
-        base = root / directory
-        if not base.is_dir():
-            continue
-        for path in sorted(base.rglob("*.swift")):
-            if ".build" in path.parts or "DerivedData" in path.parts:
+    # Local trees, then core: a trace must not be stored on either side of
+    # the boundary, and the report keeps checkout-relative paths so a finding
+    # names the file it is in.
+    core = core_sources_root(root)
+    scan_roots = [(root, ("client", "platform")), (core, ("core",))]
+    for base_root, directories in scan_roots:
+        for directory in directories:
+            base = base_root / directory
+            if not base.is_dir():
                 continue
-            for finding in raw_trace_findings(path.read_text(encoding="utf-8")):
-                problems.append(f"{path.relative_to(root)}: {finding}")
+            for path in sorted(base.rglob("*.swift")):
+                if ".build" in path.parts or "DerivedData" in path.parts:
+                    continue
+                for finding in raw_trace_findings(path.read_text(encoding="utf-8")):
+                    problems.append(f"{path.relative_to(base_root)}: {finding}")
     return problems
 
 
 def redacted_contract_problems(root: Path) -> list[str]:
+    core = core_sources_root(root)
     problems: list[str] = []
-    models = (root / "core/config/Sources/RoviaConfig/CanonicalModels.swift").read_text(
+    models = (core / "core/config/Sources/RoviaConfig/CanonicalModels.swift").read_text(
         encoding="utf-8"
     )
     for phrase in ("In memory only", "never written to disk", REDACTED_TYPE):
         if phrase not in models:
             problems.append(f"the raw trace no longer states '{phrase}' in its contract")
-    diagnostic = (root / "core/routing/Sources/RoviaRouting/RoutingDiagnostic.swift").read_text(
+    diagnostic = (core / "core/routing/Sources/RoviaRouting/RoutingDiagnostic.swift").read_text(
         encoding="utf-8"
     )
     declaration = re.search(
@@ -824,7 +928,12 @@ ALL_CHECKS = (
 
 
 class Workspace:
-    """A temporary copy of the repository, for mutation tests."""
+    """A temporary copy of the repository, for mutation tests.
+
+    Core sources ride along from the pinned checkout: mutations address them
+    by the same relative paths the checks read, so the workspace mirrors the
+    checkout under core/.
+    """
 
     def __init__(self) -> None:
         self.directory = Path(tempfile.mkdtemp())
@@ -835,6 +944,11 @@ class Workspace:
             ignore=shutil.ignore_patterns(
                 ".git", ".build", "DerivedData", "__pycache__", ".DS_Store", "*.xcuserstate"
             ),
+        )
+        shutil.copytree(
+            core_root() / "core",
+            self.root / "core",
+            ignore=shutil.ignore_patterns(".build", "DerivedData", "__pycache__", ".DS_Store"),
         )
 
     def close(self) -> None:
@@ -980,17 +1094,83 @@ def _comment_out_product(text: str, target: str, product: str) -> str:
     raise AssertionError(f"{target} does not declare {product}")
 
 
+def _local_reference_id(text: str, expected_path: str) -> str:
+    project = Project(text)
+    return next(
+        key for key, reference in project.local_references.items() if reference["path"] == expected_path
+    )
+
+
+def _remote_reference_id(text: str, url: str) -> str:
+    project = Project(text)
+    return next(
+        key for key, reference in project.remote_references.items() if reference["url"] == url
+    )
+
+
+def _float_remote_requirement(text: str, url: str) -> str:
+    identifier = _remote_reference_id(text, url)
+    body = Project(text).objects[identifier]
+    assert "kind = exactVersion;" in body, "the remote reference is not version-pinned"
+    floated = body.replace("kind = exactVersion;", "kind = branch;", 1)
+    return text.replace(body, floated, 1)
+
+
+def _change_remote_url(text: str, url: str, new_url: str) -> str:
+    _remote_reference_id(text, url)
+    old = f'repositoryURL = "{url}";'
+    assert old in text
+    return text.replace(old, f'repositoryURL = "{new_url}";', 1)
+
+
+def _point_product_at_package(text: str, product: str, package_id: str) -> str:
+    for body in Project(text).objects.values():
+        if "XCSwiftPackageProductDependency" in body and f"productName = {product};" in body:
+            assert re.search(r"\bpackage = [0-9A-F]{24}", body), f"{product} has no package field to repoint"
+            return text.replace(
+                body,
+                re.sub(r"\bpackage = [0-9A-F]{24}[^\n]*", f"package = {package_id}", body, count=1),
+                1,
+            )
+    raise AssertionError(f"no product dependency for {product}")
+
+
+def _add_local_core_reference(text: str) -> str:
+    anchor = "/* End XCLocalSwiftPackageReference section */"
+    assert anchor in text
+    block = (
+        "\t\tDEAD00000000000000000001 /* XCLocalSwiftPackageReference \"core/config\" */ = {\n"
+        "\t\t\tisa = XCLocalSwiftPackageReference;\n"
+        "\t\t\trelativePath = ../../../core/config;\n"
+        "\t\t};\n"
+    )
+    return text.replace(anchor, block + anchor, 1)
+
+
 def _mutate_project(operation):
     return lambda workspace: workspace.transform(PROJECT_FILE, operation)
 
 
 PACKAGE_MUTATIONS = {
-    "the local config package path is repointed": _mutate_project(
-        lambda text: _repoint_local_reference(text, LOCAL_PACKAGE_PATHS["RoviaConfig"], "../../../core/elsewhere")
+    "the local platform package path is repointed": _mutate_project(
+        lambda text: _repoint_local_reference(text, LOCAL_PACKAGE_PATHS["RoviaApplePlatform"], "../../../platform/elsewhere")
     ),
-    "the local routing package path is repointed": _mutate_project(
-        lambda text: _repoint_local_reference(text, LOCAL_PACKAGE_PATHS["RoviaRouting"], "../../../../core/routing")
+    "the remote pin is floated to a branch": _mutate_project(
+        lambda text: _float_remote_requirement(text, REMOTE_PACKAGES["rovia-core"]["url"])
     ),
+    "the remote URL is changed": _mutate_project(
+        lambda text: _change_remote_url(
+            text,
+            REMOTE_PACKAGES["rovia-core"]["url"],
+            "https://example.invalid/rovia-core",
+        )
+    ),
+    "a core product is repointed at the local platform package": _mutate_project(
+        lambda text: _point_product_at_package(
+            text, "RoviaConfig", _local_reference_id(text, LOCAL_PACKAGE_PATHS["RoviaApplePlatform"])
+        )
+    ),
+    "a local core reference is reintroduced": _mutate_project(_add_local_core_reference),
     "the product dependency is removed from the app target": _mutate_project(
         lambda text: _drop_product_from_target(text, "RoviaApp", "RoviaConfig")
     ),
@@ -1004,7 +1184,7 @@ PACKAGE_MUTATIONS = {
         lambda text: _point_product_at_nothing(text, "RoviaRouting")
     ),
     "a local package is declared but not attached to the project": _mutate_project(
-        lambda text: _detach_local_reference(text, LOCAL_PACKAGE_PATHS["RoviaConfig"])
+        lambda text: _detach_local_reference(text, LOCAL_PACKAGE_PATHS["RoviaApplePlatform"])
     ),
     "a product is renamed so it is not the canonical one": _mutate_project(
         lambda text: _rename_product(text, "RoviaConfig")
@@ -1312,6 +1492,16 @@ class PackageDependencyStructureTests(WorkspaceTestCase):
             {reference["path"] for reference in project.local_references.values()},
             set(LOCAL_PACKAGE_PATHS.values()),
         )
+        self.assertEqual(
+            {
+                (reference["url"], reference["kind"], reference["version"])
+                for reference in project.remote_references.values()
+            },
+            {
+                (expected["url"], "exactVersion", expected["version"])
+                for expected in REMOTE_PACKAGES.values()
+            },
+        )
         for target in LINKED_TARGETS:
             with self.subTest(target=target):
                 self.assertEqual(project.declared_products(target), set(CANONICAL_PACKAGES))
@@ -1346,7 +1536,7 @@ class PackageDependencyStructureTests(WorkspaceTestCase):
             (
                 "a repointed package path",
                 lambda text: _repoint_local_reference(
-                    text, LOCAL_PACKAGE_PATHS["RoviaRouting"], "../../elsewhere"
+                    text, LOCAL_PACKAGE_PATHS["RoviaApplePlatform"], "../../elsewhere"
                 ),
             ),
             ("a dropped target product", lambda text: _drop_product_from_target(text, "RoviaApp", "RoviaConfig")),
@@ -1356,10 +1546,14 @@ class PackageDependencyStructureTests(WorkspaceTestCase):
             ),
             (
                 "a detached local reference",
-                lambda text: _detach_local_reference(text, LOCAL_PACKAGE_PATHS["RoviaConfig"]),
+                lambda text: _detach_local_reference(text, LOCAL_PACKAGE_PATHS["RoviaApplePlatform"]),
             ),
             ("a product pointed at no package", lambda text: _point_product_at_nothing(text, "RoviaRouting")),
             ("a renamed product", lambda text: _rename_product(text, "RoviaConfig")),
+            (
+                "a floated remote pin",
+                lambda text: _float_remote_requirement(text, REMOTE_PACKAGES["rovia-core"]["url"]),
+            ),
             (
                 "a commented-out product entry",
                 lambda text: _comment_out_product(text, "RoviaApp", "RoviaConfig"),
@@ -1488,6 +1682,11 @@ class RawTraceDetectorTests(unittest.TestCase):
         return raw_trace_findings(source)
 
     def test_the_current_sources_are_clean(self):
+        roots = {
+            "core/": core_root(),
+            "client/": REPO_ROOT,
+            "platform/": REPO_ROOT,
+        }
         for relative in (
             "core/config/Sources/RoviaConfig/CanonicalModels.swift",
             "core/config/Sources/RoviaConfig/ConfigValidation.swift",
@@ -1498,8 +1697,9 @@ class RawTraceDetectorTests(unittest.TestCase):
             "platform/apple/Sources/RoviaApplePlatform/ApplePlatform.swift",
         ):
             with self.subTest(source=relative):
+                base = next(root for prefix, root in roots.items() if relative.startswith(prefix))
                 self.assertEqual(
-                    self.detector((REPO_ROOT / relative).read_text(encoding="utf-8")), []
+                    self.detector((base / relative).read_text(encoding="utf-8")), []
                 )
 
     def test_each_shape_is_detected(self):

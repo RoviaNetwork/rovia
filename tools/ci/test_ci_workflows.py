@@ -60,6 +60,7 @@ class WorkflowPolicyTests(unittest.TestCase):
     LOCAL_GATES = (
         "tools/ci/check-shell-syntax.sh",
         "tools/ci/run-tool-tests.sh",
+        "tools/ci/fetch-core.sh",
         "tools/ci/test_ci_changelog.py",
         "tools/ci/test_ci_toolchain.py",
         "tools/ci/test_ci_workflows.py",

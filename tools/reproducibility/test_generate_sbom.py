@@ -266,13 +266,23 @@ class GenerateSbomTests(unittest.TestCase):
             for item in self.document["relationships"]
         }
         self.assertIn(
-            ("SPDXRef-App-io.rovia.client", "STATIC_LINK", "SPDXRef-Package-RoviaConfig"),
+            ("SPDXRef-App-io.rovia.client", "STATIC_LINK", "SPDXRef-Package-rovia-core"),
+            relationships,
+        )
+        self.assertIn(
+            ("SPDXRef-App-io.rovia.client", "STATIC_LINK", "SPDXRef-Package-RoviaApplePlatform"),
             relationships,
         )
         self.assertIn(
             ("SPDXRef-App-io.rovia.client", "CONTAINS", "SPDXRef-Extension-io.rovia.client.tunnel"),
             relationships,
         )
+
+    def test_both_remote_pin_parsers_agree(self):
+        project = (REPO_ROOT / "client/app/ios/RoviaApp.xcodeproj/project.pbxproj").read_text(
+            encoding="utf-8"
+        )
+        self.assertEqual(generator.remote_pins(project), checker.remote_pins(project))
 
     def test_the_document_is_byte_reproducible_when_both_run_fields_are_fixed(self):
         # This test used to overwrite creationInfo.created with a fixed string and
@@ -617,7 +627,7 @@ class CheckSbomTests(unittest.TestCase):
             missing["packages"] = [
                 package
                 for package in missing["packages"]
-                if package["SPDXID"] != "SPDXRef-Package-RoviaRouting"
+                if package["SPDXID"] != "SPDXRef-Package-rovia-core"
             ]
             path.write_text(json.dumps(missing), encoding="utf-8")
             result = subprocess.run(
@@ -627,7 +637,7 @@ class CheckSbomTests(unittest.TestCase):
                 text=True,
             )
             self.assertEqual(result.returncode, 1)
-            self.assertIn("core/routing", result.stdout + result.stderr)
+            self.assertIn("rovia-core", result.stdout + result.stderr)
 
     def test_coverage_check_reports_a_missing_package_list(self):
         document = generate()
@@ -690,7 +700,10 @@ class LocalPackageListTests(unittest.TestCase):
             for line in PACKAGE_LIST.read_text(encoding="utf-8").splitlines()
             if line.strip() and not line.strip().startswith("#")
         ]
-        self.assertGreaterEqual(len(entries), 7)
+        # One entry today: only platform/apple is still local. Core and the
+        # engines moved to their own repositories and enter as pinned remotes,
+        # which the coverage check holds separately.
+        self.assertGreaterEqual(len(entries), 1)
 
     def test_every_listed_package_manifest_exists(self):
         for relative in self.local_packages():
@@ -871,10 +884,16 @@ class EngineLicenseTests(unittest.TestCase):
 
     def test_the_local_packages_stay_mit(self):
         # Only the engines are derived; Rovia's own packages are MIT because
-        # this repository is.
+        # this repository is. Pinned remotes are exempt: they carry their own
+        # licenses (rovia-core is MIT under its own LICENSE), and asserting
+        # MIT here would claim this repository's license for another's code.
         result, document = self.emit(self.lock_with(self.candidate()))
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        packages = [p for p in document["packages"] if p["name"] != "engine"]
+        packages = [
+            p
+            for p in document["packages"]
+            if p["name"] != "engine" and p.get("downloadLocation", "") == "NOASSERTION"
+        ]
         for package in packages:
             with self.subTest(package=package["name"]):
                 self.assertEqual(package["licenseDeclared"], "MIT")
