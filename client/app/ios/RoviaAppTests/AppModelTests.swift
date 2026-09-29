@@ -17,11 +17,12 @@ final class AppModelTests: XCTestCase {
         loadError: (any Error)? = nil,
         subscriptions: SubscriptionCoordinator? = nil,
         probeLatency: (@Sendable (String, Int) async -> Int?)? = nil,
-        favoritesStorage: UserDefaults = .standard
+        favoritesStorage: UserDefaults = .standard,
+        selectionStorage: UserDefaults? = nil
     ) -> (AppModel, CountingFixtureProvider) {
         let now = fixedNow
         let provider = CountingFixtureProvider(content: content, loadError: loadError)
-        let model = AppModel(tunnel: tunnel, fixtures: provider, subscriptions: subscriptions, probeLatency: probeLatency, favoritesStorage: favoritesStorage, now: { now })
+        let model = AppModel(tunnel: tunnel, fixtures: provider, subscriptions: subscriptions, probeLatency: probeLatency, favoritesStorage: favoritesStorage, selectionStorage: selectionStorage, now: { now })
         return (model, provider)
     }
 
@@ -1948,4 +1949,196 @@ private enum ModelFixtures {
     static let vless =
         "vless://00000000-0000-0000-0000-000000000001@synthetic.example:443?encryption=none&security=tls&type=tcp"
     static let trojan = "trojan://Model-Password-1@synthetic.example:443?security=tls"
+}
+
+extension AppModelTests {
+    func testSameLinkInTwoSubscriptionsStaysSeparate() async {
+        let box = ModelBodyBox(body: ModelFixtures.vless)
+        let (model, coordinator, _) = makeSubscriptionModel(box: box)
+        assertTrue(await model.bootstrap())
+        assertTrue(await model.addSubscription(url: URL(string: "https://a.example/sub")!, name: "A"))
+        assertTrue(await model.addSubscription(url: URL(string: "https://b.example/sub")!, name: "B"))
+        let servers = model.snapshot.content.servers
+        assertEqual(servers.count, 2)
+        assertEqual(Set(servers.map(\.id)).count, 2)
+        // Same canonical server, different owners: suffixes match, prefixes differ.
+        let suffixes = servers.map { $0.id.split(separator: "/").last.map(String.init) }
+        assertEqual(suffixes[0], suffixes[1])
+        assertTrue(servers[0].id != servers[1].id)
+        // Both selectable, no trap in visibleServers.
+        assertTrue(await model.selectServer(servers[0].id))
+        assertTrue(await model.selectServer(servers[1].id))
+    }
+
+    func testRefreshOneSubscriptionKeepsOtherSelection() async {
+        let box = ModelBodyBox(body: ModelFixtures.vless)
+        let (model, coordinator, _) = makeSubscriptionModel(box: box)
+        assertTrue(await model.bootstrap())
+        assertTrue(await model.addSubscription(url: URL(string: "https://a.example/sub")!, name: "A"))
+        assertTrue(await model.addSubscription(url: URL(string: "https://b.example/sub")!, name: "B"))
+        let subs = await coordinator.subscriptions()
+        guard let subB = subs.first(where: { $0.name == "B" }) else {
+            XCTFail("subscription B missing"); return
+        }
+        guard let serverB = model.snapshot.content.servers.first(where: { $0.id.hasPrefix(subB.id.uuidString.lowercased()) }) else {
+            XCTFail("server of subscription B missing"); return
+        }
+        assertTrue(await model.selectServer(serverB.id))
+        assertTrue(await model.toggleFavorite(serverB.id))
+        guard let subA = subs.first(where: { $0.name == "A" }) else {
+            XCTFail("subscription A missing"); return
+        }
+        assertTrue(await model.refreshSubscription(subA.id))
+        assertEqual(model.snapshot.selection.server, serverB.id)
+        assertTrue(model.isFavorite(serverB.id))
+        assertEqual(model.snapshot.content.servers.count, 2)
+    }
+
+    func testDeletingOneSubscriptionKeepsOtherWorking() async {
+        let box = ModelBodyBox(body: ModelFixtures.vless)
+        let (model, coordinator, _) = makeSubscriptionModel(box: box)
+        assertTrue(await model.bootstrap())
+        assertTrue(await model.addSubscription(url: URL(string: "https://a.example/sub")!, name: "A"))
+        assertTrue(await model.addSubscription(url: URL(string: "https://b.example/sub")!, name: "B"))
+        let subs = await coordinator.subscriptions()
+        guard let subB = subs.first(where: { $0.name == "B" }) else {
+            XCTFail("subscription B missing"); return
+        }
+        guard let serverB = model.snapshot.content.servers.first(where: { $0.id.hasPrefix(subB.id.uuidString.lowercased()) }) else {
+            XCTFail("server of subscription B missing"); return
+        }
+        assertTrue(await model.selectServer(serverB.id))
+        guard let subA = subs.first(where: { $0.name == "A" }) else {
+            XCTFail("subscription A missing"); return
+        }
+        assertTrue(await model.removeSubscription(subA.id))
+        assertEqual(model.snapshot.content.servers.count, 1)
+        // The surviving server keeps working: still present and still selected.
+        assertEqual(model.snapshot.content.servers.first?.id, serverB.id)
+        assertEqual(model.snapshot.selection.server, serverB.id)
+    }
+}
+
+extension AppModelTests {
+    func testBootstrapStatesNoSubscriptions() async {
+        let (model, _, _) = makeSubscriptionModel(box: ModelBodyBox(body: ""))
+        assertTrue(await model.bootstrap())
+        assertEqual(model.snapshot.contentSource, .none)
+        assertTrue(model.snapshot.content.servers.isEmpty)
+    }
+
+    func testBootstrapAllRejected() async {
+        let box = ModelBodyBox(body: "")
+        box.body = "vmess://eyJhZGRyZXNzIjoieCJ9"
+        let (model, _, dir) = makeSubscriptionModel(box: box)
+        assertTrue(await model.bootstrap())
+        _ = await model.addSubscription(url: URL(string: "https://provider.example/sub")!, name: "P")
+        let (relaunched, _, _) = makeSubscriptionModel(box: box, directory: dir)
+        assertTrue(await relaunched.bootstrap())
+        assertEqual(relaunched.snapshot.contentSource, .allRejected)
+        assertTrue(relaunched.snapshot.content.servers.isEmpty)
+    }
+
+    func testBootstrapCorruptStoreFailsWithRetry() async {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        do {
+            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+            try Data("corrupt{".utf8).write(to: dir.appendingPathComponent("subscriptions.json"))
+        } catch {
+            XCTFail("fixture setup failed: \(error)")
+            return
+        }
+        let box = ModelBodyBox(body: ModelFixtures.vless)
+        let (model, _, _) = makeSubscriptionModel(box: box, directory: dir)
+        assertFalse(await model.bootstrap())
+        assertEqual(model.snapshot.contentSource, .unavailable)
+        assertTrue(model.snapshot.lastError != nil)
+        // The corrupt file is not overwritten: fixing it and retrying works.
+        do {
+            try Data("[]".utf8).write(to: dir.appendingPathComponent("subscriptions.json"))
+        } catch {
+            XCTFail("fixture repair failed: \(error)")
+            return
+        }
+        assertTrue(await model.bootstrap())
+        assertEqual(model.snapshot.contentSource, .none)
+    }
+
+    func testSelectionPersistsAcrossRelaunch() async {
+        let suite = UUID().uuidString
+        let storage = UserDefaults(suiteName: suite)!
+        defer { storage.removePersistentDomain(forName: suite) }
+        let box = ModelBodyBox(body: "\(ModelFixtures.vless)\n\(ModelFixtures.trojan)")
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let coordinator = SubscriptionCoordinator(
+            store: SubscriptionStore(directory: dir),
+            secrets: InMemorySecretStore(),
+            session: ModelStubSession(box: box)
+        )
+        let (model, _) = makeModel(
+            tunnel: StubTunnelController(), content: .empty,
+            subscriptions: coordinator, favoritesStorage: storage, selectionStorage: storage
+        )
+        assertTrue(await model.bootstrap())
+        assertTrue(await model.addSubscription(url: URL(string: "https://provider.example/sub")!, name: "P"))
+        let servers = model.snapshot.content.servers
+        assertEqual(servers.count, 2)
+        assertTrue(await model.selectServer(servers[1].id))
+        let coordinator2 = SubscriptionCoordinator(
+            store: SubscriptionStore(directory: dir),
+            secrets: InMemorySecretStore(),
+            session: ModelStubSession(box: box)
+        )
+        let (relaunched, _) = makeModel(
+            tunnel: StubTunnelController(), content: .empty,
+            subscriptions: coordinator2, favoritesStorage: storage, selectionStorage: storage
+        )
+        assertTrue(await relaunched.bootstrap())
+        assertEqual(relaunched.snapshot.selection.server, servers[1].id)
+        assertTrue(relaunched.snapshot.selection.group != nil)
+    }
+
+    func testStalePartialFailureReportsIDs() async {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let box = ModelBodyBox(body: ModelFixtures.vless)
+        box.status = 500
+        let seeding = SubscriptionStore(directory: dir)
+        let seededID: UUID
+        do {
+            try await seeding.load()
+            let record = StoredSubscription(
+                name: "A",
+                source: SubscriptionSource(
+                    kind: .url, displayValue: "https://a.example/sub?token=t",
+                    secretReference: SecretReference(key: "subscription/a")
+                ),
+                updatedAt: Date(timeIntervalSince1970: 1_750_000_000 - 7200)
+            )
+            seededID = record.id
+            try await seeding.upsert(record)
+        } catch {
+            XCTFail("fixture setup failed: \(error)")
+            return
+        }
+        let (model, _, _) = makeSubscriptionModel(box: box, directory: dir)
+        assertTrue(await model.bootstrap())
+        assertFalse(await model.refreshStaleSubscriptions(maxAge: 3600))
+        assertEqual(model.snapshot.failedRefreshIDs, [seededID])
+        assertTrue(model.snapshot.lastError != nil)
+    }
+
+    func testCancelledImportReturnsFalseSilently() async {
+        let lines = (1...6000).map { index in
+            "vless://00000000-0000-0000-0000-\(String(format: "%012X", index))@h\(index).example:443?encryption=none&security=tls&type=tcp"
+        }.joined(separator: "\n")
+        let box = ModelBodyBox(body: lines)
+        let (model, _, _) = makeSubscriptionModel(box: box)
+        assertTrue(await model.bootstrap())
+        let task = Task { await model.addSubscriptionText(lines, name: "Big") }
+        try? await Task.sleep(nanoseconds: 50_000_000)
+        task.cancel()
+        let result = await task.value
+        assertFalse(result)
+        assertTrue(model.snapshot.lastError == nil)
+    }
 }

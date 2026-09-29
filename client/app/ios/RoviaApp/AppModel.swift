@@ -135,6 +135,7 @@ final class AppModel {
     private let subscriptions: SubscriptionCoordinator?
     private let probeLatency: (@Sendable (String, Int) async -> Int?)?
     private let favoritesStorage: UserDefaults
+    private let selectionStorage: UserDefaults
     private let now: @Sendable () -> Date
 
     init(
@@ -143,6 +144,7 @@ final class AppModel {
         subscriptions: SubscriptionCoordinator? = nil,
         probeLatency: (@Sendable (String, Int) async -> Int?)? = nil,
         favoritesStorage: UserDefaults = .standard,
+        selectionStorage: UserDefaults? = nil,
         now: @escaping @Sendable () -> Date = { Date() }
     ) {
         self.tunnel = tunnel
@@ -150,11 +152,65 @@ final class AppModel {
         self.subscriptions = subscriptions
         self.probeLatency = probeLatency
         self.favoritesStorage = favoritesStorage
+        // An explicit store persists across launches; tests that pass none
+        // get an isolated suite so selections never leak between cases.
+        self.selectionStorage = selectionStorage ?? UserDefaults(suiteName: "rovia.test.\(UUID().uuidString)")!
         self.now = now
         self.favoriteServerIDs = Set(favoritesStorage.stringArray(forKey: Self.favoritesKey) ?? [])
     }
 
     private static let favoritesKey = "rovia.favoriteServerIDs"
+    private static let selectionProfileKey = "rovia.selection.profile"
+    private static let selectionGroupKey = "rovia.selection.group"
+    private static let selectionServerKey = "rovia.selection.server"
+
+    private func persistSelection() {
+        let selection = snapshot.selection
+        if let profile = selection.profile {
+            selectionStorage.set(profile, forKey: Self.selectionProfileKey)
+        } else {
+            selectionStorage.removeObject(forKey: Self.selectionProfileKey)
+        }
+        if let group = selection.group {
+            selectionStorage.set(group, forKey: Self.selectionGroupKey)
+        } else {
+            selectionStorage.removeObject(forKey: Self.selectionGroupKey)
+        }
+        if let server = selection.server {
+            selectionStorage.set(server, forKey: Self.selectionServerKey)
+        } else {
+            selectionStorage.removeObject(forKey: Self.selectionServerKey)
+        }
+    }
+
+    /// Restores the persisted selection level by level: a stored server is
+    /// kept only if its group and profile still contain it, otherwise the
+    /// content defaults apply. Runs after every bootstrap content swap.
+    private func restoreSelection() {
+        let content = snapshot.content
+        if let profile = selectionStorage.string(forKey: Self.selectionProfileKey),
+           content.isKnownProfile(profile)
+        {
+            snapshot.selection.profile = profile
+        } else if let fallback = content.defaultProfileID {
+            snapshot.selection.profile = fallback
+        }
+        if let group = selectionStorage.string(forKey: Self.selectionGroupKey),
+           content.group(id: group) != nil
+        {
+            snapshot.selection.group = group
+        } else if let fallback = content.defaultGroupID {
+            snapshot.selection.group = fallback
+        }
+        if let server = selectionStorage.string(forKey: Self.selectionServerKey),
+           content.server(id: server) != nil
+        {
+            snapshot.selection.server = server
+        } else {
+            snapshot.selection.server = nil
+        }
+        updateDerivedMeasurements()
+    }
 
     var pendingActions: Set<AppAction> {
         inFlightActions
@@ -323,7 +379,10 @@ final class AppModel {
         snapshot.lastError = nil
 
         if await prepareFromSubscriptions() {
-            return true
+            // Handled upstream: report whether the app is actually ready, so
+            // an unreadable store surfaces as a failed bootstrap with retry
+            // instead of a silent fallback.
+            return snapshot.system == .ready
         }
 
         let content: AppContent
@@ -342,6 +401,7 @@ final class AppModel {
 
         snapshot.content = content
         snapshot.isSampleData = content.isSampleData
+        snapshot.contentSource = .sample
         snapshot.evaluation = nil
         if content.defaultProfileID != nil {
             snapshot.selection.profile = content.defaultProfileID
@@ -352,6 +412,8 @@ final class AppModel {
         if content.defaultDebugSampleID != nil {
             snapshot.selection.debugSample = content.defaultDebugSampleID
         }
+        restoreSelection()
+        persistSelection()
 
         let availability = await tunnel.engineAvailability()
         switch availability {
@@ -365,27 +427,44 @@ final class AppModel {
         return true
     }
 
-    /// Stored subscriptions are the source of truth when they exist. A
-    /// corrupt file store never fails the launch: the fixture path below
-    /// still runs. Returns true when subscription content was applied.
+    /// Stored subscriptions are the source of truth when a coordinator is
+    /// wired. Every outcome is an explicit state — never a silent fixture
+    /// fallback: no subscriptions yet (`.none`), real servers (`.live`),
+    /// stored but all rejected (`.allRejected`), or an unreadable store
+    /// (`.unavailable`, with retry). A corrupt file is never overwritten.
+    /// Returns true when the coordinator handled the bootstrap, whatever the
+    /// outcome; only a missing coordinator falls through to fixtures.
     private func prepareFromSubscriptions() async -> Bool {
         guard let coordinator = subscriptions else { return false }
         do {
             try await coordinator.loadPersisted()
         } catch {
-            return false
+            snapshot.content = .empty
+            snapshot.isSampleData = false
+            snapshot.contentSource = .unavailable
+            snapshot.evaluation = nil
+            snapshot.selection = .none
+            storedSubscriptions = []
+            let failure = AppError.unknown(code: "subscription.storage.failed")
+            snapshot.system = .failed(failure)
+            snapshot.lastError = failure
+            updateDerivedMeasurements()
+            return true
         }
-        let content = await coordinator.syncToContent()
-        guard !content.servers.isEmpty else { return false }
-        snapshot.content = content
+        let records = await coordinator.subscriptions()
+        storedSubscriptions = records
+        snapshot.content = await coordinator.syncToContent()
         snapshot.isSampleData = false
-        storedSubscriptions = await coordinator.subscriptions()
-        if content.defaultProfileID != nil {
-            snapshot.selection.profile = content.defaultProfileID
+        snapshot.evaluation = nil
+        if records.isEmpty {
+            snapshot.contentSource = .none
+        } else if snapshot.content.servers.isEmpty {
+            snapshot.contentSource = .allRejected
+        } else {
+            snapshot.contentSource = .live
         }
-        if content.defaultGroupID != nil {
-            snapshot.selection.group = content.defaultGroupID
-        }
+        restoreSelection()
+        persistSelection()
         let availability = await tunnel.engineAvailability()
         switch availability {
         case .available:
@@ -476,6 +555,7 @@ final class AppModel {
         guard snapshot.selection.profile != id else { return false }
         snapshot.selection.profile = id
         revalidateServerSelection()
+        persistSelection()
         return true
     }
 
@@ -486,6 +566,7 @@ final class AppModel {
         snapshot.selection.server = nil
         snapshot.evaluation = nil
         updateDerivedMeasurements()
+        persistSelection()
         return true
     }
 
@@ -500,6 +581,7 @@ final class AppModel {
         guard snapshot.selection.server != id else { return false }
         snapshot.selection.server = id
         updateDerivedMeasurements()
+        persistSelection()
         return true
     }
 
@@ -562,6 +644,8 @@ final class AppModel {
             let summary = try await coordinator.add(url: url, name: name, allowInsecure: allowInsecure)
             await resyncSubscriptions(lastResult: summary)
             return true
+        } catch is CancellationError {
+            return false
         } catch let error as SubscriptionCoordinatorError {
             await resyncAfterSubscriptionFailure(error)
             return false
@@ -588,6 +672,8 @@ final class AppModel {
             }
             await resyncSubscriptions(lastResult: summary)
             return true
+        } catch is CancellationError {
+            return false
         } catch let error as SubscriptionCoordinatorError {
             await resyncAfterSubscriptionFailure(error)
             return false
@@ -603,6 +689,10 @@ final class AppModel {
             let summary = try await coordinator.refresh(id: id)
             await resyncSubscriptions(lastResult: summary)
             return true
+        } catch is CancellationError {
+            return false
+        } catch is CancellationError {
+            return false
         } catch let error as SubscriptionCoordinatorError {
             await resyncAfterSubscriptionFailure(error)
             return false
@@ -618,6 +708,8 @@ final class AppModel {
             try await coordinator.rename(id: id, name: name)
             await resyncSubscriptions(lastResult: nil)
             return true
+        } catch is CancellationError {
+            return false
         } catch {
             snapshot.lastError = .unknown(code: "subscription.rename.failed")
             return false
@@ -630,6 +722,8 @@ final class AppModel {
             try await coordinator.remove(id: id)
             await resyncSubscriptions(lastResult: nil)
             return true
+        } catch is CancellationError {
+            return false
         } catch {
             snapshot.lastError = .unknown(code: "subscription.remove.failed")
             return false
@@ -731,10 +825,14 @@ final class AppModel {
         let stale = await coordinator.subscriptions().filter { $0.updatedAt < cutoff }
         guard !stale.isEmpty else { return true }
         var last: SubscriptionImportSummary?
+        var failed: Set<UUID> = []
         for record in stale {
             do {
                 last = try await coordinator.refresh(id: record.id)
+            } catch is CancellationError {
+                return false
             } catch let error as SubscriptionCoordinatorError {
+                failed.insert(record.id)
                 if case let .nothingAccepted(accepted, rejected) = error {
                     last = SubscriptionImportSummary(
                         subscriptionID: record.id,
@@ -742,10 +840,19 @@ final class AppModel {
                         rejected: rejected
                     )
                 }
-            } catch {}
+            } catch {
+                failed.insert(record.id)
+            }
         }
         await resyncSubscriptions(lastResult: last)
-        return true
+        snapshot.failedRefreshIDs = failed
+        if failed.isEmpty {
+            return true
+        }
+        // Partial failure is not success, and the resync above already
+        // cleared the banner: record exactly which subscriptions failed.
+        snapshot.lastError = .unknown(code: "subscription.refresh.partial")
+        return false
     }
 
     private func applyFavorite(_ id: ServerID) -> Bool {
@@ -779,5 +886,6 @@ final class AppModel {
             snapshot.selection.server = nil
         }
         updateDerivedMeasurements()
+        persistSelection()
     }
 }
