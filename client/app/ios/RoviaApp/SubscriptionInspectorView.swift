@@ -1,133 +1,312 @@
+import Foundation
+import RoviaSubscription
 import SwiftUI
+
+#if canImport(UIKit)
+    import UIKit
+#endif
 
 struct SubscriptionInspectorView: View {
     let model: AppModel
 
+    @State private var addShown = false
+    @State private var urlText = ""
+    @State private var nameText = ""
+    @State private var pasteText = ""
+    @State private var allowInsecure = false
+    @State private var renameTarget: UUID?
+    @State private var renameText = ""
+
     var body: some View {
         Group {
-            if model.snapshot.content.subscription == nil {
-                ContentUnavailableView(
-                    "No subscription loaded",
-                    systemImage: "doc.text.magnifyingglass",
-                    description: Text("Rovia does not fetch subscriptions in this build. Load a local configuration to inspect parsed results offline.")
-                )
-                .modifier(ConditionalAccessibilityIdentifier(
-                    identifier: AppAccessibilityIdentifier.subscriptionEmpty
-                ))
+            if model.storedSubscriptions.isEmpty {
+                emptyState
             } else {
-                RoviaScreen {
-                    RoviaScreenHeader(
-                        title: "Subscription Inspector",
-                        subtitle: "Local parse results with every endpoint redacted. No network request is made in this build.",
-                        identifier: AppAccessibilityIdentifier.subscriptionScreen
-                    )
-                    summaryCard
-                    entriesCard
-                    redactionNotice
-                    SampleDataNotice(identifier: AppAccessibilityIdentifier.subscriptionScreen + ".notice")
-                }
+                subscriptionList
             }
         }
         .navigationTitle(AppRoute.subscription.title)
         .navigationBarTitleDisplayMode(.inline)
-    }
-
-    private var summaryCard: some View {
-        SectionCard(title: "Source", systemImage: "link") {
-            if let subscription = model.snapshot.content.subscription {
-                VStack(alignment: .leading, spacing: 12) {
-                    InfoRow(
-                        label: "Name",
-                        value: subscription.name,
-                        identifier: AppAccessibilityIdentifier.subscriptionSummary + ".name"
-                    )
-                    InfoRow(
-                        label: "Source kind",
-                        value: subscription.sourceKindLabel,
-                        identifier: AppAccessibilityIdentifier.subscriptionSummary + ".kind"
-                    )
-                    InfoRow(
-                        label: "Source value",
-                        value: subscription.sourceDisplayValue,
-                        identifier: AppAccessibilityIdentifier.subscriptionSummary + ".value"
-                    )
-                    InfoRow(
-                        label: "Accepted entries",
-                        value: "\(subscription.acceptedCount)",
-                        identifier: AppAccessibilityIdentifier.subscriptionSummary + ".accepted"
-                    )
-                    InfoRow(
-                        label: "Rejected entries",
-                        value: "\(subscription.rejectedCount)",
-                        identifier: AppAccessibilityIdentifier.subscriptionSummary + ".rejected"
-                    )
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    addShown = true
+                } label: {
+                    Label("Add subscription", systemImage: "plus")
+                }
+                .accessibilityIdentifier(AppAccessibilityIdentifier.subscriptionScreen + ".add")
+            }
+        }
+        .sheet(isPresented: $addShown) {
+            addSheet
+        }
+        .alert("Rename subscription", isPresented: renameBinding) {
+            TextField("Name", text: $renameText)
+            Button("Rename") {
+                if let id = renameTarget {
+                    Task { await model.renameSubscription(id, name: renameText) }
                 }
             }
+            Button("Cancel", role: .cancel) {}
         }
     }
 
-    private var entriesCard: some View {
-        SectionCard(
-            title: "Parsed entries",
-            systemImage: "list.bullet.rectangle",
-            identifier: AppAccessibilityIdentifier.subscriptionEntries
-        ) {
-            VStack(alignment: .leading, spacing: 12) {
-                if let subscription = model.snapshot.content.subscription {
-                    ForEach(subscription.entries) { entry in
-                        entryRow(entry)
+    // MARK: - Empty
+
+    private var emptyState: some View {
+        ContentUnavailableView {
+            Label {
+                Text("No subscriptions yet")
+            } icon: {
+                RoviaLogoView(.emptyState)
+            }
+        } description: {
+            Text("Add a subscription URL or paste subscription text. Servers appear here and in the Servers list.")
+        } actions: {
+            Button("Add subscription") {
+                addShown = true
+            }
+            .buttonStyle(.borderedProminent)
+            .accessibilityIdentifier(AppAccessibilityIdentifier.subscriptionScreen + ".addEmpty")
+        }
+        .modifier(ConditionalAccessibilityIdentifier(
+            identifier: AppAccessibilityIdentifier.subscriptionEmpty
+        ))
+    }
+
+    // MARK: - List
+
+    private var subscriptionList: some View {
+        List {
+            if let result = model.snapshot.lastSubscriptionResult {
+                Section {
+                    resultBanner(result)
+                }
+            }
+            if let error = model.snapshot.lastError {
+                Section {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(error.userMessage)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Button("Dismiss") {
+                            model.clearError()
+                        }
+                        .font(.footnote)
+                        .accessibilityIdentifier(AppAccessibilityIdentifier.subscriptionScreen + ".dismissError")
+                    }
+                    .accessibilityElement(children: .combine)
+                }
+            }
+            Section {
+                ForEach(model.storedSubscriptions) { subscription in
+                    subscriptionRow(subscription)
+                }
+                .onDelete { offsets in
+                    for index in offsets {
+                        let id = model.storedSubscriptions[index].id
+                        Task { await model.removeSubscription(id) }
                     }
                 }
+            } header: {
+                Text("Subscriptions")
             }
-        }
-    }
-
-    private func entryRow(_ entry: SubscriptionEntrySummary) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            ViewThatFits(in: .horizontal) {
-                HStack(alignment: .firstTextBaseline, spacing: 12) {
-                    Text(entry.displayName)
-                        .font(.subheadline.weight(.semibold))
-                    Spacer(minLength: 12)
-                    statusBadge(entry)
-                }
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(entry.displayName)
-                        .font(.subheadline.weight(.semibold))
-                    statusBadge(entry)
-                }
-            }
-            Text("\(entry.protocolLabel) · \(entry.redactedEndpointLabel)")
+            .accessibilityIdentifier(AppAccessibilityIdentifier.subscriptionEntries)
+            Section {
+                Label(
+                    "Credentials are never shown. Server addresses are replaced with a redacted placeholder, and secrets stay in the Keychain.",
+                    systemImage: "eye.slash"
+                )
                 .font(.footnote)
                 .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier(AppAccessibilityIdentifier.subscriptionRedaction)
+            }
         }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.quaternary.opacity(0.25), in: RoundedRectangle(cornerRadius: 12))
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(entry.displayName)
-        .accessibilityValue("\(entry.statusLabel), \(entry.protocolLabel), \(entry.redactedEndpointLabel)")
-        .accessibilityIdentifier(AppAccessibilityIdentifier.subscriptionEntryPrefix + entry.id)
+        .listStyle(.insetGrouped)
+        .refreshable {
+            for subscription in model.storedSubscriptions {
+                await model.refreshSubscription(subscription.id)
+            }
+        }
     }
 
-    private func statusBadge(_ entry: SubscriptionEntrySummary) -> some View {
-        StatusBadge(
-            text: entry.statusLabel,
-            systemImage: entry.isAccepted ? "checkmark.circle" : "xmark.circle",
-            tint: entry.isAccepted ? .green : .orange
-        )
+    private func subscriptionRow(_ subscription: StoredSubscription) -> some View {
+        let groupID = "sub/\(subscription.id.uuidString.lowercased())"
+        let memberCount = model.snapshot.content.group(id: groupID)?.memberIDs.count
+            ?? subscription.servers.count
+        let isRefreshing = model.refreshingSubscriptions.contains(subscription.id)
+        return VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                Text(subscription.name)
+                    .font(.headline)
+                Spacer(minLength: 12)
+                if isRefreshing {
+                    ProgressView()
+                        .accessibilityLabel("Refreshing \(subscription.name)")
+                } else {
+                    Button {
+                        Task { await model.refreshSubscription(subscription.id) }
+                    } label: {
+                        Label("Refresh", systemImage: "arrow.clockwise")
+                            .labelStyle(.iconOnly)
+                    }
+                    .accessibilityLabel("Refresh \(subscription.name)")
+                    .accessibilityIdentifier(AppAccessibilityIdentifier.subscriptionEntryPrefix + subscription.id.uuidString)
+                }
+            }
+            Text("\(memberCount) servers · updated \(subscription.updatedAt.formatted(date: .abbreviated, time: .shortened))")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            if subscription.rejectedCount > 0 {
+                Text("\(subscription.acceptedCount) accepted · \(subscription.rejectedCount) rejected")
+                    .font(.footnote)
+                    .foregroundStyle(.orange)
+            }
+            if let info = subscription.userInfo, let line = userInfoLine(info) {
+                Text(line)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.vertical, 4)
+        .contextMenu {
+            Button("Rename") {
+                renameTarget = subscription.id
+                renameText = subscription.name
+            }
+            Button("Refresh") {
+                Task { await model.refreshSubscription(subscription.id) }
+            }
+            Button("Delete", role: .destructive) {
+                Task { await model.removeSubscription(subscription.id) }
+            }
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(subscription.name), \(memberCount) servers")
     }
 
-    private var redactionNotice: some View {
-        Label(
-            "Credentials are never shown. Server addresses are replaced with a redacted placeholder, and nothing is written to disk.",
-            systemImage: "eye.slash"
-        )
-        .font(.footnote)
-        .foregroundStyle(.secondary)
-        .fixedSize(horizontal: false, vertical: true)
+    private func resultBanner(_ result: SubscriptionImportSummary) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                Image(systemName: result.rejected.isEmpty ? "checkmark.circle" : "exclamationmark.triangle")
+                    .foregroundStyle(result.rejected.isEmpty ? Color.green : Color.orange)
+                Text("\(result.accepted) accepted · \(result.rejected.count) rejected")
+                    .font(.subheadline.weight(.semibold))
+            }
+            ForEach(result.rejected.prefix(5), id: \.index) { line in
+                Text("Line \(line.index): \(reasonText(line.reason))")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+            if result.rejected.count > 5 {
+                Text("…and \(result.rejected.count - 5) more")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+        }
         .accessibilityElement(children: .combine)
-        .accessibilityIdentifier(AppAccessibilityIdentifier.subscriptionRedaction)
+        .accessibilityIdentifier(AppAccessibilityIdentifier.subscriptionSummary)
+    }
+
+    private func userInfoLine(_ info: SubscriptionUserInfo) -> String? {
+        var parts: [String] = []
+        if let total = info.totalBytes {
+            let used = (info.uploadBytes ?? 0) + (info.downloadBytes ?? 0)
+            parts.append("\(formatBytes(used)) of \(formatBytes(total)) used")
+        }
+        if let expire = info.expireDate {
+            parts.append("expires \(expire.formatted(date: .abbreviated, time: .omitted))")
+        }
+        guard !parts.isEmpty else { return nil }
+        return parts.joined(separator: " · ")
+    }
+
+    private func formatBytes(_ value: Int64) -> String {
+        let formatter = ByteCountFormatter()
+        formatter.countStyle = .binary
+        return formatter.string(fromByteCount: value)
+    }
+
+    private func reasonText(_ reason: ShareLinkParseError) -> String {
+        switch reason {
+        case .unsupportedScheme: "unsupported link type"
+        case .malformedURL: "malformed link"
+        case .invalidUUID: "bad identifier"
+        case .invalidHost: "bad host"
+        case .invalidPort: "bad port"
+        case .invalidCredential: "bad credential"
+        case .invalidQuery, .unsupportedQueryKey, .unsupportedQueryValue, .duplicateQueryKey, .queryTooComplex:
+            "unsupported setting"
+        case .inputTooLarge: "link too large"
+        case .invalidUTF8, .emptyInput: "empty or unreadable"
+        case .invalidPercentEncoding, .invalidPath: "bad encoding"
+        case .invalidSecretReference, .credentialSinkFailed: "could not save credentials"
+        }
+    }
+
+    // MARK: - Add sheet
+
+    private var addSheet: some View {
+        NavigationStack {
+            Form {
+                Section("From URL") {
+                    TextField("https://provider.example/sub", text: $urlText)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                    TextField("Name", text: $nameText)
+                    Toggle("Allow plain HTTP (insecure)", isOn: $allowInsecure)
+                    Button("Add subscription") {
+                        addShown = false
+                        let urlString = urlText.trimmingCharacters(in: .whitespacesAndNewlines)
+                        let name = nameText.trimmingCharacters(in: .whitespacesAndNewlines)
+                        if let url = URL(string: urlString) {
+                            Task { await model.addSubscription(url: url, name: name.isEmpty ? urlString : name, allowInsecure: allowInsecure) }
+                        }
+                        urlText = ""
+                        nameText = ""
+                        allowInsecure = false
+                    }
+                    .disabled(urlText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+                Section("Paste") {
+                    #if canImport(UIKit)
+                        Button("Paste from clipboard") {
+                            pasteText = UIPasteboard.general.string ?? ""
+                        }
+                    #endif
+                    TextEditor(text: $pasteText)
+                        .frame(minHeight: 120)
+                    Button("Import pasted text") {
+                        addShown = false
+                        let name = nameText.trimmingCharacters(in: .whitespacesAndNewlines)
+                        Task {
+                            await model.addSubscriptionText(
+                                pasteText,
+                                name: name.isEmpty ? "Pasted subscription" : name
+                            )
+                        }
+                        pasteText = ""
+                        nameText = ""
+                    }
+                    .disabled(pasteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+            .navigationTitle("Add subscription")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { addShown = false }
+                }
+            }
+        }
+    }
+
+    private var renameBinding: Binding<Bool> {
+        Binding(
+            get: { renameTarget != nil },
+            set: { if !$0 { renameTarget = nil } }
+        )
     }
 }

@@ -20,7 +20,7 @@ enum AppRoute: String, CaseIterable, Identifiable, Hashable {
         case .routingDebugger:
             "Routing Debugger"
         case .subscription:
-            "Subscription Inspector"
+            "Subscriptions"
         }
     }
 
@@ -67,12 +67,21 @@ struct RootView: View {
 
     var body: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
-            List(AppRoute.allCases, selection: $route) { destination in
-                Label(destination.title, systemImage: destination.systemImage)
-                    .tag(destination)
-                    .accessibilityIdentifier(destination.accessibilityIdentifier)
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 10) {
+                    RoviaLogoView(.navigation)
+                    Text("Rovia")
+                        .font(.headline)
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+                List(AppRoute.allCases, selection: $route) { destination in
+                    Label(destination.title, systemImage: destination.systemImage)
+                        .tag(destination)
+                        .accessibilityIdentifier(destination.accessibilityIdentifier)
+                }
+                .listStyle(.sidebar)
             }
-            .listStyle(.sidebar)
             .navigationTitle("Rovia")
         } detail: {
             detail
@@ -123,15 +132,21 @@ struct RoviaScreenHeader: View {
     let title: String
     let subtitle: String
     let identifier: String
+    var showsLogo: Bool = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(title)
-                .font(.largeTitle.weight(.semibold))
-            Text(subtitle)
-                .font(.body)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+        HStack(alignment: .top, spacing: 12) {
+            if showsLogo {
+                RoviaLogoView(.header)
+            }
+            VStack(alignment: .leading, spacing: 6) {
+                Text(title)
+                    .font(.largeTitle.weight(.semibold))
+                Text(subtitle)
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)

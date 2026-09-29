@@ -62,7 +62,8 @@ struct OverviewView: View {
             RoviaScreenHeader(
                 title: "Overview",
                 subtitle: "Local status only. This build ships no tunnel engine, so Rovia cannot establish a VPN connection.",
-                identifier: AppAccessibilityIdentifier.overviewScreen
+                identifier: AppAccessibilityIdentifier.overviewScreen,
+                showsLogo: true
             )
 
             if !model.snapshot.hasContent {

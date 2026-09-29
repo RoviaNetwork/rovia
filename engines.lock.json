@@ -9,8 +9,8 @@
     "xray": {
       "enabled": false,
       "source": "https://github.com/XTLS/libXray",
-      "version": null,
-      "commit": null,
+      "version": "v26.9.9",
+      "commit": "50b95979f5db551bd273165cf469e5daaf791341",
       "sourceArchiveSha256": null,
       "artifact": null,
       "sha256": null,

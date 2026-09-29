@@ -74,8 +74,11 @@ the change hard to review, which is the only reason anyone reads it.
   parsers, secrets, routing, tunnels, signing, or CI. "This cannot affect any of them"
   is a valid answer; leaving it blank is not.
 - **A pull request is required, and no review is enforced.** An active ruleset on
-  `main` requires a pull request, forbids deletion and force-push, and permits
-  only a squash merge, so open a pull request rather than pushing to `main`.
+  `main` requires a pull request, forbids deletion and force-push, permits only a
+  squash merge, and requires the `swift-tests` status check to pass **strictly**. Open
+  a pull request rather than pushing to `main`, and rebase onto `main` when it moves:
+  the branch has to be up to date with `main`, and the check has to have run against
+  the current `main`, before an ordinary merge will go through.
   A review is not required, and not enforced: the only account with write access is
   the maintainer, and GitHub does not count the author's own approval, so a review
   requirement here would make the repository unmergeable rather than safer.

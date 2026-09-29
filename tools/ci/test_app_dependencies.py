@@ -86,10 +86,12 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 
 # The two local packages the app target and the test target must both link, and
 # the path each one has, relative to the directory holding the Xcode project.
-CANONICAL_PACKAGES = ("RoviaConfig", "RoviaRouting")
+CANONICAL_PACKAGES = ("RoviaConfig", "RoviaRouting", "RoviaSubscription", "RoviaApplePlatform")
 LOCAL_PACKAGE_PATHS = {
     "RoviaConfig": "../../../core/config",
     "RoviaRouting": "../../../core/routing",
+    "RoviaSubscription": "../../../core/subscription",
+    "RoviaApplePlatform": "../../../platform/apple",
 }
 LINKED_TARGETS = ("RoviaApp", "RoviaAppTests")
 APP_SOURCE_DIRECTORIES = ("client/app/ios",)

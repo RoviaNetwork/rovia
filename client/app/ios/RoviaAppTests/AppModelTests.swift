@@ -1,6 +1,9 @@
-import XCTest
+import Foundation
+import RoviaApplePlatform
 import RoviaConfig
 import RoviaRouting
+import RoviaSubscription
+import XCTest
 
 @MainActor
 final class AppModelTests: XCTestCase {
@@ -11,11 +14,14 @@ final class AppModelTests: XCTestCase {
     private func makeModel(
         tunnel: any TunnelControlling,
         content: AppContent = .sample,
-        loadError: (any Error)? = nil
+        loadError: (any Error)? = nil,
+        subscriptions: SubscriptionCoordinator? = nil,
+        probeLatency: (@Sendable (String, Int) async -> Int?)? = nil,
+        favoritesStorage: UserDefaults = .standard
     ) -> (AppModel, CountingFixtureProvider) {
         let now = fixedNow
         let provider = CountingFixtureProvider(content: content, loadError: loadError)
-        let model = AppModel(tunnel: tunnel, fixtures: provider, now: { now })
+        let model = AppModel(tunnel: tunnel, fixtures: provider, subscriptions: subscriptions, probeLatency: probeLatency, favoritesStorage: favoritesStorage, now: { now })
         return (model, provider)
     }
 
@@ -689,6 +695,175 @@ final class AppModelTests: XCTestCase {
         let rejected = await model.selectServer("srv-us-01")
         assertFalse(rejected, "a server outside the selected profile must be rejected")
         assertEqual(model.snapshot.selection.server, nil)
+    }
+
+    func testVisibleServersScaleToThousands() async {
+        let count = 5_000
+        let ids = (0..<count).map { String(format: "perf-srv-%05d", $0) }
+        var content = AppContent()
+        content.servers = ids.map {
+            ServerSummary(
+                id: $0,
+                name: "Relay \($0)",
+                protocolLabel: "VLESS",
+                locationLabel: "Nowhere",
+                latency: .notMeasured,
+                health: .none,
+                groupIDs: ["perf-group"]
+            )
+        }
+        content.groups = [
+            ServerGroupSummary(
+                id: "perf-group",
+                name: "All",
+                modeLabel: "Manual",
+                policyLabel: "Manual selection",
+                memberIDs: ids
+            )
+        ]
+        content.profiles = [
+            ProfileSummary(id: "perf-profile", name: "P", sourceKindLabel: "Test", serverIDs: ids)
+        ]
+        content.defaultProfileID = "perf-profile"
+        content.defaultGroupID = "perf-group"
+        content.isSampleData = false
+        let model = await makePreparedModel(content: content)
+        let start = Date()
+        let visible = model.snapshot.visibleServers
+        let elapsed = Date().timeIntervalSince(start)
+        assertEqual(visible.count, count)
+        assertEqual(visible.map(\.id), ids, "group order with the profile filter applied")
+        print("visibleServers(\(count)) = \(String(format: "%.3f", elapsed))s")
+    }
+
+    // MARK: - Stored subscriptions
+
+    func testSubscriptionAddPopulatesServers() async {
+        let box = ModelBodyBox(body: "\(ModelFixtures.vless)\n\(ModelFixtures.trojan)")
+        let (model, _, _) = makeSubscriptionModel(box: box)
+        assertTrue(await model.bootstrap())
+        let added = await model.addSubscription(
+            url: URL(string: "https://provider.example/sub")!,
+            name: "Provider"
+        )
+        assertTrue(added)
+        assertEqual(model.snapshot.content.servers.count, 2)
+        assertEqual(model.snapshot.lastSubscriptionResult?.accepted, 2)
+        assertEqual(model.snapshot.lastSubscriptionResult?.rejected.count, 0)
+        assertFalse(model.snapshot.isSampleData)
+    }
+
+    func testRefreshKeepsSelectedServer() async {
+        let box = ModelBodyBox(body: "")
+        let (model, coordinator, _) = makeSubscriptionModel(box: box)
+        box.body = "\(ModelFixtures.vless)\n\(ModelFixtures.trojan)"
+        assertTrue(await model.bootstrap())
+        assertTrue(await model.addSubscription(url: URL(string: "https://provider.example/sub")!, name: "P"))
+        let servers = model.snapshot.content.servers
+        assertEqual(servers.count, 2)
+        assertTrue(await model.selectServer(servers[0].id))
+        box.body = "\(ModelFixtures.trojan)\n\(ModelFixtures.vless)"
+        let subID = await coordinator.subscriptions()[0].id
+        assertTrue(await model.refreshSubscription(subID))
+        assertEqual(model.snapshot.selection.server, servers[0].id)
+    }
+
+    func testVanishedServerClearsSelection() async {
+        let box = ModelBodyBox(body: "")
+        let (model, coordinator, _) = makeSubscriptionModel(box: box)
+        box.body = "\(ModelFixtures.vless)\n\(ModelFixtures.trojan)"
+        assertTrue(await model.bootstrap())
+        assertTrue(await model.addSubscription(url: URL(string: "https://provider.example/sub")!, name: "P"))
+        let servers = model.snapshot.content.servers
+        assertTrue(await model.selectServer(servers[0].id))
+        box.body = ModelFixtures.trojan
+        let subID = await coordinator.subscriptions()[0].id
+        assertTrue(await model.refreshSubscription(subID))
+        assertEqual(model.snapshot.content.servers.count, 1)
+        assertEqual(model.snapshot.selection.server, nil)
+    }
+
+    func testBootstrapLoadsPersistedSubscriptions() async {
+        let box = ModelBodyBox(body: ModelFixtures.vless)
+        let (_, coordinator, dir) = makeSubscriptionModel(box: box)
+        try? await coordinator.loadPersisted()
+        _ = try? await coordinator.add(url: URL(string: "https://provider.example/sub")!, name: "P", allowInsecure: false)
+        let failing = ModelBodyBox(body: "")
+        let (relaunched, _, _) = makeSubscriptionModel(box: failing, directory: dir)
+        assertTrue(await relaunched.bootstrap())
+        assertEqual(relaunched.snapshot.content.servers.count, 1)
+        assertFalse(relaunched.snapshot.isSampleData)
+    }
+
+    func testProbeVisibleServersUpdatesLatency() async {
+        let box = ModelBodyBox(body: "\(ModelFixtures.vless)\n\(ModelFixtures.trojan)")
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let coordinator = SubscriptionCoordinator(
+            store: SubscriptionStore(directory: dir),
+            secrets: InMemorySecretStore(),
+            session: ModelStubSession(box: box)
+        )
+        let (model, _) = makeModel(
+            tunnel: StubTunnelController(),
+            content: .empty,
+            subscriptions: coordinator,
+            probeLatency: { _, _ in 42 }
+        )
+        assertTrue(await model.bootstrap())
+        assertTrue(await model.addSubscription(url: URL(string: "https://provider.example/sub")!, name: "P"))
+        assertTrue(model.snapshot.content.servers.allSatisfy { $0.latency.milliseconds == nil })
+        assertTrue(await model.probeVisibleServers())
+        let probed = model.snapshot.content.servers
+        assertEqual(probed.count, 2)
+        assertTrue(probed.allSatisfy { $0.latency.milliseconds == 42 })
+        assertEqual(probed[0].latency.quality, .good)
+    }
+
+    func testProbeWithoutCoordinatorLeavesContentAlone() async {
+        let (model, _) = makeModel(tunnel: StubTunnelController(), probeLatency: { _, _ in 42 })
+        assertTrue(await model.bootstrap())
+        assertTrue(await model.probeVisibleServers())
+        assertEqual(model.snapshot.content.servers.count, 5)
+    }
+
+    func testStaleRefreshSkipsFreshSubscriptions() async {
+        let box = ModelBodyBox(body: ModelFixtures.vless)
+        let (model, _, _) = makeSubscriptionModel(box: box)
+        assertTrue(await model.bootstrap())
+        assertTrue(await model.addSubscription(url: URL(string: "https://provider.example/sub")!, name: "P"))
+        assertEqual(box.calls, 1)
+        assertTrue(await model.refreshStaleSubscriptions())
+        assertEqual(box.calls, 1)
+    }
+
+    func testFavoritesToggleAndPersist() async {
+        let suite = UUID().uuidString
+        let storage = UserDefaults(suiteName: suite)!
+        defer { storage.removePersistentDomain(forName: suite) }
+        let (model, _) = makeModel(tunnel: StubTunnelController(), favoritesStorage: storage)
+        assertTrue(await model.bootstrap())
+        assertTrue(await model.toggleFavorite("srv-fi-01"))
+        assertTrue(model.isFavorite("srv-fi-01"))
+        assertFalse(await model.toggleFavorite("srv-missing"))
+        let relaunched = makeModel(tunnel: StubTunnelController(), favoritesStorage: storage).0
+        assertTrue(relaunched.isFavorite("srv-fi-01"))
+        assertTrue(await relaunched.bootstrap())
+        assertTrue(await relaunched.toggleFavorite("srv-fi-01"))
+        assertFalse(relaunched.isFavorite("srv-fi-01"))
+    }
+
+    private func makeSubscriptionModel(
+        box: ModelBodyBox,
+        directory: URL? = nil
+    ) -> (AppModel, SubscriptionCoordinator, URL) {
+        let dir = directory ?? FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let coordinator = SubscriptionCoordinator(
+            store: SubscriptionStore(directory: dir),
+            secrets: InMemorySecretStore(),
+            session: ModelStubSession(box: box)
+        )
+        let (model, _) = makeModel(tunnel: StubTunnelController(), content: .empty, subscriptions: coordinator)
+        return (model, coordinator, dir)
     }
 
     func testSwitchingProfileClearsAServerThatTheNewProfileDoesNotContain() async {
@@ -1745,4 +1920,32 @@ actor GateTunnelController: TunnelControlling {
             waiter.resume()
         }
     }
+}
+
+private final class ModelBodyBox: @unchecked Sendable {
+    var body: String
+    var status: Int
+    var calls: Int = 0
+
+    init(body: String, status: Int = 200) {
+        self.body = body
+        self.status = status
+    }
+}
+
+private struct ModelStubSession: SubscriptionHTTPSession {
+    let box: ModelBodyBox
+
+    func data(for request: URLRequest) async throws -> (Data, URLResponse) {
+        box.calls += 1
+        guard let url = request.url else { throw URLError(.badURL) }
+        let response = HTTPURLResponse(url: url, statusCode: box.status, httpVersion: nil, headerFields: nil)!
+        return (Data(box.body.utf8), response)
+    }
+}
+
+private enum ModelFixtures {
+    static let vless =
+        "vless://00000000-0000-0000-0000-000000000001@synthetic.example:443?encryption=none&security=tls&type=tcp"
+    static let trojan = "trojan://Model-Password-1@synthetic.example:443?security=tls"
 }

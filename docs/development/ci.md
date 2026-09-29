@@ -62,11 +62,11 @@ tests and copies the
 tree 69 times, because each test that needs a broken repository pays for one copy
 and the mutation cases pay for one each. That figure is **measured**, not derived:
 it comes from counting `Workspace` instantiations — one per copy — rather than counting `shutil.copytree` calls, which recurse: the same run makes 6486 `copytree` calls and 69 outermost ones, and quoting the unqualified number would be wrong by two orders of magnitude, and measuring it costs the 20–90 seconds across the runs recorded in this repository's verification record, which is a measurement on one x86_64 Mac and not a bound, so
-`tools/ci/test_ci_checks.py` enforces only the bracket the mutation and test
+`tools/ci/test_ci_counts.py` enforces only the bracket the mutation and test
 counts imply — 54 copies at the low end, 81 at the high — and not the number
 itself. A check with no mutation is an assertion
 about today's source, so the count of mutations is the count of rules.
-`test_ci_checks.py` reads the tables out of the gate module and requires each
+`test_ci_counts.py` reads the tables out of the gate module and requires each
 group to be stated with its label attached, so a bare digit cannot satisfy it by
 accident.
 
@@ -126,7 +126,7 @@ Five tests hold this: the gate exists, is executable, pins the version, and uses
 unpinned invocation; `run-tool-tests.sh` invokes it; it refuses a file with a
 finding; it refuses an empty tree rather than reporting a clean lint of nothing;
 and both documents name the command and the pinned version. The number is derived
-from `tools/ci/test_ci_checks.py` rather than written here, and a test requires this
+from `tools/ci/test_ci_toolchain.py` rather than written here, and a test requires this
 sentence to state what the module holds.
 
 ## Pull requests
@@ -139,7 +139,7 @@ simulator is available.
 
 Two of its steps assert facts rather than exit codes:
 
-- `tools/ci/test_ci_checks.py` fails if a third-party action is not pinned to a
+- `tools/ci/test_ci_workflows.py` fails if a third-party action is not pinned to a
   40-character commit, if the pull-request workflow ever references a secret or
   an environment, if `ROVIA_MARKETING_VERSION` drifts from the app's
   `CFBundleShortVersionString`, if the release workflow ever checks secrets
@@ -182,7 +182,7 @@ the same code:
 
 Two arguments in that file are load-bearing, and both were absent in the version
 that was written first. They are asserted by `PreCommitConfigTests` in
-`tools/ci/test_ci_checks.py`, because a hook that cannot fail is worse than a hook
+`tools/ci/test_ci_toolchain.py`, because a hook that cannot fail is worse than a hook
 that is absent - the configuration then reads as coverage:
 
 - `check-merge-conflict` takes `--assume-in-merge`. Without it the hook reads the
@@ -353,7 +353,7 @@ a workflow step can branch without an inline script.
 
 The release workflow runs only for a version tag and uses the protected
 `ios-production` environment. It stops at a verified artifact: there is no
-upload step, and `tools/ci/test_ci_checks.py` fails the build if one appears.
+upload step, and `tools/ci/test_ci_workflows.py` fails the build if one appears.
 That check reads the workflow's steps and inspects each step's `uses:` and its
 whole step text — the name, the keys, and the comments, not only the `run:`
 body — for a publishing action, so it forbids `actions/upload-artifact`,
@@ -366,7 +366,7 @@ listed once in `tools/ci/script_test_support.py` instead of being searched for
 in this document.
 
 Its order is part of the guarantee, and
-`tools/ci/test_ci_checks.py` fails if this list stops matching the workflow:
+`tools/ci/test_ci_workflows.py` fails if this list stops matching the workflow:
 
 1. `Checkout`
 2. `Install pinned Python tooling` — the release job runs the same schema
@@ -416,7 +416,7 @@ Its order is part of the guarantee, and
     Xray entry, before the artifact is opened — and only then the **artifact**,
     the **checksums**, the **SBOM**, and the **provenance manifest**. The engine
     lock has never been the last check, though it was documented as one until
-    `tools/ci/test_ci_checks.py` began deriving this order from the script body
+    `tools/ci/test_ci_docs.py` began deriving this order from the script body
     and requiring both this document and `CHANGELOG.md` to state it.
 17. `Cleanup signing material` — `always()`, removes the certificate, the
     profiles, and the keychain

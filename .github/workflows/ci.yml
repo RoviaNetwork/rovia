@@ -16,7 +16,9 @@ concurrency:
 env:
   ROVIA_ENGINE_LOCK: engines.lock.json
   # Must match CFBundleShortVersionString in client/app/ios/RoviaApp/Info.plist.
-  # tools/ci/test_ci_checks.py fails if the two drift apart.
+  # tools/ci/test_ci_changelog.py tools/ci/test_ci_toolchain.py
+  # tools/ci/test_ci_workflows.py tools/ci/test_ci_counts.py
+  # tools/ci/test_ci_docs.py fail if the two drift apart.
   ROVIA_MARKETING_VERSION: 0.1.0
 
 jobs:

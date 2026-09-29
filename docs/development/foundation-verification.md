@@ -99,14 +99,18 @@ Apple silicon or on a hosted runner.
 ### Python tool tests
 
 `./tools/ci/run-tool-tests.sh` ran every `tools/**/test_*.py` as its own
-process: **10 files, 621 tests, 0 failures**.
+process: **14 files, 628 tests, 0 failures**.
 
 | Test file | Tests | Seconds |
 | --- | --- | --- |
 | `tools/ci/test_app_dependencies.py` | 27 | 25.53 |
 | `tools/ci/test_audit_accessibility_identifiers.py` | 58 | 2.05 |
 | `tools/ci/test_check_repository_hygiene.py` | 26 | 6.27 |
-| `tools/ci/test_ci_checks.py` | 193 | 22.88 |
+| `tools/ci/test_ci_changelog.py` | 10 | not measured |
+| `tools/ci/test_ci_toolchain.py` | 67 | not measured |
+| `tools/ci/test_ci_workflows.py` | 22 | not measured |
+| `tools/ci/test_ci_counts.py` | 18 | not measured |
+| `tools/ci/test_ci_docs.py` | 83 | not measured |
 | `tools/ci/test_validate_schemas.py` | 61 | 105.12 |
 | `tools/ci/test_verify_engine_checksums.py` | 38 | 2.96 |
 | `tools/ci/test_verify_lockfiles.py` | 29 | 3.35 |
@@ -205,12 +209,12 @@ Every entry in `tools/ci/local-packages.txt`, each with its own
 | --- | --- | --- |
 | `core/config` | 64 | 0 |
 | `core/routing` | 44 | 0 |
-| `core/subscription` | 41 | 0 |
+| `core/subscription` | 73 | 0 |
 | `engines/api` | 3 | 0 |
-| `engines/xray` | 2 | 0 |
+| `engines/xray` | 11 | 0 |
 | `engines/singbox` | 1 | 0 |
 | `platform/apple` | 5 | 0 |
-| **Total** | **160** | **0** |
+| **Total** | **201** | **0** |
 
 ### SBOM
 
@@ -252,7 +256,7 @@ fresh UUID and that file is not expected to match byte for byte.
 
 | Command | Result |
 | --- | --- |
-| `xcodebuild -project client/app/ios/RoviaApp.xcodeproj -scheme RoviaApp -configuration Debug -destination "platform=iOS Simulator,id=1AA6273F-…" -derivedDataPath "$TMPDIR"/rovia-derived-data test` | `Executed 60 tests, with 0 failures`, `** TEST SUCCEEDED **` |
+| `xcodebuild -project client/app/ios/RoviaApp.xcodeproj -scheme RoviaApp -configuration Debug -destination "platform=iOS Simulator,id=1AA6273F-…" -derivedDataPath "$TMPDIR"/rovia-derived-data test` | `Executed 85 tests, with 0 failures`, `** TEST SUCCEEDED **` |
 | the same, `-configuration Release -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build` | `** BUILD SUCCEEDED **` |
 | the same, `-configuration Debug`, unsigned, generic simulator destination | `** BUILD SUCCEEDED **` |
 | `./tools/ci/verify-bundle-metadata.sh …/Debug-iphonesimulator/Rovia.app --expect-version 0.1.0` | `io.rovia.client version 0.1.0 (1) executable Rovia, RoviaTunnel io.rovia.client.tunnel embedded` |
@@ -264,18 +268,30 @@ fresh UUID and that file is not expected to match byte for byte.
 Derived data goes in a fresh directory under `$TMPDIR` on every run, and the path
 is not recorded here: naming one would leave a stale path in a record the next run
 invalidates. What is load-bearing is that it is outside the checkout, which is what
-`tools/ci/test_ci_checks.py` requires — inside a checkout on the Desktop the test
+`tools/ci/test_ci_counts.py` requires — inside a checkout on the Desktop the test
 runner loses access to its own bundle and the run times out before a single test
 executes, which is a failure that looks like a hang rather than a misconfiguration.
 
-The 60 tests are the `RoviaAppTests` suite: the model behaviour the slice has
+The 85 tests are the `RoviaAppTests` suite: the model behaviour the slice has
 always gated, plus four tests that hold the app to the canonical route model —
 one that runs `RouteEvaluator.explain` for every sample input and requires the
 debugger's display model to agree with it field for field, one that requires
 every sample group and rule identifier to be a canonical UUID, one that requires
 the bridge to refuse content the canonical model cannot represent, and one that
 requires a refused evaluation to surface the sanitized `route.explanation.failed`
-error without echoing the identifier it refused.
+error without echoing the identifier it refused — plus four model tests for the
+stored-subscription flow (adding a URL populates servers, refresh keeps the
+selected server, a vanished server clears the selection, bootstrap loads
+persisted subscriptions) and ten coordinator tests (fetch, decode, import with
+honest counts, atomic refresh, stable IDs across reorder, the HTTP policy,
+rename and remove with secret cleanup, and a legacy file without the insecure
+flag) and two probe tests (measured latency lands on the servers, and probing
+without a coordinator changes nothing) and one stale-refresh test (fresh
+subscriptions are not re-fetched on foreground), one favorites test
+(toggle, unknown rejection, and relaunch persistence), and four deep-link
+tests (URL import with a name, single share links, base64 containers, and
+rejected garbage), and one userinfo test (provider traffic/expiry persists
+on add and clears when a refresh stops sending it).
 
 The app and the test target both link `RoviaRouting` and `RoviaConfig` as local
 Swift packages. Two build facts are part of that evidence: the Debug
@@ -298,7 +314,7 @@ the bundle launches. Neither is evidence of a tunnel.
 
 These are recorded because a refusal is the result, not because anything failed.
 Every row below is re-derived from the gate itself by
-`tools/ci/test_ci_checks.py::test_the_refusal_table_is_what_the_gates_actually_do`,
+`tools/ci/test_ci_docs.py::test_the_refusal_table_is_what_the_gates_actually_do`,
 which runs each command and matches the recorded outcome; the table cannot keep
 describing a gate that has since changed its first refusal.
 
@@ -320,7 +336,7 @@ refuses earlier, on the thing that is actually missing.
 
 ## Working tree
 
-25 tracked top-level entries, 178 files. `build/` holds the
+25 tracked top-level entries, 199 files. `build/` holds the
 generated `SBOM.spdx.json` and is gitignored; the `.build` directories, the
 `__pycache__` directories, and the `.DS_Store` files are gitignored; derived data
 was kept outside the checkout. `git check-ignore` confirms
@@ -508,7 +524,7 @@ and export into one item where the readiness document separates the signing
 identity from the archive, and it separates publishing where the readiness
 document folds publishing into the upload row. The two lists are the same ten
 gates described at different granularity, not two lists of the same length, and
-`tools/ci/test_ci_checks.py` counts both so neither number can drift.
+`tools/ci/test_ci_counts.py` counts both so neither number can drift.
 
 1. **GitHub Actions.** No workflow has ever run. `$RUNNER_TEMP`,
    `GITHUB_OUTPUT`, `GITHUB_ENV`, the `macos-15` image contents, and the
@@ -556,7 +572,7 @@ numbers above are from the run that fixed them.
 docstring used to advertise the check as beyond the reach of any change, and the
 foundation record repeated a weaker version of the same claim. The docstring
 now opens with what it reads, carries a `## What this gate does not claim`
-section listing all five limits, and two new tests in `test_ci_checks.py` fail if
+section listing all five limits, and two new tests in `test_ci_docs.py` fail if
 that section is deleted, if any of the five limits is reworded away, or if the
 absolute claim and its relatives come back into the gate or into any of the five
 documents that describe it. One of the two new tests is the old
@@ -568,7 +584,7 @@ order to be disowned.
 **Every number in the documents is now computed, not remembered.** The
 foundation record carried two different mutation tables: 8/12/11/2/6 and 33
 workspace copies in one paragraph, 9/16/16/2/7 and 45 in another. Both are gone.
-`test_ci_checks.py` now loads every `tools/**/test_*.py` with
+`test_ci_docs.py` now loads every `tools/**/test_*.py` with
 `unittest.defaultTestLoader` and requires the record to state the count it finds
 — including the count of that suite itself, which is the one that is easy to get
 wrong and impossible to hard-code without recursion. A second test imports the
@@ -604,7 +620,7 @@ silently.
 the user types a destination: `CanonicalRouteBridge.swift` on the canonical input
 and `AppSnapshot.swift` on what the display model holds. Both now say what is
 true — one of the content's built-in samples, and no destination at all — and
-the wording test in `test_ci_checks.py` reads every `client/**/*.swift` as well
+the wording test in `test_ci_docs.py` reads every `client/**/*.swift` as well
 as the nine documents, because a comment is where a reader is most likely to
 meet a stale claim.
 
@@ -626,8 +642,7 @@ returns 1.
 | `### Fixed` headings in the changelog | 2 | 1 |
 | Fixtures the record claimed | 29 | 32 |
 
-All three new tests are test methods in `test_ci_checks.py`, which is why its own
-row moved from 83 to 86: one for the overclaim and the limits, one for the channel
+All three new tests are test methods in the docs suite, which is why its row moved from 83 to 86 when they landed (the file was `test_ci_checks.py` then, `test_ci_docs.py` after the thematic split): one for the overclaim and the limits, one for the channel
 list, and one that computes the mutation and shape counts out of the gate module.
 The two channel mutations are cases inside an existing test method, so they add
 evidence without adding a test. The count in this record is computed by the
@@ -763,12 +778,12 @@ documents now say that instead of leaving a reader to infer it from the word
 all ten gates, each with why it is open and what would close it, and each naming a
 path in this repository that would have to change. It existed only in a planning
 ledger outside the repository before, which is not disclosure: nobody reviewing a
-change sees a ledger. Seven tests hold it, including one that requires each row's
+change sees a ledger. Eight tests hold it, including one that requires each row's
 title to be followed by an absence rather than a pass.
 
 | Thing | Before | After |
 | --- | --- | --- |
-| Tool tests | 364 | 621 |
+| Tool tests | 364 | 628 |
 | Security-sensitive paths listed | 14, one of them nonexistent | 19, all existing |
 | Ownership directions checked | 1 | 3 |
 | Engine license declared per candidate | none, defaulted to MIT | required, derived, and cross-checked |
@@ -1035,7 +1050,7 @@ leave a reader to find the rest in a planning ledger outside the repository.
 | Team-ID ahead of everything that signs | The release workflow carries `Require a resolved signing identity` at position 5 of 17, before the keychain, the certificate, the profiles, `Archive`, and `Export IPA` | `test_the_export_identity_gate_precedes_every_signing_step_in_the_workflow`, plus a test that `ci.md` documents it at the position the workflow has |
 | Derived engine licenses | `licenseDeclared` was MIT for every component. Each candidate in the lock now declares the license of the code it builds, the schema requires it, and the generator checks it against the upstream project the lock names — libXray MIT, Xray-core MPL-2.0, sing-box GPL-3.0-or-later — refusing a missing, unverifiable, or inconsistent license | 11 tests in `EngineLicenseTests`; 3 lock-schema probes; the schema enum and the generator table are required to be the same set |
 | Bidirectional ownership | `core/config/` was in neither ownership file; `core/persistence/` was in both and does not exist. `SECURITY.md` states the criterion, and the test checks three directions: sensitive implies owned by a security or engine handle, security-handled implies sensitive, and every path named exists | one test with three directions, plus a test for the stated criterion and one for the unresolved review identity |
-| In-repo readiness disclosure | The nine unexecuted gates lived only in a ledger outside the repository. `docs/development/release-readiness.md` is dated, names the path or workflow step that would have to change for each gate, and makes no claim about any of them | 7 tests, including that every named path exists and that no gate title is followed by a claim that it passed |
+| In-repo readiness disclosure | The nine unexecuted gates lived only in a ledger outside the repository. `docs/development/release-readiness.md` is dated, names the path or workflow step that would have to change for each gate, and makes no claim about any of them | 8 tests, including that every named path exists and that no gate title is followed by a claim that it passed |
 | Derived counts | Suite totals, gate mutation and shape counts, the refusal-table row count, the overclaim subject count, the readiness gate count, the sensitive path count, the probe counts, the license-test count, and the gate runtime range are each read from the thing they describe rather than restated | the loader, `SemanticProbeCountTests`, and per-area drift tests |
 
 **What the five correction passes changed in this record, rather than in the code.**
@@ -1265,7 +1280,7 @@ record of finished work. The gate holds the ignore line.
 
 **The README's figures are generated.** `tools/ci/update-readme-counts.py` writes the
 test counts between `<!-- counts:start -->` and `<!-- counts:end -->` from the same
-loaders the suite uses, and `tools/ci/test_ci_checks.py` fails if the committed text
+loaders the suite uses, and `tools/ci/test_ci_docs.py` fails if the committed text
 drifts from them. The file count in that check was a literal `9` and is now derived;
 adding a test file had made the record wrong, and a literal is a number somebody has
 to remember to bump.

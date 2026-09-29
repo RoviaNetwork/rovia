@@ -89,7 +89,7 @@ swift test --package-path platform/apple
 The last three were missing from this list, which is how a reader could conclude
 the engine adapters and the Apple platform layer were untested. They are not: the
 engine adapters carry the adapter-boundary tests, and `platform/apple` carries the
-Keychain and App Group store tests. `tools/ci/test_ci_checks.py` requires this list
+Keychain and App Group store tests. `tools/ci/test_ci_docs.py` requires this list
 to match the file, so a package added to `local-packages.txt` cannot be left out of
 the documented commands.
 

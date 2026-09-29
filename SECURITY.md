@@ -97,9 +97,15 @@ are both failures.
 ### This list does not enforce a review
 
 An active ruleset on `main` requires a pull request,
-forbids deletion and force-push, and permits only a squash merge
-(<https://github.com/princeofscale/rovia/rules/24096965>). **It does not require a
-review, and that is a decision rather than an oversight.** The only account with
+forbids deletion and force-push, permits only a squash merge, and requires the
+`swift-tests` status check to pass
+(<https://github.com/princeofscale/rovia/rules/24096965>). An ordinary merge
+therefore cannot reach `main` with its CI red or still running, and because the
+policy is strict the branch must be up to date with `main` at the moment of the
+merge. The qualifier is deliberate: a repository administrator can merge with
+`gh pr merge --admin`, and a ruleset can grant a bypass, so this is a statement
+about the ordinary path and not about what any account can force. **It does not
+require a review, and that is a decision rather than an oversight.** The only account with
 write access is the repository owner, and GitHub does not count the author's own
 approval, so a one-review rule would make the repository unmergeable — which is
 protection by paralysis, not protection. `require_code_owner_review` is off for the
