@@ -107,7 +107,9 @@ struct SubscriptionInspectorView: View {
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                .accessibilityIdentifier(AppAccessibilityIdentifier.subscriptionScreen + ".allRejected")
+                .modifier(ConditionalAccessibilityIdentifier(
+                    identifier: AppAccessibilityIdentifier.subscriptionAllRejected
+                ))
             }
             if let result = model.snapshot.lastSubscriptionResult {
                 Section {

@@ -58,6 +58,7 @@ enum AppAccessibilityIdentifier {
     static let subscriptionEntryPrefix = "rovia.subscription.entry."
     static let subscriptionRedaction = "rovia.subscription.redaction"
     static let subscriptionEmpty = "rovia.subscription.empty"
+    static let subscriptionAllRejected = "rovia.subscription.allRejected"
 
     static func sidebarRoute(_ rawValue: String) -> String {
         "rovia.sidebar.\(rawValue)"
@@ -75,7 +76,8 @@ enum AppAccessibilityIdentifier {
         routingDebuggerSteps,
         routingDebuggerEmpty,
         subscriptionEntries,
-        subscriptionEmpty
+        subscriptionEmpty,
+        subscriptionAllRejected
     ]
 
     static let elementIdentifiers: [String] = [
