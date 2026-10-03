@@ -659,6 +659,12 @@ final class AppModel {
         } catch is CancellationError {
             return false
         } catch let error as SubscriptionCoordinatorError {
+            // A fetch the caller cancelled reports `.cancelled` rather than
+            // throwing raw: silence it like any other cancellation instead of
+            // bannering a user-aborted load as a failure.
+            if case .fetchFailed(.cancelled) = error {
+                return false
+            }
             await resyncAfterSubscriptionFailure(error)
             return false
         } catch {
@@ -687,6 +693,12 @@ final class AppModel {
         } catch is CancellationError {
             return false
         } catch let error as SubscriptionCoordinatorError {
+            // A fetch the caller cancelled reports `.cancelled` rather than
+            // throwing raw: silence it like any other cancellation instead of
+            // bannering a user-aborted load as a failure.
+            if case .fetchFailed(.cancelled) = error {
+                return false
+            }
             await resyncAfterSubscriptionFailure(error)
             return false
         } catch {
@@ -706,6 +718,12 @@ final class AppModel {
         } catch is CancellationError {
             return false
         } catch let error as SubscriptionCoordinatorError {
+            // A fetch the caller cancelled reports `.cancelled` rather than
+            // throwing raw: silence it like any other cancellation instead of
+            // bannering a user-aborted load as a failure.
+            if case .fetchFailed(.cancelled) = error {
+                return false
+            }
             await resyncAfterSubscriptionFailure(error)
             return false
         } catch {
@@ -754,7 +772,44 @@ final class AppModel {
         }
         snapshot.lastSubscriptionResult = lastResult
         snapshot.lastError = nil
+        if let result = lastResult, !result.remappedServerIDs.isEmpty {
+            applyServerIDRemap(subscriptionID: result.subscriptionID, map: result.remappedServerIDs)
+        }
         reconcileSelection()
+    }
+
+    /// Carries the selection and favorites across a server ID rotation
+    /// (v1→v2 migration on refresh): summary IDs embed the server UUID, so
+    /// each affected entry is rebuilt with its successor. Runs before
+    /// `reconcileSelection`, which then validates the result as usual.
+    private func applyServerIDRemap(subscriptionID: UUID, map: [UUID: UUID]) {
+        let prefix = subscriptionID.uuidString.lowercased()
+        func remapped(_ summaryID: String) -> String? {
+            let parts = summaryID.split(separator: "/")
+            guard parts.count == 2, parts[0].lowercased() == prefix,
+                  let old = UUID(uuidString: String(parts[1])),
+                  let new = map[old]
+            else {
+                return nil
+            }
+            return SubscriptionCoordinator.summaryID(subscriptionID: subscriptionID, serverID: new)
+        }
+        if let selected = snapshot.selection.server, let next = remapped(selected) {
+            snapshot.selection.server = next
+        }
+        var favorites = favoriteServerIDs
+        var changed = false
+        for id in favorites {
+            if let next = remapped(id) {
+                favorites.remove(id)
+                favorites.insert(next)
+                changed = true
+            }
+        }
+        if changed {
+            favoriteServerIDs = favorites
+            favoritesStorage.set(Array(favorites), forKey: Self.favoritesKey)
+        }
     }
 
     /// A failed add/refresh still updates what the UI shows: an empty first
