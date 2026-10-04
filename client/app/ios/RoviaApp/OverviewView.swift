@@ -82,7 +82,7 @@ struct OverviewView: View {
                     identifier: AppAccessibilityIdentifier.overviewEmptyNoContent
                 ))
             } else {
-                statusCard
+                heroCard
                 actions
                 if let error = model.snapshot.lastError {
                     ErrorBanner(
@@ -99,16 +99,53 @@ struct OverviewView: View {
         }
     }
 
-    private var statusCard: some View {
-        SectionCard(title: "Tunnel engine", systemImage: "lock.shield") {
-            VStack(alignment: .leading, spacing: 12) {
-                Label {
-                    Text(model.snapshot.engineStatusText)
-                        .font(.body)
-                        .fixedSize(horizontal: false, vertical: true)
-                } icon: {
+    /// The connect powerhouse: one big round action, honest engine state,
+    /// and the time since the last confirmed connection — the three things
+    /// a person opens a VPN client to see, ahead of everything else.
+    private var heroCard: some View {
+        VStack(spacing: 18) {
+            Button {
+                Task { await runPrimaryAction() }
+            } label: {
+                ZStack {
+                    Circle()
+                        .stroke(engineTint.opacity(0.18), lineWidth: 8)
+                        .frame(width: 148, height: 148)
+                    if case .connected = model.snapshot.engine, !reduceMotion {
+                        Circle()
+                            .trim(from: 0, to: 0.72)
+                            .stroke(
+                                engineTint,
+                                style: StrokeStyle(lineWidth: 8, lineCap: .round)
+                            )
+                            .frame(width: 148, height: 148)
+                            .rotationEffect(.degrees(-90))
+                    }
+                    Circle()
+                        .fill(engineTint.opacity(0.10))
+                        .frame(width: 120, height: 120)
+                    Image(systemName: "power")
+                        .font(.system(size: 44, weight: .semibold))
+                        .foregroundStyle(engineTint)
+                }
+                .contentShape(Circle())
+                .padding(8)
+            }
+            .buttonStyle(.plain)
+            .disabled(!model.snapshot.isPrimaryActionEnabled)
+            .accessibilityLabel(model.snapshot.connectActionTitle)
+            .accessibilityHint(model.snapshot.primaryActionHint)
+            .accessibilityIdentifier(AppAccessibilityIdentifier.overviewPrimaryAction)
+
+            VStack(spacing: 6) {
+                HStack(spacing: 8) {
                     Image(systemName: engineIcon)
                         .foregroundStyle(engineTint)
+                        .accessibilityHidden(true)
+                    Text(model.snapshot.engineStatusText)
+                        .font(.headline)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 .accessibilityElement(children: .combine)
                 .accessibilityIdentifier(AppAccessibilityIdentifier.overviewEngineStatus)
@@ -121,35 +158,20 @@ struct OverviewView: View {
                         .accessibilityIdentifier(AppAccessibilityIdentifier.overviewConnectedSince)
                 }
 
-                Divider()
-
-                InfoRow(
-                    label: "App state",
-                    value: model.snapshot.systemStatusText,
-                    identifier: AppAccessibilityIdentifier.overviewSystemStatus
-                )
+                Text(model.snapshot.systemStatusText)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier(AppAccessibilityIdentifier.overviewSystemStatus)
             }
         }
-        .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: model.snapshot.engine)
+        .frame(maxWidth: .infinity)
+        .padding(20)
+        .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 20))
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.25), value: model.snapshot.engine)
     }
 
     private var actions: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Button {
-                Task { await runPrimaryAction() }
-            } label: {
-                Label(
-                    model.snapshot.connectActionTitle,
-                    systemImage: model.snapshot.primaryActionSystemImage
-                )
-                .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
-            .disabled(!model.snapshot.isPrimaryActionEnabled)
-            .accessibilityHint(model.snapshot.primaryActionHint)
-            .accessibilityIdentifier(AppAccessibilityIdentifier.overviewPrimaryAction)
-
             Button {
                 Task { await model.refreshStatus() }
             } label: {
