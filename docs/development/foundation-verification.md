@@ -303,7 +303,7 @@ the bundle launches. Neither is evidence of a tunnel.
 
 | Check | Result |
 | --- | --- |
-| `pyyaml` 6.0.2 over `.github/workflows/*.yml` | all four parse: `ci.yml` 1 job / 18 steps, `engine-proof.yml` 1 job / 6 steps, `engine-repro.yml` 1 job / 8 steps, `release-ios.yml` 1 job / 17 steps; every one declares `permissions: contents: read` |
+| `pyyaml` 6.0.2 over `.github/workflows/*.yml` | all four parse: `ci.yml` 1 job / 18 steps, `engine-proof.yml` 1 job / 7 steps, `engine-repro.yml` 1 job / 8 steps, `release-ios.yml` 1 job / 17 steps; every one declares `permissions: contents: read` |
 | `./tools/ci/check-python-lint.sh` | `3.2.0 Python 3.14.4 on Darwin, 14 files`, `no findings`; invoked by `run-tool-tests.sh`, followed by the warnings gate |
 | `./tools/ci/check-python-warnings.sh` | `Python 3.14.7, 14 files, warnings are errors`, `no warnings`; the last step of `run-tool-tests.sh` |
 | `bash -n` over every script in the tree | the same script count as the shell-syntax gate above, no syntax error |
