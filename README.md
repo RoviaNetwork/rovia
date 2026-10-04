@@ -12,6 +12,7 @@ decision can be *shown*, not just applied.
 [![Status](https://img.shields.io/badge/status-pre--alpha-ff6b35?style=flat-square)](#status--what-works-and-what-does-not)
 [![CI](https://github.com/RoviaNetwork/rovia/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/RoviaNetwork/rovia/actions/workflows/ci.yml)
 [![Engine repro](https://github.com/RoviaNetwork/rovia/actions/workflows/engine-repro.yml/badge.svg?branch=main)](https://github.com/RoviaNetwork/rovia/actions/workflows/engine-repro.yml)
+[![Engine proof](https://github.com/RoviaNetwork/rovia/actions/workflows/engine-proof.yml/badge.svg?branch=main)](https://github.com/RoviaNetwork/rovia/actions/workflows/engine-proof.yml)
 [![License](https://img.shields.io/badge/license-MIT%20provisional-8a8a8a?style=flat-square)](LICENSE)
 [![Engine](https://img.shields.io/badge/engine-none%20enabled-dimgray?style=flat-square)](engines.lock.json)
 [![Platform](https://img.shields.io/badge/iOS-18%2B-0a84ff?style=flat-square&logo=apple&logoColor=white)](docs/development/ios.md)
