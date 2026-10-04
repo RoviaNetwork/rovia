@@ -1,24 +1,24 @@
 {
-  "originHash" : "1de763c43d598f5f29678e468911494c1729b94b93d39a38d0e628d95d2f23d1",
-  "pins" : [
+  "originHash": "1de763c43d598f5f29678e468911494c1729b94b93d39a38d0e628d95d2f23d1",
+  "pins": [
     {
-      "identity" : "rovia-core",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/RoviaNetwork/rovia-core",
-      "state" : {
-        "revision" : "c4dd0a3a8c0ccfdcdcb65c1a70f6891921bcd9e2",
-        "version" : "0.2.3"
+      "identity": "rovia-core",
+      "kind": "remoteSourceControl",
+      "location": "https://github.com/RoviaNetwork/rovia-core",
+      "state": {
+        "revision": "c4dd0a3a8c0ccfdcdcb65c1a70f6891921bcd9e2",
+        "version": "0.2.3"
       }
     },
     {
-      "identity" : "rovia-engine",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/RoviaNetwork/rovia-engine",
-      "state" : {
-        "revision" : "8d5950400abc9e044b5be695d648480ff736be55",
-        "version" : "0.2.1"
+      "identity": "rovia-engine",
+      "kind": "remoteSourceControl",
+      "location": "https://github.com/RoviaNetwork/rovia-engine",
+      "state": {
+        "revision": "ad65d4345a07196ff26575bf39245329a417f15e",
+        "version": "0.3.0"
       }
     }
   ],
-  "version" : 3
+  "version": 3
 }

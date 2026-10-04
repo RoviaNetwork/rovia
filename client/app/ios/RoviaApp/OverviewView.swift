@@ -61,7 +61,7 @@ struct OverviewView: View {
         RoviaScreen {
             RoviaScreenHeader(
                 title: "Overview",
-                subtitle: "Local status only. This build ships no tunnel engine, so Rovia cannot establish a VPN connection.",
+                subtitle: "The pinned engine is wired in this build. A start installs the system VPN profile on first run, and the status below is what the extension reports.",
                 identifier: AppAccessibilityIdentifier.overviewScreen,
                 showsLogo: true
             )

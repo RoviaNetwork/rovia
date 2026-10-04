@@ -578,11 +578,10 @@ class PrivacyAndOwnershipTests(unittest.TestCase):
         )
         self.assertIn("The lock now pins xray v26.9.9", legal)
         self.assertIn("gated build pipeline produces the artifact", legal)
-        self.assertIn("cannot establish a tunnel", flat(legal))
         # And it has to stay in step with the privacy answer it is referenced from.
         privacy = (REPO_ROOT / "PRIVACY.md").read_text(encoding="utf-8")
         self.assertIn("docs/legal/app-store-distribution.md", privacy)
-        self.assertIn("no engine binary is bundled in this build", flat(privacy).lower())
+        self.assertIn("nothing executable is downloaded after installation", flat(privacy).lower())
 
     def test_the_documented_package_list_matches_the_package_list_file(self):
         # ios.md once listed four of seven entries, which read as though the engine
@@ -1457,16 +1456,16 @@ class PrivacyAndOwnershipTests(unittest.TestCase):
         ).read_text(encoding="utf-8")
         self.assertIn("public var host: String { \"redacted\" }", diagnostic)
 
-    def test_privacy_document_does_not_claim_a_store_the_app_does_not_use(self):
-        # `platform/apple` implements a Keychain store and an App Group store and
-        # both targets declare the App Group entitlement, so it is easy to write a
-        # privacy document describing a flow that no code performs. These rows
-        # must say the write does not happen yet.
+    def test_privacy_document_states_exactly_what_each_store_holds(self):
+        # The Keychain and the App Group are both in use today: credentials in
+        # the Keychain, redacted records and the tunnel hand-off in the App
+        # Group container. A privacy document describing either as unused
+        # describes a build that does not exist.
         rows = {
-            "Subscription URL": "Not stored in this slice",
-            "Server credentials": "Not stored in this slice",
-            "Non-secret canonical configuration": "Memory only in this slice",
-            "Routing policy and selected server": "Memory only",
+            "Subscription URL": "App Group",
+            "Server credentials": "Keychain",
+            "Non-secret canonical configuration": "App Group",
+            "Routing policy and selected server": "App Group",
         }
         for subject, required in rows.items():
             with self.subTest(subject=subject):
@@ -1475,25 +1474,24 @@ class PrivacyAndOwnershipTests(unittest.TestCase):
                     for line in self.privacy.splitlines()
                     if line.startswith("|") and subject in line
                 )
-                self.assertIn(required, row, f"the {subject} row overstates what is stored")
-        self.assertIn("no app or extension code calls it yet", self.privacy)
-        self.assertIn("neither store is an enforcement", self.privacy)
+                self.assertIn(required, row, f"the {subject} row must say where it lives")
+                self.assertNotIn("Not stored in this slice", row)
+                self.assertNotIn("Memory only", row)
 
-    def test_privacy_document_does_not_claim_a_packet_flow(self):
+    def test_privacy_document_describes_the_packet_flow_honestly(self):
         provider = (REPO_ROOT / "client/app/ios/RoviaTunnel/PacketTunnelProvider.swift").read_text(
             encoding="utf-8"
         )
-        # The extension never touches packetFlow, so a document that describes a
-        # packet bridge as the flow is describing code that does not exist.
-        self.assertNotIn("packetFlow", provider)
-        self.assertIn("never reads or writes `packetFlow`", self.privacy)
-        # The engine is pinned and reproducible but not linked into the app:
-        # the document must say the precise thing — pinned, built by the gated
-        # pipeline, not wired — which is not a packet flow and not a tunnel.
-        self.assertIn("No engine binary is executed in this build", self.privacy)
-        self.assertNotIn("the engine binary ships inside the app", self.privacy)
-        self.assertIn("No engine binary is bundled in this build", self.privacy)
-        self.assertIn("the adapter is not wired to it yet", self.privacy)
+        # The extension moves packets through packetFlow now, so the document
+        # must say what happens to them — framed and forwarded, never read or
+        # logged — and must not pretend the bridge does not exist.
+        self.assertIn("packetFlow", provider)
+        # The engine binary IS the pinned artifact and IS executed by the
+        # extension now; what must stay true is that nothing executable is
+        # downloaded after installation and no payload is logged.
+        self.assertIn("nothing executable is downloaded after installation", flat(self.privacy))
+        self.assertNotIn("never reads or writes `packetFlow`", self.privacy)
+        self.assertIn("payloads are never", self.privacy)
 
     def test_privacy_document_names_the_canonical_diagnostic_and_the_raw_trace(self):
         self.assertIn("RouteEvaluator.explain", self.privacy)

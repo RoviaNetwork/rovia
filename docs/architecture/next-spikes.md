@@ -50,6 +50,12 @@ What the spike must demonstrate, on a physical device:
 - reconnect after the tunnel is stopped and restarted, and after the device
   changes network.
 
+**Code-complete, awaiting the device (2026-10-05):** the pump
+(`XrayTunPump` in rovia-engine 0.3.0) and the extension wiring
+(`PacketTunnelProvider` + `PacketFlowBridge`) implement all of this at the code
+level — utun framing both ways, lock-gated teardown, bounded writes with
+drop-and-count. What none of it has done is run on hardware.
+
 What it must not do: read or log packet payloads. `PRIVACY.md` states that
 constraint, and the spike output must not become a diagnostic channel for them.
 `RoviaConfig.RoutingDecisionTrace`, the one type in this repository that holds a
@@ -109,7 +115,7 @@ What the spike must demonstrate, on a physical device:
 Exit condition: one signed artifact that passes every gate, on a device, with
 the tunnel from spike 1 carrying traffic.
 
-## 3. Wire the app to real configuration instead of sample data
+## 3. Wire the app's debugger to real configuration instead of sample data
 
 The app's routing debugger now evaluates with `RoviaRouting.RouteEvaluator` and
 renders the canonical `RoutingDiagnostic`, through
@@ -120,8 +126,10 @@ data, and the bridge converts that. The spike is to load an
 one evaluator. Two things have to be settled first, and both are privacy
 decisions rather than engineering:
 
-- where the configuration lives. `PRIVACY.md` now says nothing is written to
-  disk, so the first durable store is a change to that document;
+- where the debugger's configuration would live. The tunnel hand-off already
+  writes the canonical config to the App Group (documented in `PRIVACY.md`);
+  extending that store to what the debugger evaluates is a change to the same
+  section;
 - the sample group and rule identifiers became canonical UUIDs so the bridge
   never has to invent one. Real identifiers are real UUIDs, and the sample
   should not be the thing that teaches a different shape; and
@@ -130,6 +138,12 @@ decisions rather than engineering:
   user supplies reaches it and there is nothing to redact. Adding a typed
   destination is a privacy change, not a feature, and `PRIVACY.md` says so in the
   place where the redaction limits are listed.
+
+**Partially landed (2026-10-05):** the *tunnel* path reads real configuration —
+the app writes the canonical config for the selected server into the App Group
+hand-off and the extension starts the engine from it. The debugger's display
+data remains compiled-in sample data, which is what this spike's privacy
+decisions are about.
 
 ## 4. Subscription parser hardening
 

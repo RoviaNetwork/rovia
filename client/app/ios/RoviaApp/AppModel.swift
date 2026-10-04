@@ -9,6 +9,25 @@ protocol TunnelControlling: Sendable {
     func currentStatus() async -> TunnelStatus
 }
 
+/// The kill-switch hand-off settings, abstracted so tests never touch the App
+/// Group container.
+protocol TunnelSettingsStoring: Sendable {
+    func loadSettings() -> TunnelSettings
+    func saveSettings(_ settings: TunnelSettings) throws
+}
+
+struct HandoffTunnelSettingsStore: TunnelSettingsStoring {
+    let handoff: TunnelHandoff
+
+    func loadSettings() -> TunnelSettings {
+        handoff.readSettings()
+    }
+
+    func saveSettings(_ settings: TunnelSettings) throws {
+        try handoff.writeSettings(settings)
+    }
+}
+
 struct UnavailableTunnelController: TunnelControlling {
     static let reason = EngineUnavailableReason.noEngineConfigured
 
@@ -68,6 +87,7 @@ enum AppAction: Hashable, Sendable {
     case probeServers
     case refreshStaleSubscriptions(TimeInterval)
     case toggleFavorite(ServerID)
+    case setKillSwitch(Bool)
 
     var label: String {
         switch self {
@@ -105,6 +125,8 @@ enum AppAction: Hashable, Sendable {
             "Refresh subscriptions updated over an hour ago"
         case .toggleFavorite:
             "Toggle a favorite server"
+        case .setKillSwitch:
+            "Toggle the kill switch"
         }
     }
 }
@@ -137,6 +159,8 @@ final class AppModel {
     private let tunnel: any TunnelControlling
     private let fixtures: any FixtureProviding
     private let subscriptions: SubscriptionCoordinator?
+    private let configWriter: (any TunnelConfigWriting)?
+    private let settingsStore: (any TunnelSettingsStoring)?
     private let probeLatency: (@Sendable (String, Int) async -> Int?)?
     private let favoritesStorage: UserDefaults
     private let selectionStorage: UserDefaults
@@ -146,6 +170,8 @@ final class AppModel {
         tunnel: any TunnelControlling = UnavailableTunnelController(),
         fixtures: any FixtureProviding = StaticFixtureProvider(),
         subscriptions: SubscriptionCoordinator? = nil,
+        configWriter: (any TunnelConfigWriting)? = nil,
+        settingsStore: (any TunnelSettingsStoring)? = nil,
         probeLatency: (@Sendable (String, Int) async -> Int?)? = nil,
         favoritesStorage: UserDefaults = .standard,
         selectionStorage: UserDefaults? = nil,
@@ -154,6 +180,8 @@ final class AppModel {
         self.tunnel = tunnel
         self.fixtures = fixtures
         self.subscriptions = subscriptions
+        self.configWriter = configWriter
+        self.settingsStore = settingsStore
         self.probeLatency = probeLatency
         self.favoritesStorage = favoritesStorage
         // An explicit store persists across launches; tests that pass none
@@ -290,6 +318,11 @@ final class AppModel {
     }
 
     @discardableResult
+    func setKillSwitch(_ enabled: Bool) async -> Bool {
+        await perform(.setKillSwitch(enabled))
+    }
+
+    @discardableResult
     func refreshStatus() async -> Bool {
         await perform(.refreshStatus)
     }
@@ -407,6 +440,8 @@ final class AppModel {
             return await refreshStale(maxAge: maxAge)
         case let .toggleFavorite(id):
             return applyFavorite(id)
+        case let .setKillSwitch(enabled):
+            return applyKillSwitch(enabled)
         }
     }
 
@@ -463,6 +498,7 @@ final class AppModel {
         case let .unavailable(reason):
             snapshot.engine = .unavailable(reason)
         }
+        snapshot.killSwitch = settingsStore?.loadSettings().killSwitch ?? snapshot.killSwitch
         snapshot.system = .ready
         updateDerivedMeasurements()
         return true
@@ -516,6 +552,7 @@ final class AppModel {
         case let .unavailable(reason):
             snapshot.engine = .unavailable(reason)
         }
+        snapshot.killSwitch = settingsStore?.loadSettings().killSwitch ?? snapshot.killSwitch
         snapshot.system = .ready
         updateDerivedMeasurements()
         return true
@@ -528,6 +565,29 @@ final class AppModel {
             return false
         }
         guard snapshot.canConnect else { return false }
+
+        // A start with a real engine writes the hand-off first: the extension
+        // reads the canonical config and the settings from the App Group. A
+        // start with no real server selected is refused loudly — connecting to
+        // nothing is not connecting.
+        if let configWriter {
+            guard let serverID = resolvedServerID() else {
+                let failure = AppError.tunnelStartRejected(code: "tunnel.start.no-server")
+                snapshot.engine = .failed(failure)
+                snapshot.lastError = failure
+                return false
+            }
+            do {
+                try await configWriter.writeConfiguration(serverID: serverID, killSwitch: snapshot.killSwitch)
+            } catch is CancellationError {
+                return false
+            } catch {
+                let sanitized = AppError(sanitizing: error, operation: .connect)
+                snapshot.engine = .failed(sanitized)
+                snapshot.lastError = sanitized
+                return false
+            }
+        }
 
         do {
             try await tunnel.requestStart()
@@ -545,6 +605,15 @@ final class AppModel {
         snapshot.engine = .starting
         snapshot.lastError = nil
         return true
+    }
+
+    /// The selected server, or the first visible one — deterministic, so the
+    /// tunnel and the UI never disagree about what "connect" means.
+    private func resolvedServerID() -> ServerID? {
+        if let selected = snapshot.selection.server {
+            return selected
+        }
+        return snapshot.visibleServers.first?.id
     }
 
     private func requestStop() async -> Bool {
@@ -1033,6 +1102,19 @@ final class AppModel {
             favoriteServerIDs.insert(id)
         }
         favoritesStorage.set(Array(favoriteServerIDs), forKey: Self.favoritesKey)
+        return true
+    }
+
+    /// The kill switch flips in memory first, then persists. A persist failure
+    /// surfaces as a banner — the toggle never lies about what the next start
+    /// will install.
+    private func applyKillSwitch(_ enabled: Bool) -> Bool {
+        snapshot.killSwitch = enabled
+        do {
+            try settingsStore?.saveSettings(TunnelSettings(killSwitch: enabled))
+        } catch {
+            snapshot.lastError = .unknown(code: "settings.persist.failed")
+        }
         return true
     }
 

@@ -88,7 +88,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 
 # The two local packages the app target and the test target must both link, and
 # the path each one has, relative to the directory holding the Xcode project.
-CANONICAL_PACKAGES = ("RoviaConfig", "RoviaRouting", "RoviaSubscription", "RoviaApplePlatform")
+CANONICAL_PACKAGES = ("RoviaConfig", "RoviaRouting", "RoviaSubscription", "RoviaApplePlatform", "RoviaEngineAPI")
 LOCAL_PACKAGE_PATHS = {
     "RoviaApplePlatform": "../../../platform/apple",
 }
@@ -99,12 +99,12 @@ REMOTE_PACKAGES = {
     "rovia-core": {
         "url": "https://github.com/RoviaNetwork/rovia-core",
         "version": "0.2.3",
-        "products": ("RoviaConfig", "RoviaRouting", "RoviaSubscription"),
+        "products": ("RoviaConfig", "RoviaRouting", "RoviaSubscription", "RoviaEngineAPI"),
     },
     "rovia-engine": {
         "url": "https://github.com/RoviaNetwork/rovia-engine",
-        "version": "0.2.1",
-        "products": ("RoviaXray",),
+        "version": "0.3.0",
+        "products": ("RoviaXray", "RoviaXrayLive"),
     },
 }
 # Local references that must never come back: core and engines moved to

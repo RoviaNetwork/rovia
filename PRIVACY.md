@@ -22,11 +22,11 @@ decision recorded in `docs/architecture/decision-log.md`.
 
 | Data | Where it lives | Who can read it | Retention | Deleted when |
 | --- | --- | --- | --- | --- |
-| Subscription URL | Not stored in this slice. The parser returns a canonical source and a redacted display value in memory; the app keeps the sample content in memory and writes nothing | The parsing code, then the app model in memory | One import | Immediately after parsing, or when the app is closed |
+| Subscription URL | The App Group container, in the subscription store (`subscriptions/`), with the credential part in the Keychain — never in the file | The app and the tunnel extension, both via the shared App Group | Until the subscription is removed | Deleting the subscription, or deleting the app |
 | Subscription or share-link response body | Memory only | The parsing code | One import | Immediately after parsing |
-| Server credentials (UUIDs, passwords, keys) | Not stored in this slice. A credential is parsed into a transient `SecretReference` whose *key* is a name, and the value is never persisted. `platform/apple` implements `KeychainSecretStore` with `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`, and no app or extension code calls it yet | The parsing code, in memory | One import | Immediately after parsing |
-| Non-secret canonical configuration | Memory only in this slice. `platform/apple` implements `AppGroupStore`, both targets declare the `group.io.rovia.shared` entitlement, and neither target calls the store | The app model, in memory | Until the app closes | When the app closes, or when the app is deleted |
-| Routing policy and selected server | Memory only | The app model | Until changed | When the app closes |
+| Server credentials (UUIDs, passwords, keys) | The Keychain, written by the subscription import with `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly` in the shared access group the extension also reads. The canonical configuration carries only a `SecretReference` key | The app and the tunnel extension, on this device only | Until the subscription is removed | Deleting the subscription, or deleting the app |
+| Non-secret canonical configuration | The App Group container: the subscription store, plus the tunnel hand-off (`tunnel/canonical-config.json`, `tunnel/settings.json`) written before a tunnel start and read by the extension | The app and the tunnel extension | Until overwritten by the next write | Deleting the app, or the next write |
+| Routing policy and selected server | The App Group hand-off (in the canonical configuration) and the app model | The app and the tunnel extension | Until changed | The next write, or deleting the app |
 | Connection state and timestamps | Memory only | The app model | Until the next status refresh | Replaced by newer status |
 | Latency and health samples | Memory | Selection logic | Until the next sample | Replaced by newer samples |
 | Routing diagnostic (what the user asked about) | Memory, and the on-screen debugger | The user, on the device | Until the user leaves the screen | Leaving the screen or deleting the app |
@@ -34,13 +34,13 @@ decision recorded in `docs/architecture/decision-log.md`.
 | Signing material | A temporary CI keychain, never on a user's device | The release job in the protected `ios-production` environment | One job | The keychain is deleted in an `always()` step |
 
 Credentials are never written to the canonical configuration, a diagnostic, an
-error message, or a log. In this slice that is mostly because nothing is written
-at all. Where the code does assert it, the assertions are the schema rules that
+error message, or a log. The assertions are the schema rules that
 reject secret-bearing transport keys, the `SecretReference` key rule in
 `RoviaConfig` and `schemas/config.schema.json`, and canary-secret tests in
-`core/config`, `core/subscription`, and `client/app/ios/RoviaAppTests`. No
-Keychain or App Group write happens yet, so neither store is an enforcement
-mechanism today; when one is wired in, that sentence has to change with it.
+`core/config`, `core/subscription`, and `client/app/ios/RoviaAppTests`. The
+Keychain and the App Group are both written to today: credentials go to the
+Keychain, and the hand-off files carry no credential values — a test reads the
+written configuration and fails if a credential value appears in it.
 
 ## Data flows
 
@@ -54,9 +54,9 @@ bounded read (1 MiB, UTF-8)  ->  parser  ->  transient secret reference
         |                          |
         |                          +-> canonical server record naming a secret
         v
-raw body discarded; nothing is written to a Keychain or an App Group
-container in this slice, and only a redacted display value such as
-"vless://synthetic.example:443/••••••••" is ever kept
+raw body discarded after parsing; the App Group holds the redacted record and
+the Keychain holds the credential. A redacted display value such as
+"vless://synthetic.example:443/••••••••" is all the UI ever shows
 ```
 
 A URL source is stored as a URL plus a secret reference; the token, path, and
@@ -70,29 +70,36 @@ display value, and a parser error contains a stable code, never the input.
 user taps Connect
         |
         v
-engine availability check  ->  unavailable: stop, no route, DNS, or packet change
+selected server resolved to a canonical configuration
+(App Group hand-off: endpoints and routing, never credentials)
         |
         v
-configuration validation (schema + semantic, fail closed)
+NetworkExtension public API: NEPacketTunnelProvider starts
         |
         v
-NetworkExtension public API: NEPacketTunnelProvider
+engine validates and starts (XrayAdapter over the pinned artifact)
         |
         v
-NEPacketTunnelNetworkSettings, when an engine exists
+NEPacketTunnelNetworkSettings applied — after the engine is running
+        |
+        v
+packets move: NEPacketTunnelFlow <-> pump <-> xray.tun.fd
 ```
 
-This is where the flow stops today. The engine lock approves and enables a
-pinned xray build, and the gated pipeline produces the artifact, but the
-adapter's `prepare`/`start` are not wired to it, so
-the availability check refuses before any network setting is constructed, and
-the extension never reads or writes `packetFlow`. The code that would move a
-packet between `packetFlow` and the engine does not exist yet in this
-repository, and no traffic passes through Rovia in this build.
+The engine lock approves and enables a pinned xray build, and the extension is
+wired to it: `PacketTunnelProvider` validates the canonical configuration the
+app wrote to the App Group hand-off, starts the engine through the live
+adapter, and moves packets between `packetFlow` and the engine's utun file
+descriptor via the pump. Packets are framed and forwarded; **payloads are never
+read, logged, or persisted** — the pump's only counters are drop counts, and
+`RoviaConfig.RoutingDecisionTrace` stays in memory, not `Codable`, with nothing
+persisting it.
 
-Rovia never installs a default route before the engine and configuration are
-known to be available. No engine binary is executed in this build and nothing
-executable is downloaded after installation.
+Rovia never installs a default route before the engine is running: the
+extension prepares and starts the engine first and applies network settings
+after, so the route never exists without something consuming it. The engine
+binary is the pinned artifact built by the gated pipeline; nothing executable
+is downloaded after installation.
 
 ### Routing and health
 
@@ -144,16 +151,15 @@ arrives in.
 
 ## Retention and deletion
 
-- Everything this slice handles lives in memory only. Nothing is written to disk
-  by the app or the extension: no Keychain item, no App Group file, no
-  configuration file, no cache.
+- The Keychain holds server credentials; the App Group container holds the
+  subscription store and the tunnel hand-off (`tunnel/canonical-config.json`,
+  `tunnel/settings.json`). That is everything that outlives the process.
+- Removing a subscription deletes its Keychain items and its store record; the
+  next tunnel start overwrites the hand-off. Deleting the app removes the
+  Keychain items, the container, and the profile.
 - There is no analytics store, no crash store, and no log file that Rovia
   writes. Rovia does not call `Logger` or `os_log` with user data, and the
   control API is a provider message rather than a log sink.
-- Closing the app discards everything, because the app model holds it and
-  nothing reloads it. Deleting the app therefore removes all of it. When a
-  durable store is wired in, deletion has to be implemented there, and this
-  section has to say so.
 - There is no server-side retention question, because there is no server.
 
 ## Export
@@ -201,12 +207,12 @@ user does not rely on a stronger promise than the code makes.
   is not a URL falls back to the literal string `redacted`; a value with
   unusual encoding, an IDN or punycode label, an IPv6 literal, or a very long
   authority can be rejected and replaced, which hides more than intended.
-- Nothing is redacted at rest today, because nothing is stored at rest. The day a
-  secret reaches the Keychain it will not be redacted there: it will be protected
-  by the device's Keychain protections and by the access group, not by a string
-  transformation. A keychain item is the one place a real credential can exist,
-  and this document should be read as a warning about that day rather than a
-  description of it.
+- Secrets are not redacted at rest — they are *protected* at rest: a credential
+  in the Keychain is protected by the device's Keychain protections and by the
+  access group, not by a string transformation. A Keychain item is the one
+  place a real credential exists, and the hand-off files never carry one — the
+  canary test in `client/app/ios/RoviaAppTests` reads the written configuration
+  and fails if a credential value appears in it.
 - A future feature that introduces a new redacted shape must add a canary test.
   The existing canaries live in `core/subscription/Tests` and
   `client/app/ios/RoviaAppTests`; a canary that stops failing is a regression,
@@ -221,13 +227,11 @@ user does not rely on a stronger promise than the code makes.
 - Rovia opens no listener. There is no local HTTP server, no LAN listener, and
   no unauthenticated debug endpoint. Host-to-extension communication is defined
   as a versioned JSON provider message rather than a network service, and the
-  extension implements the provider side of that contract today:
+  extension implements the provider side of that contract:
   `PacketTunnelProvider.handleAppMessage` accepts an envelope of at most 64 KiB,
-  answers `status.get` with a fixed state, and answers every other declared
-  method with `not-implemented`. The host side is not wired in this slice — the
-  app model uses an unavailable tunnel controller, so no request currently
-  travels from the app to the extension, and no provider-message data is stored
-  or logged either way.
+  answers `status.get` with the engine's lifecycle state, and answers every
+  other declared method with `not-implemented`. No provider-message data is
+  stored or logged either way.
 - The only outbound connections are the ones the user's own configuration
   selects: the configured server, and the subscription URL the user supplied.
   The provider of that subscription sees the request, as any HTTP client does.
@@ -251,12 +255,12 @@ before submission, and must update this section if the answer changes.
 | Is the data used for tracking? | No. No tracking, no advertising identifier, no cross-app or cross-site sharing, no third-party SDK. |
 | What is the data used for? | App functionality only: to configure the tunnel the user asked for and to explain routing decisions. |
 | What categories could apply? | If a label is required, the closest description is user-provided content processed on device, not collected. This must be confirmed before submission. |
-| What is the retention? | In memory for the life of the app process. Nothing is written to disk in this slice, and there is no server-side retention. |
-| Can the user request deletion? | There is nothing stored to delete: closing the app discards it, and deleting the app removes it. There is no server to ask. When a durable store is added, deletion has to be implemented there first. |
+| What is the retention? | Keychain for credentials, App Group for the subscription store and the tunnel hand-off; everything else lives for the life of the app process. There is no server-side retention. |
+| Can the user request deletion? | Removing a subscription deletes its Keychain items and its store record; deleting the app removes the Keychain items, the container, and the profile. There is no server to ask. |
 | Does the app use data for advertising? | No. |
-| Does the app download executable code? | No. No engine binary is bundled in this build either: the lock pins a reproducible engine that the gated build pipeline produces, but the adapter is not wired to it yet, so the app cannot establish a tunnel. `docs/legal/app-store-distribution.md` records the App Review position for the day the engine is wired in. |
+| Does the app download executable code? | No. The engine binary is the pinned artifact built by the gated pipeline and linked at build time; nothing executable is downloaded after installation. `docs/legal/app-store-distribution.md` records the App Review position. |
 | Does the app open a local listener? | No. |
-| Are there region-specific requirements? | None today, because no engine binary is linked into the app. A bundled engine carries licence obligations (libXray MIT, Xray-core MPL-2.0) that travel with the binary — see `licenses/` and `docs/legal/licensing.md` — and can create rules that differ by jurisdiction; legal review is required before shipping one. |
+| Are there region-specific requirements? | The engine linked into the app carries licence obligations (libXray MIT, Xray-core MPL-2.0) that travel with the binary — see `licenses/` and `docs/legal/licensing.md`. Region-specific *engine* rules beyond that need legal review before shipping; see `docs/legal/app-store-distribution.md`. |
 
 ## Reporting a privacy problem
 
