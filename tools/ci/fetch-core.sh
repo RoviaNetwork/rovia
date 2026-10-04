@@ -7,6 +7,12 @@
 # tarball of the tag in tools/ci/core-pin.txt, verifies its SHA-256, and
 # unpacks it into a cache. Prints the resulting directory.
 #
+# Cache integrity: the marker records the exact tag AND tarball SHA the cache
+# was built from. Both the normal path and --check compare the marker against
+# the current pin: a pin change (or a stale/foreign cache) refetches instead
+# of silently reusing. Marker presence alone is never treated as proof.
+# Parallel invocations serialize on an atomic mkdir lock.
+#
 # Usage:
 #   ROVIA_CORE_ROOT="$(tools/ci/fetch-core.sh)"   # uses cache when fresh
 #   tools/ci/fetch-core.sh --check                  # verify cache, no network
@@ -31,20 +37,44 @@ test -n "$expected_sha" || fail "no ROVIA_CORE_TARBALL_SHA256 in tools/ci/core-p
 
 cache_dir="$cache_base/$tag"
 marker="$cache_dir/.fetch-core-ok"
+sentinel="core/config/Package.swift"
+
+marker_matches_pin() {
+  test -f "$marker" || return 1
+  test -f "$cache_dir/$sentinel" || return 1
+  recorded_tag="$(sed -n '1p' "$marker")"
+  recorded_sha="$(sed -n '2p' "$marker")"
+  test "$recorded_tag" = "$tag" || return 1
+  test "$recorded_sha" = "$expected_sha" || return 1
+  return 0
+}
 
 if [ "${1:-}" = "--check" ]; then
-  test -f "$marker" || fail "no verified core checkout for $tag; run tools/ci/fetch-core.sh"
+  marker_matches_pin \
+    || fail "no verified core checkout for $tag ($expected_sha); run tools/ci/fetch-core.sh"
   printf '%s\n' "$cache_dir"
   exit 0
 fi
 
-if [ -f "$marker" ]; then
+lock_dir="$cache_base/.lock-$tag"
+mkdir -p "$cache_base" || fail "could not create cache base $cache_base"
+i=0
+while ! mkdir "$lock_dir" 2>/dev/null; do
+  i=$((i + 1))
+  if [ "$i" -ge 300 ]; then
+    fail "timed out waiting for the core cache lock"
+  fi
+  sleep 1
+done
+trap 'rmdir "$lock_dir" 2>/dev/null || true' EXIT
+
+if marker_matches_pin; then
   printf '%s\n' "$cache_dir"
   exit 0
 fi
 
 tmp="$(mktemp -d)"
-trap 'rm -rf "$tmp"' EXIT
+trap 'rm -rf "$tmp"; rmdir "$lock_dir" 2>/dev/null || true' EXIT
 archive="$tmp/core.tar.gz"
 curl -sfSL "https://github.com/RoviaNetwork/rovia-core/archive/refs/tags/$tag.tar.gz" \
   -o "$archive" || fail "could not download rovia-core $tag"
@@ -55,7 +85,7 @@ rm -rf "$cache_dir"
 mkdir -p "$cache_dir"
 tar xzf "$archive" -C "$cache_dir" --strip-components=1 \
   || fail "could not unpack rovia-core $tag"
-test -f "$cache_dir/core/config/Package.swift" \
-  || fail "unpacked tree has no core/config/Package.swift"
-date -u +"%Y-%m-%dT%H:%M:%SZ" > "$marker"
+test -f "$cache_dir/$sentinel" \
+  || fail "unpacked tree has no $sentinel"
+printf '%s\n%s\n' "$tag" "$expected_sha" > "$marker"
 printf '%s\n' "$cache_dir"

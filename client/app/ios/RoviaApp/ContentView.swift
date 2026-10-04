@@ -17,10 +17,15 @@ struct ContentView: View {
                 }
             }
             .onOpenURL { url in
+                // Queued, never acted on directly: the preview sheet asks
+                // first, and a link that arrives mid-bootstrap waits for it.
                 guard let target = SubscriptionCoordinator.importTarget(from: url) else { return }
-                Task {
-                    await model.addSubscriptionText(target.text, name: target.name ?? "Imported subscription")
-                }
+                model.queueDeepLink(text: target.text, name: target.name)
+            }
+            .sheet(
+                item: Binding(get: { model.pendingImport }, set: { model.pendingImport = $0 })
+            ) { pending in
+                ImportPreviewSheet(model: model, pending: pending)
             }
     }
 }

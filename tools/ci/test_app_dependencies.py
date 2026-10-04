@@ -98,7 +98,7 @@ LOCAL_PACKAGE_PATHS = {
 REMOTE_PACKAGES = {
     "rovia-core": {
         "url": "https://github.com/RoviaNetwork/rovia-core",
-        "version": "0.1.0",
+        "version": "0.2.3",
         "products": ("RoviaConfig", "RoviaRouting", "RoviaSubscription"),
     },
 }
@@ -748,7 +748,7 @@ def package_dependency_problems(root: Path) -> list[str]:
     remote_ids = set(project.remote_references)
     for name, expected in REMOTE_PACKAGES.items():
         # The Xcode pin is a bare version, the git tag carries its `v`:
-        # v0.1.0 the tag, 0.1.0 the pin. Compared after that prefix, so a
+        # v0.2.3 the tag, 0.2.3 the pin. Compared after that prefix, so a
         # real drift still fails and the naming convention cannot hide it.
         if expected["version"] != pinned_core_tag().removeprefix("v"):
             problems.append(
