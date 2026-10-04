@@ -232,7 +232,15 @@ class WorkflowPolicyTests(unittest.TestCase):
             lock_path.write_text(json.dumps(lock, indent=2) + "\n", encoding="utf-8")
             approved = gate.run_script(script, "--lock", str(lock_path))
             self.assertNotEqual(approved.returncode, 0, gate.combined(approved))
-            self.assertIn("the lock pins", gate.combined(approved))
+            # With or without a Go toolchain on the machine, the refusal must
+            # come from the gating phase: nothing was downloaded or built.
+            self.assertTrue(
+                "the lock pins" in gate.combined(approved)
+                or "no Go toolchain is available" in gate.combined(approved),
+                gate.combined(approved),
+            )
+            self.assertNotIn("downloading", gate.combined(approved).lower())
+            self.assertNotIn("built libXray", gate.combined(approved))
 
     def test_engine_build_stub_rejects_a_usage_error(self):
         stub = REPO_ROOT / "tools/build-engine/xray/build-apple.sh"

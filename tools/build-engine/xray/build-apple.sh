@@ -215,7 +215,10 @@ ensure_gomobile() {
   fi
   # The pinned gomobile is a build input, exactly like the pinned source:
   # installing the locked revision is what keeps two builds comparable.
+  # gobind must come from the same x/mobile revision, or the generated glue
+  # and the binder disagree.
   GOBIN="$gobin" go install "golang.org/x/mobile/cmd/gomobile@$gomobile_version" >&2
+  GOBIN="$gobin" go install "golang.org/x/mobile/cmd/gobind@$gomobile_version" >&2
   binary="$gobin/gomobile"
   [[ -x "$binary" ]] || return 1
   [[ "$(gomobile_mod_version "$binary")" == "$gomobile_version" ]] || return 1
@@ -317,7 +320,15 @@ entries.sort(key=lambda pair: pair[1])
 
 with zipfile.ZipFile(artifact, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as zf:
     for path, arcname in entries:
-        if path.is_dir():
+        if path.is_symlink():
+            # A framework's macOS slice links Versions/Current to A; storing
+            # the link as content would break the slice's layout. The zip
+            # keeps the link itself, which is also the deterministic answer.
+            info = zipfile.ZipInfo(arcname, date_time=FIXED_DATE)
+            info.external_attr = (0o120777 << 16)
+            info.compress_type = zipfile.ZIP_STORED
+            zf.writestr(info, str(path.readlink()).encode())
+        elif path.is_dir():
             info = zipfile.ZipInfo(arcname + "/", date_time=FIXED_DATE)
             info.external_attr = (0o755 << 16) | 0x10
             zf.writestr(info, b"")
