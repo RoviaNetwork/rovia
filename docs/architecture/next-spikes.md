@@ -16,23 +16,28 @@ Prove that one pinned libXray artifact can take packets out of
 `NEPacketTunnelFlow` and put packets back through the same public API.
 
 This is first because it is the only spike that decides whether Rovia can be a
-VPN at all. Today the extension checks engine availability before it constructs
-or applies network settings and returns a typed engine-unavailable error,
-because `engines.lock.json` enables no production engine.
+VPN at all. The extension checks engine availability before it constructs or
+applies network settings; the lock now approves and enables a pinned xray
+build, so what remains is wiring `prepare`/`start` to the artifact — until
+then the extension keeps returning a typed engine-unavailable error.
 
 Entry conditions, all of them required before the spike starts:
 
-- one exact libXray release selected, with its source commit recorded in
+- ~~one exact libXray release selected, with its source commit recorded in
   `engines.lock.json` as `approved` and `enabled`, and listed in
-  `productionEngines` — the current lock satisfies none of this;
-- an Apple XCFramework built by `tools/build-engine/xray/build-apple.sh`, which
-  today refuses with `No approved Xray lock entry is available; refusing to
-  build a floating engine`;
-- an artifact whose bytes match the digest in the lock, so
-  `tools/ci/verify-engine-checksums.sh --mode release` accepts the lock. That
-  mode currently refuses the real lock;
-- the license obligations of libXray written down next to the ADR, as
-  `docs/adr/0004-engine-licensing.md` requires.
+  `productionEngines`~~ **Done (2026-10-04):** the lock approves and enables
+  xray v26.9.9 at `50b95979f5db551bd273165cf469e5daaf791341`;
+- ~~an Apple XCFramework built by `tools/build-engine/xray/build-apple.sh`~~
+  **Done:** the recipe exists, fetches the pinned source archive, verifies its
+  digest before building, and builds `LibXray.xcframework` with the pinned
+  Go/gomobile toolchain;
+- ~~an artifact whose bytes match the digest in the lock~~ **Done:**
+  `tools/ci/verify-engine-checksums.sh --mode release` accepts the lock, and
+  `tools/reproducibility/verify-xray.sh` has produced the same digest from two
+  independent builds;
+- ~~the license obligations of libXray written down next to the ADR~~ **Done:**
+  `licenses/libXray-MIT.txt` and `licenses/Xray-core-MPL-2.0.txt` hold the
+  texts, and `THIRD_PARTY_NOTICES.md` records the redistribution obligations.
 
 What the spike must demonstrate, on a physical device:
 
@@ -52,7 +57,9 @@ raw hostname, address, and port, is deliberately not `Codable` and nothing
 persists it; the packet bridge must not reintroduce that shape.
 
 Exit condition: `tools/reproducibility/verify-xray.sh` compares two independent
-builds of the pinned commit and passes, instead of refusing as it does now.
+builds of the pinned commit and **passes** — met on 2026-10-04 — *and* the
+packet-flow demonstration above has run on a physical device, which has not
+happened yet.
 
 ## 2. Signed Apple lifecycle on a physical device
 

@@ -140,6 +140,15 @@ an approved binary with no declared release path.
 `tools/ci/test_verify_lockfiles.py` fails when a `Package.swift` exists in the
 tree but is not listed, so the list, the scripts, and the tests cannot drift.
 
-## Current foundation
+## Current state
 
-No production engine is enabled in the current lock, so there is no engine hash to compare yet. `tools/ci/verify-engine-checksums.sh --mode foundation` accepts the empty lock and says so; `--mode release` refuses it, and the release workflow only ever runs the release mode. `tools/reproducibility/verify-xray.sh` still exits non-zero, and `tools/build-engine/xray/build-apple.sh` refuses even when the lock pins an approved Xray build, because the deterministic build recipe is not written yet. No claim of engine reproducibility is made.
+The lock enables one production engine: xray v26.9.9, pinned to commit
+`50b95979f5db551bd273165cf469e5daaf791341` with a verified source archive
+digest. `tools/build-engine/xray/build-apple.sh` builds
+`LibXray.xcframework.zip` from that pin, `tools/reproducibility/verify-xray.sh`
+builds it twice in isolation and refuses unless both digests agree, and
+`tools/ci/verify-engine-checksums.sh --mode release` refuses anything whose
+bytes do not match the recorded digest
+`8c9eadede96413189dbc6587056790e8de108657968165faf3adbe98ee3f2891`. The digest
+is reproduced by two independent builds on the reference machine, and the
+engine-proof workflow reruns both checks on every change to the lock.

@@ -82,14 +82,16 @@ NetworkExtension public API: NEPacketTunnelProvider
 NEPacketTunnelNetworkSettings, when an engine exists
 ```
 
-This is where the flow stops today. `engines.lock.json` enables no production
-engine, so the availability check refuses before any network setting is
-constructed, and the extension never reads or writes `packetFlow`. The code that
-would move a packet between `packetFlow` and an engine does not exist in this
+This is where the flow stops today. The engine lock approves and enables a
+pinned xray build, and the gated pipeline produces the artifact, but the
+adapter's `prepare`/`start` are not wired to it, so
+the availability check refuses before any network setting is constructed, and
+the extension never reads or writes `packetFlow`. The code that would move a
+packet between `packetFlow` and the engine does not exist yet in this
 repository, and no traffic passes through Rovia in this build.
 
 Rovia never installs a default route before the engine and configuration are
-known to be available. No engine binary is bundled in this build and nothing
+known to be available. No engine binary is executed in this build and nothing
 executable is downloaded after installation.
 
 ### Routing and health
@@ -252,9 +254,9 @@ before submission, and must update this section if the answer changes.
 | What is the retention? | In memory for the life of the app process. Nothing is written to disk in this slice, and there is no server-side retention. |
 | Can the user request deletion? | There is nothing stored to delete: closing the app discards it, and deleting the app removes it. There is no server to ask. When a durable store is added, deletion has to be implemented there first. |
 | Does the app use data for advertising? | No. |
-| Does the app download executable code? | No, and no engine is bundled in this build either: `engines.lock.json` enables none, so the app cannot establish a tunnel. `docs/legal/app-store-distribution.md` records the App Review note for the day a pinned engine is added. |
+| Does the app download executable code? | No. No engine binary is bundled in this build either: the lock pins a reproducible engine that the gated build pipeline produces, but the adapter is not wired to it yet, so the app cannot establish a tunnel. `docs/legal/app-store-distribution.md` records the App Review position for the day the engine is wired in. |
 | Does the app open a local listener? | No. |
-| Are there region-specific requirements? | None today, because no engine is bundled. Bundling one can create licence obligations that differ by jurisdiction; see `docs/legal/app-store-distribution.md`, and legal review is required before shipping an engine. |
+| Are there region-specific requirements? | None today, because no engine binary is linked into the app. A bundled engine carries licence obligations (libXray MIT, Xray-core MPL-2.0) that travel with the binary — see `licenses/` and `docs/legal/licensing.md` — and can create rules that differ by jurisdiction; legal review is required before shipping one. |
 
 ## Reporting a privacy problem
 

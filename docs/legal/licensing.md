@@ -15,39 +15,23 @@ to it.
 
 It is **not** a statement about the licences of anything a build might bundle.
 
-No third-party binary is bundled in this repository, and none can be: `engines.lock.json`
-enables nothing, and the release tooling refuses an engine entry that has no pinned
-commit and artifact digest. That is the position today, and it is not the position a
-released app would be in.
-
-## If a future build ships an engine
-
-This licence covers **Rovia's own work**: the Swift packages under `core/`,
-`engines/`, `platform/`, and `client/`, the JSON schemas, the fixtures, and the
-tooling. It is *provisional* in one specific sense, stated here rather than left
-for a reader to infer: **it is not a statement about the licences of anything a
-build might bundle.**
-
-No third-party binary is bundled in this repository, and none can be: the engine
-lock enables nothing, and the release tooling refuses an entry that has no pinned
-commit and artifact digest. That is the position today. It is not the position a
-released app would be in.
-
-If a future build ships an engine, the applicable terms are:
+No third-party binary is committed to this repository. The engine lock pins
+xray v26.9.9 — exact source commit, verified source archive digest, and the
+artifact digest every gated build reproduces — and the build pipeline produces
+`LibXray.xcframework.zip` from that pin. When the app links the artifact, the
+applicable terms are:
 
 | Component | Licence | Consequence for a distributed build |
 | --- | --- | --- |
-| Xray-core | MPL-2.0 | File-level copyleft. Covered files and any modifications must stay available, and the notices must travel with the binary. |
+| Xray-core | MPL-2.0 | File-level copyleft. Covered files and any modifications must stay available, and the notices must travel with the binary. Rovia modifies no covered file: the Corresponding Source is the upstream repository at the pinned commit `52a412d9e2f5`, and the build recipe is `tools/build-engine/xray/build-apple.sh`. |
 | libXray | MIT (wrapper) | The wrapper's licence does **not** override the obligations of the Xray-core code it packages. |
 | sing-box / Libbox | GPL-3.0-or-later | **Not enabled.** A GPL-covered engine in an App Store build requires a compliant distribution model, source availability, and legal review before it is shipped. |
 
-So the final distribution scheme depends on which engine integration is chosen, and
-that decision has not been made. MIT-provisional is the right licence for the code as
-it stands; it is not a prediction about a binary that does not exist yet.
-
-`THIRD_PARTY_NOTICES.md` records the intended status of each candidate, and
-`docs/adr/0004-engine-licensing.md` records the decision and its reasoning. The
-project does not infer a licence permission from the existence of an official client,
-or from an engine's technical ability to compile for iOS.
+The complete license texts are in `licenses/` (`libXray-MIT.txt`,
+`Xray-core-MPL-2.0.txt`), and `THIRD_PARTY_NOTICES.md` records the exact
+revisions and the redistribution obligations. `docs/adr/0004-engine-licensing.md`
+records the decision and its reasoning. The project does not infer a licence
+permission from the existence of an official client, or from an engine's
+technical ability to compile for iOS.
 
 Nothing here is legal advice.

@@ -3,12 +3,33 @@
 All notable changes to this project are documented here.
 
 The project is pre-alpha. Nothing below has been signed, archived, uploaded, or
-run on a physical device, and no production engine is enabled. The verification
+run on a physical device. One production engine is pinned, bundled, and
+reproducible; it is not wired to the tunnel yet. The verification
 record for the current state is `docs/development/foundation-verification.md`.
 
 ## Unreleased
 
 ### Added
+
+- The pinned Xray engine build: `engines.lock.json` approves and enables xray
+  v26.9.9 (`50b95979f5db551bd273165cf469e5daaf791341`, verified against the
+  upstream source archive digest), `tools/build-engine/xray/build-apple.sh`
+  builds `LibXray.xcframework` (iOS, iOS Simulator, macOS) with the pinned
+  Go 1.27.1 + gomobile toolchain,
+  and `tools/build-engine/xray/determinize-xcframework.py` normalises the ar
+  member headers, the plist version stamps, and the xcframework slice order so
+  the artifact is byte-reproducible. Two independent builds produce the
+  recorded digest `8c9eaded…f2891`, which
+  `tools/reproducibility/verify-xray.sh` now proves on every run instead of
+  refusing. The artifact is gitignored — built, not committed — and the
+  engine-proof and engine-repro workflows select the pinned Go toolchain,
+  rebuild, and re-verify on every lock change. Release evidence:
+  `licenses/libXray-MIT.txt`,
+  `licenses/Xray-core-MPL-2.0.txt`, and the redistribution obligations in
+  `THIRD_PARTY_NOTICES.md`.
+- Refusal-path tests for the engine build gate
+  (`tools/build-engine/xray/test_build_apple.py`): an unapproved, disabled,
+  unpinned, or escaping lock is refused before any download or build runs.
 
 - `ProductionFetchTests.swift`: the production composition — real
   `SubscriptionFetcher.production()` through a real coordinator over a local

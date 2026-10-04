@@ -11,7 +11,7 @@ decision can be *shown*, not just applied.
 
 [![Status](https://img.shields.io/badge/status-pre--alpha-ff6b35?style=flat-square)](#status--what-works-and-what-does-not) [![CI](https://github.com/RoviaNetwork/rovia/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/RoviaNetwork/rovia/actions/workflows/ci.yml) [![Engine repro](https://github.com/RoviaNetwork/rovia/actions/workflows/engine-repro.yml/badge.svg?branch=main)](https://github.com/RoviaNetwork/rovia/actions/workflows/engine-repro.yml) [![Engine proof](https://github.com/RoviaNetwork/rovia/actions/workflows/engine-proof.yml/badge.svg?branch=main)](https://github.com/RoviaNetwork/rovia/actions/workflows/engine-proof.yml)
 
-[![License](https://img.shields.io/badge/license-MIT%20provisional-8a8a8a?style=flat-square)](LICENSE) [![Engine](https://img.shields.io/badge/engine-none%20enabled-dimgray?style=flat-square)](engines.lock.json) [![Platform](https://img.shields.io/badge/iOS-17%2B-0a84ff?style=flat-square&logo=apple&logoColor=white)](docs/development/ios.md) [![Swift](https://img.shields.io/badge/Swift-6.2-F05138?style=flat-square&logo=swift&logoColor=white)](#building-and-developing)
+[![License](https://img.shields.io/badge/license-MIT%20provisional-8a8a8a?style=flat-square)](LICENSE) [![Engine](https://img.shields.io/badge/engine-xray%20v26.9.9%20pinned-blue?style=flat-square)](engines.lock.json) [![Platform](https://img.shields.io/badge/iOS-17%2B-0a84ff?style=flat-square&logo=apple&logoColor=white)](docs/development/ios.md) [![Swift](https://img.shields.io/badge/Swift-6.2-F05138?style=flat-square&logo=swift&logoColor=white)](#building-and-developing)
 
 [Status](#status--what-works-and-what-does-not) · [The app](#the-app) · [Privacy](#privacy-first-principles) · [Protocols](#importable-protocols) · [Routing](#routing-architecture) · [Roadmap](#roadmap) · [Contributing](#contributing)
 
@@ -21,11 +21,14 @@ decision can be *shown*, not just applied.
 
 > [!IMPORTANT]
 > **This build does not establish a VPN tunnel, and no VPN claim is made here.**
-> There is no production engine in this repository: `engines.lock.json` enables none,
-> the Packet Tunnel extension therefore refuses to start before it touches any network
-> setting, and there is no `packetFlow` → Xray bridge. The part of Rovia that *is*
-> finished is the domain core and the fail-closed scaffolding around it. Read
-> [Status](#status--what-works-and-what-does-not) before anything else.
+> The production engine is pinned and reproducible — `engines.lock.json`
+> approves xray v26.9.9, and the gated pipeline builds it byte-identically on
+> every run — but the adapter's `prepare`/`start` are not wired to the
+> artifact, so the Packet Tunnel extension still refuses to start before it
+> touches any network setting, and there is no `packetFlow` → Xray bridge. The
+> part of Rovia that *is* finished is the domain core, the fail-closed
+> scaffolding around it, and the engine build pipeline.
+> Read [Status](#status--what-works-and-what-does-not) before anything else.
 
 ---
 
@@ -126,7 +129,8 @@ evaluator into the app, and 20 that persist a raw routing trace.
 | | |
 |---|---|
 | **State** | `Pre-alpha`. No release, no tag, no App Store submission. |
-| **Establishes a VPN tunnel** | **No.** No production engine is enabled. |
+| **Establishes a VPN tunnel** | **No.** The engine is pinned and reproducible, but the adapter is not wired to it yet. |
+| **Engine build** | **Pinned and reproducible.** xray v26.9.9 builds byte-identically twice; the digest is in `engines.lock.json`. |
 | **Xray `packetFlow` bridge** | **Not implemented.** Adapters are typed stubs. |
 | **Signed device / archive validation** | **Has not happened.** No Apple Developer team, no certificate, no provisioning profile. |
 | **Hosted CI** | Runs on every push and pull request. See [Verification](#verification). |
@@ -157,7 +161,8 @@ evaluator into the app, and 20 that persist a raw routing trace.
 
 ### ❌ Not verified — cannot be claimed
 
-- **A working tunnel.** There is no engine, so the VPN path has never run end to end.
+- **A working tunnel.** The engine is pinned and reproducible, but the adapter's
+  `prepare`/`start` are not wired to it, so the VPN path has never run end to end.
   The 60 app tests are a launch and model check, not a tunnel.
 - **Packet Tunnel Provider lifecycle on a device.** Only a simulator install/launch
   was performed. A process staying alive in the simulator is evidence about a process
@@ -230,14 +235,14 @@ can fail, and the mapping from each claim to the App Store privacy question it a
 | `core/subscription` | Share-link parser, redaction, sanitisation. |
 | `core/routing` | Route evaluator, routing diagnostic, server selection. |
 | `engines/api` | The `TunnelEngine` protocol — the only engine-shaped thing in the tree. |
-| `engines/xray`, `engines/singbox` | Adapter boundaries. Both currently unavailable. |
+| `engines/xray`, `engines/singbox` | Adapter boundaries. sing-box is disabled; xray has a pinned, reproducible artifact the gated pipeline builds, with `prepare`/`start` still to be wired. |
 | `platform/apple` | Tunnel launch coordination, Keychain and App Group stores. |
 | `client/app/ios` | SwiftUI app and the Packet Tunnel extension. |
 | `schemas` | Portable JSON contracts, shared with any future Android client. |
 | `fixtures` | Sanitised test vectors. Every host is `synthetic.example`. |
 | `tools/ci` | Every gate. Local and hosted CI run the same commands. |
 | `tools/reproducibility` | SBOM generation and checking, provenance manifests. |
-| `tools/release`, `tools/build-engine` | Tag grammar, export-options preflight, engine build refusal. |
+| `tools/release`, `tools/build-engine` | Tag grammar, export-options preflight, the pinned engine build. |
 | `docs/adr` | The decisions, and why each was taken. |
 | `docs/architecture` | Overview, decision log, and the next spikes. |
 | `docs/development` | CI reference, iOS notes, the dated verification record, release readiness. |
@@ -343,8 +348,8 @@ xcodebuild -project client/app/ios/RoviaApp.xcodeproj -scheme RoviaApp \
 <!-- counts:start -->
 | Swift packages (`tools/ci/local-packages.txt`) | 1 | 5 |
 | iOS app model (`RoviaAppTests`) | 1 | 103 |
-| Tooling gates (`tools/**/test_*.py`) | 14 | 627 |
-| **Total** | | **735** |
+| Tooling gates (`tools/**/test_*.py`) | 15 | 641 |
+| **Total** | | **749** |
 <!-- counts:end -->
 
 The figures above are generated by `tools/ci/update-readme-counts.py` from the same

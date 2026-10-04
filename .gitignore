@@ -41,4 +41,5 @@ __pycache__/
 
 # Generated engine artifacts
 /LibXray.xcframework/
+/LibXray.xcframework.zip
 /Libbox.xcframework/

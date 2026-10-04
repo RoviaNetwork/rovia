@@ -1,15 +1,20 @@
 #!/usr/bin/env bash
 # Verify the engine lock.
 #
-# Two modes with opposite obligations:
+# Two modes with shared structure and one deliberate difference:
 #
-#   foundation  the current slice ships no production engine, so an empty lock
-#               is a valid answer. Any entry that is present must still be
-#               complete: approved, enabled, a full commit SHA, and an artifact
-#               whose bytes match the recorded digest.
+#   foundation  an empty lock is a valid answer. A lock that enables an engine
+#               must still be complete: approved, enabled, a full commit SHA,
+#               and a 64-character artifact digest. The artifact's bytes are
+#               verified when the artifact is on disk; on a fresh checkout it
+#               is not there yet, because the build produces it and the file
+#               is gitignored. A present artifact whose bytes disagree with
+#               the lock is refused in both modes.
 #   release     a release may only be built from exactly one approved Xray
-#               entry. Every missing, partial, or ambiguous input is a refusal;
-#               the script never repairs or downgrades a lock to make it pass.
+#               entry, and the artifact's bytes must be on disk and match the
+#               recorded digest. Every missing, partial, or ambiguous input is
+#               a refusal; the script never repairs or downgrades a lock to
+#               make it pass.
 #
 # Usage:
 #   verify-engine-checksums.sh [--mode foundation|release] [--lock PATH]
@@ -135,7 +140,7 @@ def resolve_artifact(entry):
     return artifact
 
 
-def verify_candidate(name, entry):
+def verify_candidate(name, entry, mode):
     if not isinstance(entry, dict):
         fail(f"the {name} candidate is missing")
     if entry.get("enabled") is not True:
@@ -177,7 +182,18 @@ def verify_candidate(name, entry):
 
     artifact = resolve_artifact(entry)
     if not artifact.is_file():
-        fail(f"{name} artifact does not exist: {artifact}")
+        if mode == "release":
+            fail(f"{name} artifact does not exist: {artifact}")
+        # Foundation mode runs before the artifact exists on a fresh checkout:
+        # the build produces it, and the release mode then verifies the bytes.
+        # What foundation refuses is a *present* artifact whose bytes disagree
+        # with the lock — that is a checkout claiming one engine and carrying
+        # another.
+        report(
+            f"{name} artifact is not on disk ({artifact.name}); "
+            "the pinned build produces it — structure and pins verified"
+        )
+        return
     actual = hashlib.sha256(artifact.read_bytes()).hexdigest()
     if actual.lower() != entry["sha256"].lower():
         fail(f"{name} artifact checksum does not match the engine lock: {artifact}")
@@ -247,7 +263,7 @@ if not engines:
     report(f"no production engine is enabled; {mode} mode accepts an empty engine lock")
     raise SystemExit(0)
 
-verify_candidate(PRODUCTION_ENGINE, candidates.get(PRODUCTION_ENGINE))
+verify_candidate(PRODUCTION_ENGINE, candidates.get(PRODUCTION_ENGINE), mode)
 write_github_output(True, PRODUCTION_ENGINE)
 report(
     f"xray is approved and verified: version {candidates['xray']['version']}, "

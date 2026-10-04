@@ -164,8 +164,27 @@ class GenerateSbomTests(unittest.TestCase):
         self.assertEqual(packages["SPDXRef-App-io.rovia.client"]["versionInfo"], "0.1.0")
         self.assertEqual(packages["SPDXRef-Extension-io.rovia.client.tunnel"]["versionInfo"], "0.1.0")
 
-    def test_no_engine_component_is_reported_for_the_foundation_lock(self):
-        identifiers = {package["SPDXID"] for package in self.document["packages"]}
+    def test_no_engine_component_is_reported_for_a_foundation_lock(self):
+        with tempfile.TemporaryDirectory() as name:
+            directory = Path(name)
+            lock = directory / "engines.lock.json"
+            lock.write_text(
+                json.dumps(
+                    {
+                        "schemaVersion": 1,
+                        "runtimePolicy": {
+                            "maxGoRuntimesPerProcess": 1,
+                            "allowedProductionEngine": "xray",
+                        },
+                        "productionEngines": [],
+                        "candidates": {},
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            document = generate("--lock", str(lock))
+        identifiers = {package["SPDXID"] for package in document["packages"]}
         self.assertFalse([value for value in identifiers if value.startswith("SPDXRef-Engine-")])
 
     def test_enabled_engines_are_reported_with_provenance(self):
@@ -854,11 +873,22 @@ class EngineLicenseTests(unittest.TestCase):
             json.loads((REPO_ROOT / "engines.lock.json").read_text(encoding="utf-8"))
         )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        # The lock enables nothing, so no engine component is emitted; what
-        # matters is that this succeeded without any component needing a default.
+        # The lock enables xray, so the engine component is emitted with the
+        # lock's license and artifact digest; sing-box stays pending and absent.
         names = {p["name"] for p in document["packages"]}
-        self.assertNotIn("xray", names)
+        self.assertIn("xray", names)
         self.assertNotIn("sing-box", names)
+        engine = next(p for p in document["packages"] if p["name"] == "xray")
+        self.assertEqual(engine["licenseDeclared"], "MIT")
+        self.assertEqual(
+            engine["checksums"],
+            [
+                {
+                    "algorithm": "SHA256",
+                    "checksumValue": "8c9eadede96413189dbc6587056790e8de108657968165faf3adbe98ee3f2891",
+                }
+            ],
+        )
 
     def test_the_engine_comment_names_the_license_and_its_source(self):
         result, document = self.emit(self.lock_with(self.candidate()))

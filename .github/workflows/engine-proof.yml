@@ -43,6 +43,17 @@ jobs:
             --schemafile schemas/engine-lock.schema.json --color never "$ROVIA_ENGINE_LOCK"
         env:
           ROVIA_ENGINE_LOCK: engines.lock.json
+      - name: Read the Go version the engine lock pins
+        id: go-pin
+        if: steps.engine.outputs.enabled == 'true'
+        run: echo "version=$(tools/build-engine/xray/locked-go-version.sh --lock "$ROVIA_ENGINE_LOCK")" >> "$GITHUB_OUTPUT"
+        env:
+          ROVIA_ENGINE_LOCK: engines.lock.json
+      - name: Set up the pinned Go toolchain
+        if: steps.engine.outputs.enabled == 'true'
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version: ${{ steps.go-pin.outputs.version }}
       - name: Prove a real engine build or record its absence
         # Never skipped: unlike engine-repro (which skips build+verify when no
         # engine is enabled and stays green without building anything), this

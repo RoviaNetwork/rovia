@@ -15,7 +15,7 @@ Relevant primary sources:
 ## Rovia decisions
 
 - The Packet Tunnel extension uses public NetworkExtension APIs.
-- Engine versions are pinned when an engine is added, and a release ships only the version its lock names. No engine is pinned or shipped today: `engines.lock.json` enables none, so the app cannot establish a tunnel. The App Review note for that day is recorded in `PRIVACY.md` and has to be written with the lock, not before it.
+- Engine versions are pinned, and a release ships only the version its lock names. The lock now pins xray v26.9.9, and the gated build pipeline produces the artifact with the recorded digest, but the adapter is not wired to it yet, so the app cannot establish a tunnel today. The App Review note for the wired state is recorded in `PRIVACY.md` and has to be kept in step with the lock.
 - The app does not download an executable engine after installation.
 - Host-to-extension communication uses a versioned provider message rather than a LAN HTTP server.
 - The app group contains only the minimum shared data; credentials belong in Keychain.
