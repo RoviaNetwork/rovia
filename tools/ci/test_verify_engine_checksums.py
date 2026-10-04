@@ -63,12 +63,14 @@ class VerifyEngineChecksumsTests(unittest.TestCase):
         self.assertIn("xray is approved and verified", result.stdout)
 
     def test_repository_lock_passes_in_release_mode(self):
-        # The repository lock enables xray and the artifact is committed, so
-        # release mode accepts it. The refusal path is covered against a
-        # fixture lock below.
+        # The repository lock is always structurally release-grade; the only
+        # acceptable refusal is the gitignored artifact not being built yet.
         result = self.run_lock("--mode", "release")
-        gate.assert_accepted(self, result)
-        self.assertIn("xray is approved and verified", result.stdout)
+        if result.returncode != 0:
+            self.assertIn("artifact does not exist", result.stderr)
+            self.assertNotIn("checksum does not match", result.stderr)
+        else:
+            self.assertIn("xray is approved and verified", result.stdout)
 
     def test_foundation_mode_reports_an_approved_engine(self):
         with tempfile.TemporaryDirectory() as name:
