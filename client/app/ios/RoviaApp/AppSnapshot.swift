@@ -58,6 +58,7 @@ enum AppAccessibilityIdentifier {
     static let subscriptionEntryPrefix = "rovia.subscription.entry."
     static let subscriptionRedaction = "rovia.subscription.redaction"
     static let subscriptionEmpty = "rovia.subscription.empty"
+    static let subscriptionAllRejected = "rovia.subscription.allRejected"
 
     static func sidebarRoute(_ rawValue: String) -> String {
         "rovia.sidebar.\(rawValue)"
@@ -75,7 +76,8 @@ enum AppAccessibilityIdentifier {
         routingDebuggerSteps,
         routingDebuggerEmpty,
         subscriptionEntries,
-        subscriptionEmpty
+        subscriptionEmpty,
+        subscriptionAllRejected
     ]
 
     static let elementIdentifiers: [String] = [
@@ -1109,6 +1111,33 @@ enum PrimaryTunnelAction: Equatable, Sendable {
     case busy
 }
 
+/// A deep-link import awaiting explicit confirmation in the preview sheet.
+struct PendingImport: Equatable, Sendable, Identifiable {
+    let id: UUID
+    let text: String
+    let name: String?
+
+    init(text: String, name: String?) {
+        self.id = UUID()
+        self.text = text
+        self.name = name
+    }
+}
+
+/// Tells the UI which subscription state it is looking at.
+enum SubscriptionContentState: Equatable, Sendable {
+    /// Fixture/sample content (tests, previews, explicit demo mode).
+    case sample
+    /// No subscriptions stored yet.
+    case none
+    /// Real subscription servers loaded.
+    case live
+    /// Subscriptions stored, but every entry rejected: zero servers.
+    case allRejected
+    /// The store could not be read (missing keys, corrupt file, disk error).
+    case unavailable
+}
+
 struct AppSnapshot: Equatable, Sendable {
     var system: SystemState = .idle
     var engine: TunnelState = .unknown
@@ -1120,6 +1149,14 @@ struct AppSnapshot: Equatable, Sendable {
     var evaluation: DebugEvaluation?
     var lastError: AppError?
     var isSampleData: Bool = true
+    /// Where the content came from. Replaces the old silent fallback: an
+    /// empty store, an all-rejected store, and an unreadable store are
+    /// different states with different screens, not three ways to show
+    /// demo servers.
+    var contentSource: SubscriptionContentState = .sample
+    /// Subscription IDs whose last refresh failed. Cleared by any fully
+    /// successful refresh; drives per-row errors, not a global banner.
+    var failedRefreshIDs: Set<UUID> = []
     /// The last add/refresh attempt: accepted/rejected counts for honest UI.
     var lastSubscriptionResult: SubscriptionImportSummary?
 

@@ -10,6 +10,15 @@ record for the current state is `docs/development/foundation-verification.md`.
 
 ### Added
 
+- `ProductionFetchTests.swift`: the production composition — real
+  `SubscriptionFetcher.production()` through a real coordinator over a local
+  loopback server — covering redirect-chain blocking, oversized bodies without a
+  Content-Length, stalled bodies, production cancellation, document-line
+  rejection numbers, first-import rollback of the subscription URL secret,
+  mid-import save-failure rollback, and the v1→v2 server-ID remap.
+- The subscription coordinator now reports `remappedServerIDs` on every import
+  summary, and the app carries the selection and favorites across a server's
+  v1→v2 ID rotation instead of silently dropping both.
 - A lint gate over the repository's Python: `tools/ci/check-python-lint.sh` runs a
   pinned `pyflakes` and is invoked by `tools/ci/run-tool-tests.sh`.
 - A check that no module or class under `tools/` defines the same name twice, for
@@ -65,6 +74,25 @@ record for the current state is `docs/development/foundation-verification.md`.
 
 ### Fixed
 
+- The production-composition fetch shim recursed forever: `SubscriptionFetchClient.fetch(_:policy:)`
+  called `fetch(url, policy:)` inside its own conformance, binding to itself rather
+  than to `SubscriptionFetcher.fetch(_:policy override:)` — every production fetch
+  hung, and the app tests that exercised it stalled until the runner aborted. The
+  protocol requirement now uses a distinct label (`fetchPolicy:`), which compiles
+  to the real method.
+- A cancelled or failed first import leaked the subscription URL secret into the
+  Keychain: it was saved before `importAndStore`, and the transaction only rolled
+  back server secrets. The URL key is now part of the same transaction, so every
+  failure path — cancellation at any checkpoint, mid-import save failure, store
+  failure — deletes it too, while `rollbackSecrets` keeps sparing keys still
+  referenced by stored records.
+- A credential-sink failure aborted no import: `SubscriptionImporter` maps it to a
+  per-line rejection, so the discard of secret storage stayed atomic only on
+  paper. The coordinator captures the first sink failure and aborts the import
+  with it.
+- A failed first import that produced zero accepted servers stored an empty
+  record whose display state never restamped `updatedAt` or the schema version;
+  the rebuild now sets both, matching every other store write.
 - **Publication pass — the tree as an open-source repository.** `CODEOWNERS` names a
   real owner instead of an organisation that does not exist, and `SECURITY.md` states
   the consequence: with one maintainer, a required review would be a self-review, so

@@ -18,33 +18,108 @@ struct SubscriptionImportSummary: Equatable, Sendable {
     let subscriptionID: UUID
     let accepted: Int
     let rejected: [RejectedSubscriptionLine]
+    /// v1→v2 migration map: stored server IDs that changed identity across
+    /// this import, matched unambiguously by (protocol, host, port).
+    /// Empty for first imports and for refreshes with nothing to remap.
+    /// The caller applies it to the selection and favorites; without this,
+    /// an ID rotation would silently drop both.
+    let remappedServerIDs: [UUID: UUID]
+
+    init(
+        subscriptionID: UUID,
+        accepted: Int,
+        rejected: [RejectedSubscriptionLine],
+        remappedServerIDs: [UUID: UUID] = [:]
+    ) {
+        self.subscriptionID = subscriptionID
+        self.accepted = accepted
+        self.rejected = rejected
+        self.remappedServerIDs = remappedServerIDs
+    }
 }
 
-/// An import job that may cross to a detached task. Unchecked because
-/// `ShareLinkCredentialSink` is not marked `@Sendable` (marking the
-/// package-wide typealias would break every existing call site that captures
-/// test recorders); the concrete closures built by `credentialSink` capture
-/// only the `Sendable` secret store and a UUID, so no shared mutable state
-/// crosses here.
-private struct DetachedImport: @unchecked Sendable {
-    let lines: [String]
-    let sink: ShareLinkCredentialSink
+/// Fetch transport, chosen explicitly at composition — never inferred from
+/// the dependency's type. Production passes the streaming fetcher (byte cap
+/// during the read, hop-by-hop redirect control); tests pass a stub.
+/// A coordinator built with the wrong transport fetches with the wrong
+/// guarantees, so there is no default that could silently pick one.
+///
+/// The second parameter is named `fetchPolicy` on purpose: `SubscriptionFetcher`
+/// also has a `fetch(_:policy:)` overload, and `policy:` inside the conformance
+/// would recurse into itself forever. The label disambiguates.
+protocol SubscriptionFetchClient: Sendable {
+    func fetch(_ url: URL, fetchPolicy: SubscriptionFetchPolicy) async throws -> SubscriptionFetchResult
 }
 
-private enum SecretKeys {    static func subscriptionURL(_ id: UUID) -> String {
+extension SubscriptionFetcher: SubscriptionFetchClient {
+    func fetch(_ url: URL, fetchPolicy: SubscriptionFetchPolicy) async throws -> SubscriptionFetchResult {
+        try await fetch(url, policy: fetchPolicy)
+    }
+}
+
+/// Whole-body stub transport for tests. Production must never use this:
+/// it loads the entire body before checking the size cap and follows
+/// redirects with the shared session's defaults.
+struct StubFetchClient: SubscriptionFetchClient {
+    let session: any SubscriptionHTTPSession
+
+    func fetch(_ url: URL, fetchPolicy: SubscriptionFetchPolicy) async throws -> SubscriptionFetchResult {
+        try await SubscriptionFetcher(session: session, policy: fetchPolicy).fetch(url)
+    }
+}
+
+private enum SecretKeys {
+    static func subscriptionURL(_ id: UUID) -> String {
         "subscription/\(id.uuidString.lowercased())/url"
     }
 
-    /// Deterministic per secret bytes: the same credential reuses one
-    /// Keychain entry across refreshes, and two servers sharing a password
-    /// honestly share it. FNV-1a/64, hex — printable ASCII, 16 chars.
-    static func credential(subscriptionID: UUID, secret: Data) -> String {
-        var hash = UInt64(0xCBF29CE484222325)
-        for byte in secret {
-            hash ^= UInt64(byte)
-            hash &*= 0x100000001B3
-        }
-        return "subscription/\(subscriptionID.uuidString.lowercased())/credential/\(String(format: "%016llx", hash))"
+    /// Opaque per-server key. The server UUID is stable (canonical import
+    /// ID), so the same server reuses one entry across refreshes, and the
+    /// record owns its keys explicitly: refresh replaces the list, remove
+    /// deletes it, a failed import deletes what it saved.
+    static func serverCredential(subscriptionID: UUID, serverID: UUID) -> String {
+        "subscription/\(subscriptionID.uuidString.lowercased())/server/\(serverID.uuidString.lowercased())"
+    }
+}
+
+/// Keychain keys saved during one import, for rollback on failure.
+/// Unchecked because the compiler cannot see the lock; every access below
+/// holds it, and the array never escapes except as a copy.
+private final class SavedKeys: @unchecked Sendable {
+    private let lock = NSLock()
+    private var keys: [String] = []
+
+    func append(_ key: String) {
+        lock.lock()
+        defer { lock.unlock() }
+        keys.append(key)
+    }
+
+    func snapshot() -> [String] {
+        lock.lock()
+        defer { lock.unlock() }
+        return keys
+    }
+}
+
+/// First credential-sink failure of an import. The parser maps a sink
+/// throw to the per-line rejection `.credentialSinkFailed` and keeps
+/// going; the coordinator's transaction is all-or-nothing, so the real
+/// error is captured here and rethrown to abort the import.
+private final class SinkFailure: @unchecked Sendable {
+    private let lock = NSLock()
+    private var first: Error?
+
+    func record(_ error: Error) {
+        lock.lock()
+        if first == nil { first = error }
+        lock.unlock()
+    }
+
+    var error: Error? {
+        lock.lock()
+        defer { lock.unlock() }
+        return first
     }
 }
 
@@ -60,17 +135,34 @@ private enum SecretKeys {    static func subscriptionURL(_ id: UUID) -> String {
 final class SubscriptionCoordinator {
     private let store: SubscriptionStore
     private let secrets: any SecretStore
-    private let session: any SubscriptionHTTPSession
+    private let fetcher: any SubscriptionFetchClient
+    private let fetchPolicy: SubscriptionFetchPolicy
     private var refreshing: Set<UUID> = []
 
     init(
         store: SubscriptionStore,
         secrets: any SecretStore,
-        session: any SubscriptionHTTPSession = URLSession.shared
+        fetcher: any SubscriptionFetchClient,
+        fetchPolicy: SubscriptionFetchPolicy = SubscriptionFetchPolicy()
     ) {
         self.store = store
         self.secrets = secrets
-        self.session = session
+        self.fetcher = fetcher
+        self.fetchPolicy = fetchPolicy
+    }
+
+    /// Test composition: whole-body stub session. Production must use
+    /// `init(store:secrets:fetcher:)` with `SubscriptionFetcher.production()`.
+    init(
+        store: SubscriptionStore,
+        secrets: any SecretStore,
+        session: any SubscriptionHTTPSession,
+        fetchPolicy: SubscriptionFetchPolicy = SubscriptionFetchPolicy()
+    ) {
+        self.store = store
+        self.secrets = secrets
+        self.fetcher = StubFetchClient(session: session)
+        self.fetchPolicy = fetchPolicy
     }
 
     var isRefreshing: Set<UUID> { refreshing }
@@ -90,7 +182,7 @@ final class SubscriptionCoordinator {
     func add(url: URL, name: String, allowInsecure: Bool) async throws -> SubscriptionImportSummary {
         let id = UUID()
         let downloaded = try await fetch(url: url, allowInsecure: allowInsecure)
-        let document = try decode(downloaded.data)
+        let document = try await background { try Self.decode(downloaded.data) }
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedName.isEmpty else { throw SubscriptionCoordinatorError.invalidInput }
         try secrets.save(Data(url.absoluteString.utf8), for: SecretKeys.subscriptionURL(id))
@@ -127,7 +219,7 @@ final class SubscriptionCoordinator {
         guard let data = text.data(using: .utf8) else {
             throw SubscriptionCoordinatorError.decodeFailed(.invalidUTF8)
         }
-        let document = try decode(data)
+        let document = try await background { try Self.decode(data) }
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedName.isEmpty else { throw SubscriptionCoordinatorError.invalidInput }
         let record = StoredSubscription(
@@ -157,33 +249,10 @@ final class SubscriptionCoordinator {
             throw SubscriptionCoordinatorError.secretUnavailable
         }
         let raw = try await fetch(url: url, allowInsecure: record.allowInsecure)
-        let document = try decode(raw.data)
+        let document = try await background { try Self.decode(raw.data) }
         var refreshRecord = record
         refreshRecord.userInfo = raw.userInfo
         return try await importAndStore(lines: document.lines, record: refreshRecord, isFirstImport: false)
-    }
-
-    /// Refreshes every URL subscription. Pasted/single-link records have no
-    /// URL to re-fetch and are reported with their current counts. A failed
-    /// record keeps its last working servers (see `refresh`); the returned
-    /// summaries let the UI show per-subscription results honestly.
-    func refreshAll() async -> [SubscriptionImportSummary] {
-        var summaries: [SubscriptionImportSummary] = []
-        for record in await store.subscriptions() {
-            guard record.source.kind == .url else { continue }
-            do {
-                summaries.append(try await refresh(id: record.id))
-            } catch let error as SubscriptionCoordinatorError {
-                if case let .nothingAccepted(accepted, rejected) = error {
-                    summaries.append(SubscriptionImportSummary(
-                        subscriptionID: record.id,
-                        accepted: accepted,
-                        rejected: rejected
-                    ))
-                }
-            } catch {}
-        }
-        return summaries
     }
 
     func rename(id: UUID, name: String) async throws {
@@ -217,6 +286,13 @@ final class SubscriptionCoordinator {
         }
     }
 
+    /// Summary identity: `subscriptionUUID/serverUUID`, both lowercased.
+    /// Stable across refreshes (both sides are stable), unique across
+    /// subscriptions, opaque to every consumer below this file.
+    static func summaryID(subscriptionID: UUID, serverID: UUID) -> String {
+        "\(subscriptionID.uuidString.lowercased())/\(serverID.uuidString.lowercased())"
+    }
+
     /// Non-secret endpoints for latency probing, keyed by the summary ID
     /// (`ServerSummary.id`). Hosts and ports are not secrets — the redacted
     /// display values already carry the port — but credentials never leave
@@ -225,7 +301,9 @@ final class SubscriptionCoordinator {
         var result: [String: (host: String, port: Int)] = [:]
         for record in await store.subscriptions() {
             for server in record.servers {
-                result[server.id.uuidString.lowercased()] = (server.endpoint.host, server.endpoint.port)
+                result[Self.summaryID(subscriptionID: record.id, serverID: server.id)] = (
+                    server.endpoint.host, server.endpoint.port
+                )
             }
         }
         return result
@@ -277,14 +355,23 @@ final class SubscriptionCoordinator {
         content.isSampleData = false
         for record in records {
             let groupID = "sub/\(record.id.uuidString.lowercased())"
-            let serverIDs = record.servers.map { $0.id.uuidString.lowercased() }
+            // Namespaced summary IDs: the same link in two subscriptions is
+            // two different servers with two different credential owners.
+            // Sharing the canonical UUID here would merge them — and merging
+            // would silently attribute one subscription's credentials to the
+            // other — so the summary ID carries both sides.
+            let serverIDs = record.servers.map {
+                Self.summaryID(subscriptionID: record.id, serverID: $0.id)
+            }
             content.profiles.append(ProfileSummary(
                 id: groupID,
                 name: record.name,
                 sourceKindLabel: "Subscription",
                 serverIDs: serverIDs
             ))
-            content.servers.append(contentsOf: record.servers.map { serverSummary($0, groupID: groupID) })
+            content.servers.append(contentsOf: record.servers.map {
+                serverSummary($0, groupID: groupID, summaryID: Self.summaryID(subscriptionID: record.id, serverID: $0.id))
+            })
             content.groups.append(ServerGroupSummary(
                 id: groupID,
                 name: record.name,
@@ -305,20 +392,20 @@ final class SubscriptionCoordinator {
     // MARK: - Private
 
     private func fetch(url: URL, allowInsecure: Bool) async throws -> SubscriptionFetchResult {
-        let fetcher = SubscriptionFetcher(
-            session: session,
-            policy: SubscriptionFetchPolicy(allowInsecureHTTP: allowInsecure)
-        )
+        var policy = fetchPolicy
+        policy.allowInsecureHTTP = allowInsecure
         do {
-            return try await fetcher.fetch(url)
+            return try await fetcher.fetch(url, fetchPolicy: policy)
         } catch let error as SubscriptionFetchError {
             throw SubscriptionCoordinatorError.fetchFailed(error)
+        } catch is CancellationError {
+            throw SubscriptionCoordinatorError.fetchFailed(.cancelled)
         } catch {
             throw SubscriptionCoordinatorError.fetchFailed(.networkError)
         }
     }
 
-    private func decode(_ data: Data) throws -> SubscriptionDocument {
+    private nonisolated static func decode(_ data: Data) throws -> SubscriptionDocument {
         do {
             return try SubscriptionDocumentDecoder.decode(data)
         } catch let error as SubscriptionDocumentError {
@@ -328,11 +415,37 @@ final class SubscriptionCoordinator {
         }
     }
 
-    private func credentialSink(subscriptionID: UUID) -> ShareLinkCredentialSink {
-        { [secrets] secret in
-            let key = SecretKeys.credential(subscriptionID: subscriptionID, secret: secret)
-            try secrets.save(secret, for: key)
-            return SecretReference(key: key)
+    /// Runs work off the MainActor with parent cancellation propagated: a
+    /// detached task alone would keep importing (and storing) after the
+    /// caller gave up. The work closure must capture only `Sendable` values.
+    private func background<T: Sendable>(_ work: @Sendable @escaping () throws -> T) async throws -> T {
+        let task = Task.detached(priority: .userInitiated, operation: work)
+        return try await withTaskCancellationHandler {
+            try await task.value
+        } onCancel: {
+            task.cancel()
+        }
+    }
+
+    /// Deletes every key saved during a failed import except those still
+    /// referenced by stored servers — a surviving entry is never collateral
+    /// damage of another record's failure.
+    private func rollbackSecrets(_ saved: SavedKeys) async {
+        let savedKeys = Set(saved.snapshot())
+        guard !savedKeys.isEmpty else { return }
+        var referenced: Set<String> = []
+        for record in await store.subscriptions() {
+            if let urlKey = record.source.secretReference?.key {
+                referenced.insert(urlKey)
+            }
+            for server in record.servers {
+                if let key = server.credential?.key {
+                    referenced.insert(key)
+                }
+            }
+        }
+        for key in savedKeys.subtracting(referenced) {
+            try? secrets.delete(for: key)
         }
     }
 
@@ -341,35 +454,126 @@ final class SubscriptionCoordinator {
         record: StoredSubscription,
         isFirstImport: Bool
     ) async throws -> SubscriptionImportSummary {
-        // Parsing thousands of links costs ~2s per 5000 on an i3 and must
-        // never run on the MainActor: the importer is pure, so it runs
-        // detached. The sink only captures the thread-safe secret store and
-        // a UUID, which is what makes the unchecked boundary below honest —
-        // and it is the only unchecked boundary in this file.
-        let sink = credentialSink(subscriptionID: record.id)
-        let job = DetachedImport(lines: lines, sink: sink)
-        let result = await Task.detached(priority: .userInitiated) {
-            SubscriptionImporter.importLines(job.lines, credentialSink: job.sink)
-        }.value
-        guard !result.accepted.isEmpty else {
-            if isFirstImport {
-                var empty = record
-                empty.servers = []
-                empty.acceptedCount = 0
-                empty.rejectedCount = result.rejected.count
-                try? await store.upsert(empty)
+        // Document line numbers travel with the text through trimming, dedup,
+        // and chunking: a rejection in document line 300 must not surface as
+        // line 44 of some chunk. Numbers are 1-based document lines.
+        var seen: Set<String> = []
+        var unique: [(number: Int, line: String)] = []
+        unique.reserveCapacity(lines.count)
+        for (offset, rawLine) in lines.enumerated() {
+            let line = rawLine.trimmingCharacters(in: .whitespaces)
+            guard !line.isEmpty else { continue }
+            if seen.insert(SubscriptionImporter.canonicalLine(line)).inserted {
+                unique.append((offset + 1, line))
             }
-            throw SubscriptionCoordinatorError.nothingAccepted(
-                accepted: 0,
-                rejected: result.rejected
-            )
         }
-        var updated = record
-        updated.servers = result.accepted.map(\.server)
-        updated.acceptedCount = result.accepted.count
-        updated.rejectedCount = result.rejected.count
-        updated.updatedAt = Date()
+        let saved = SavedKeys()
+        // The subscription URL secret (saved by add/refresh before this
+        // runs) belongs to the same transaction as the server secrets:
+        // a cancelled import or an injected save failure must roll it
+        // back too, or it leaks into the Keychain. rollbackSecrets
+        // skips keys still referenced by stored records, so a stored
+        // record's URL key is never collateral.
+        if case .url = record.source.kind, let urlKey = record.source.secretReference?.key {
+            saved.append(urlKey)
+        }
+        var accepted: [ParsedShareLink] = []
+        var rejected: [RejectedSubscriptionLine] = []
+        // One transaction for the whole import. Every throw below — a sink
+        // failure mid-chunk, cancellation at any checkpoint including the
+        // final one, or a store failure — rolls back everything this import
+        // saved. `stored` flips only after a record reaches the store; the
+        // subscription URL key (saved by the caller before this runs) is
+        // removed with the rest when nothing was stored. Cancellation is
+        // rethrown as-is so callers can tell it apart from real failures.
+        var stored = false
         do {
+            // Cancellation checkpoints around every stage: a cancelled
+            // import stops within one chunk and never reaches the store,
+            // even if the last chunk finished in the same instant. This is
+            // inside the transaction so its throw also rolls back the URL
+            // key the caller saved before we were called.
+            try Task.checkCancellation()
+            for chunk in unique.chunked(into: 256) {
+                try Task.checkCancellation()
+                // The sink is built inside the detached closure from Sendable
+                // captures only (secret store, subscription id, key tracker), so
+                // no unchecked boundary is needed to cross threads here.
+                let texts = chunk.map(\.line)
+                let sinkFailure = SinkFailure()
+                let chunkResult = try await background { [secrets] in
+                    SubscriptionImporter.importLines(texts) { serverID, secret in
+                        let key = SecretKeys.serverCredential(subscriptionID: record.id, serverID: serverID)
+                        do {
+                            try secrets.save(secret, for: key)
+                        } catch {
+                            sinkFailure.record(error)
+                            throw error
+                        }
+                        saved.append(key)
+                        return SecretReference(key: key)
+                    }
+                }
+                // A failed secret save must abort the whole import, not
+                // report one more rejected line — atomicity is promised by
+                // the transaction around this loop.
+                if let failure = sinkFailure.error {
+                    throw failure
+                }
+                accepted.append(contentsOf: chunkResult.accepted)
+                for entry in chunkResult.rejected {
+                    // importLines numbers rejections 1-based within its
+                    // input: translate back to the document line that
+                    // produced this chunk element.
+                    guard entry.index >= 1, entry.index <= chunk.count else { continue }
+                    rejected.append(RejectedSubscriptionLine(
+                        index: chunk[entry.index - 1].number,
+                        reason: entry.reason
+                    ))
+                }
+            }
+            guard !accepted.isEmpty else {
+                if isFirstImport {
+                    var empty = record
+                    empty.servers = []
+                    empty.acceptedCount = 0
+                    empty.rejectedCount = rejected.count
+                    empty.updatedAt = Date()
+                    empty.schemaVersion = StoredSubscription.currentSchemaVersion
+                    try? await store.upsert(empty)
+                    stored = true
+                }
+                throw SubscriptionCoordinatorError.nothingAccepted(
+                    accepted: 0,
+                    rejected: rejected
+                )
+            }
+            try Task.checkCancellation()
+            var updated = record
+            updated.servers = accepted.map(\.server)
+            updated.acceptedCount = accepted.count
+            updated.rejectedCount = rejected.count
+            updated.updatedAt = Date()
+            updated.schemaVersion = StoredSubscription.currentSchemaVersion
+            // v1→v2 migration map: a refresh regenerates IDs from canonical
+            // lines, so a server whose ID rotated (remark added, query
+            // reordered) is matched to its stored predecessor by
+            // (protocol, host, port). Only unambiguous 1:1 matches remap;
+            // anything ambiguous keeps working under its new ID without
+            // stealing another server's selection or favorite.
+            let remapped = isFirstImport ? [:] : Self.remapServerIDs(
+                old: record.servers,
+                new: updated.servers
+            )
+            // Vanished servers leave orphaned Keychain entries behind unless
+            // someone deletes them: the old record's keys minus the new ones.
+            // Computed before the store swap, deleted after it succeeds.
+            let staleKeys: Set<String> = {
+                guard !isFirstImport else { return [] }
+                let oldKeys = Set(record.servers.compactMap { $0.credential?.key })
+                let newKeys = Set(updated.servers.compactMap { $0.credential?.key })
+                return oldKeys.subtracting(newKeys)
+            }()
             if isFirstImport {
                 try await store.upsert(updated)
             } else {
@@ -378,17 +582,64 @@ final class SubscriptionCoordinator {
                     servers: updated.servers,
                     acceptedCount: updated.acceptedCount,
                     rejectedCount: updated.rejectedCount,
-                    updatedAt: updated.updatedAt
+                    updatedAt: updated.updatedAt,
+                    userInfo: updated.userInfo
                 )
             }
+            stored = true
+            for key in staleKeys {
+                try? secrets.delete(for: key)
+            }
+            return SubscriptionImportSummary(
+                subscriptionID: record.id,
+                accepted: accepted.count,
+                rejected: rejected,
+                remappedServerIDs: remapped
+            )
         } catch {
+            await rollbackSecrets(saved)
+            if isFirstImport, !stored, let urlKey = record.source.secretReference?.key {
+                // The record never reached the store, so its URL secret
+                // would be an orphan: remove it with the server secrets.
+                try? secrets.delete(for: urlKey)
+            }
+            if error is CancellationError {
+                throw error
+            }
+            if let coordinatorError = error as? SubscriptionCoordinatorError {
+                throw coordinatorError
+            }
             throw SubscriptionCoordinatorError.persistenceFailed
         }
-        return SubscriptionImportSummary(
-            subscriptionID: record.id,
-            accepted: result.accepted.count,
-            rejected: result.rejected
-        )
+    }
+
+    /// Matches stored servers to freshly imported ones by (protocol, host,
+    /// port): the identity fields that survive a v1→v2 ID rotation.
+    /// Returns old→new ID pairs for unambiguous 1:1 matches only.
+    private static func remapServerIDs(old: [Server], new: [Server]) -> [UUID: UUID] {
+        struct Key: Hashable {
+            let proto: ProxyProtocol
+            let host: String
+            let port: Int
+        }
+        var oldByKey: [Key: [Server]] = [:]
+        for server in old {
+            oldByKey[Key(proto: server.protocolKind, host: server.endpoint.host, port: server.endpoint.port), default: []].append(server)
+        }
+        var newByKey: [Key: [Server]] = [:]
+        for server in new {
+            newByKey[Key(proto: server.protocolKind, host: server.endpoint.host, port: server.endpoint.port), default: []].append(server)
+        }
+        var remapped: [UUID: UUID] = [:]
+        for (key, olds) in oldByKey {
+            guard olds.count == 1, let news = newByKey[key], news.count == 1 else { continue }
+            let from = olds[0].id
+            let to = news[0].id
+            if from != to {
+                remapped[from] = to
+            }
+        }
+        return remapped
     }
 
     private func currentSummary(id: UUID) async throws -> SubscriptionImportSummary {
@@ -403,7 +654,7 @@ final class SubscriptionCoordinator {
         )
     }
 
-    private func serverSummary(_ server: Server, groupID: String) -> ServerSummary {
+    private func serverSummary(_ server: Server, groupID: String, summaryID: String) -> ServerSummary {
         let protocolLabel: String
         switch server.protocolKind {
         case .vless: protocolLabel = "VLESS"
@@ -412,8 +663,8 @@ final class SubscriptionCoordinator {
         case .vmess: protocolLabel = "VMess"
         }
         return ServerSummary(
-            id: server.id.uuidString.lowercased(),
-            name: "\(protocolLabel) · \(server.endpoint.port)",
+            id: summaryID,
+            name: server.name,
             protocolLabel: protocolLabel,
             locationLabel: "Endpoint hidden",
             latency: .notMeasured,
@@ -434,8 +685,8 @@ final class SubscriptionCoordinator {
                 case .vmess: protocolLabel = "VMess"
                 }
                 return SubscriptionEntrySummary(
-                    id: server.id.uuidString.lowercased(),
-                    displayName: "\(record.name) · \(protocolLabel)",
+                    id: Self.summaryID(subscriptionID: record.id, serverID: server.id),
+                    displayName: server.name,
                     protocolLabel: protocolLabel,
                     redactedEndpointLabel: "Host hidden · port \(server.endpoint.port)",
                     statusLabel: "Accepted"
@@ -452,5 +703,14 @@ final class SubscriptionCoordinator {
             isSampleData: false,
             entries: entries
         )
+    }
+}
+
+private extension Array {
+    func chunked(into size: Int) -> [[Element]] {
+        guard size > 0 else { return [self] }
+        return stride(from: 0, to: count, by: size).map { start in
+            Array(self[start..<Swift.min(start + size, count)])
+        }
     }
 }

@@ -154,9 +154,9 @@ struct ServersView: View {
             Task { await model.probeVisibleServers() }
         } label: {
             if isProbing {
-                Label("Measuring…", systemImage: "speedometer")
+                Label("Measuring TCP…", systemImage: "speedometer")
             } else {
-                Label("Check latency", systemImage: "speedometer")
+                Label("Check TCP latency", systemImage: "speedometer")
             }
         }
         .buttonStyle(.bordered)
