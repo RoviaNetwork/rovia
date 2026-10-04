@@ -70,3 +70,10 @@ jobs:
           ./tools/ci/verify-engine-checksums.sh --mode release --lock "$ROVIA_ENGINE_LOCK"
         env:
           ROVIA_ENGINE_LOCK: engines.lock.json
+      - name: Upload the built artifact for digest forensics
+        if: failure() && steps.engine.outputs.enabled == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: engine-artifact
+          path: LibXray.xcframework.zip
+          retention-days: 7

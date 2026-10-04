@@ -149,6 +149,6 @@ digest. `tools/build-engine/xray/build-apple.sh` builds
 builds it twice in isolation and refuses unless both digests agree, and
 `tools/ci/verify-engine-checksums.sh --mode release` refuses anything whose
 bytes do not match the recorded digest
-`8c9eadede96413189dbc6587056790e8de108657968165faf3adbe98ee3f2891`. The digest
+`df84739eec41e181153d2c681f84cffc8c50b43ebe117d29e330e7049abee444`. The digest
 is reproduced by two independent builds on the reference machine, and the
 engine-proof workflow reruns both checks on every change to the lock.

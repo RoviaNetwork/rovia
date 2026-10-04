@@ -330,7 +330,7 @@ The last three rows moved to fixture locks because the repository lock no
 longer enables nothing: it enables xray v26.9.9 at commit
 `50b95979f5db551bd273165cf469e5daaf791341`, and the gated build produces
 `LibXray.xcframework.zip` whose bytes match the recorded digest
-`8c9eadede96413189dbc6587056790e8de108657968165faf3adbe98ee3f2891` — two
+`df84739eec41e181153d2c681f84cffc8c50b43ebe117d29e330e7049abee444` — two
 independent builds of the pinned commit agree on it. The artifact is built,
 not committed: it is gitignored, foundation mode verifies a present artifact's
 bytes and reports an absent one, and release mode requires the bytes on disk,

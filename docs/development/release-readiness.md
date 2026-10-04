@@ -66,7 +66,7 @@ than a run someone has to trust a screenshot for.
   `tools/build-engine/xray/build-apple.sh` builds `LibXray.xcframework.zip`
   from that pin through `tools/build-engine/xray/determinize-xcframework.py`,
   and two independent builds produce one digest,
-  `8c9eadede96413189dbc6587056790e8de108657968165faf3adbe98ee3f2891`, recorded
+  `df84739eec41e181153d2c681f84cffc8c50b43ebe117d29e330e7049abee444`, recorded
   in the lock and matching the bytes every build produces. The artifact is
   gitignored — built, not committed: a 100 MB ceiling sits between the zip and
   a push, and the engine workflows rebuild it on every lock change anyway. The

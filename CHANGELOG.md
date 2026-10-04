@@ -19,7 +19,7 @@ record for the current state is `docs/development/foundation-verification.md`.
   and `tools/build-engine/xray/determinize-xcframework.py` normalises the ar
   member headers, the plist version stamps, and the xcframework slice order so
   the artifact is byte-reproducible. Two independent builds produce the
-  recorded digest `8c9eaded…f2891`, which
+  recorded digest `df84739e…e444`, which
   `tools/reproducibility/verify-xray.sh` now proves on every run instead of
   refusing. The artifact is gitignored — built, not committed — and the
   engine-proof and engine-repro workflows select the pinned Go toolchain,
