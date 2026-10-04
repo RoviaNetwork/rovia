@@ -1879,6 +1879,16 @@ actor StubTunnelController: TunnelControlling {
     func currentStatus() async -> TunnelStatus {
         status
     }
+
+    func statusReport() async -> TunnelStatusReport? {
+        report
+    }
+
+    private var report: TunnelStatusReport?
+
+    func setReport(_ report: TunnelStatusReport?) {
+        self.report = report
+    }
 }
 
 actor GateTunnelController: TunnelControlling {
@@ -1905,6 +1915,10 @@ actor GateTunnelController: TunnelControlling {
 
     func currentStatus() async -> TunnelStatus {
         .connecting
+    }
+
+    func statusReport() async -> TunnelStatusReport? {
+        nil
     }
 
     func waitUntilStartIsParked() async {

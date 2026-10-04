@@ -158,8 +158,8 @@ final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Sendable {
         case .statusGet:
             let completion = MessageCompletion(completionHandler)
             Task {
-                let state = await statusString()
-                completion.call(makeResponse(requestID: request.requestID, ok: true, result: ["state": state]))
+                let payload = await statusPayload()
+                completion.call(makeResponse(requestID: request.requestID, ok: true, result: payload))
             }
         case .engineCapabilities, .subscriptionInspect, .routingExplain, .healthSnapshot, .groupSelect:
             completionHandler?(
@@ -172,9 +172,24 @@ final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Sendable {
         }
     }
 
-    /// The status vocabulary the response schema allows: one bounded string.
-    private func statusString() async -> String {
-        guard let adapter else { return "disconnected" }
+    /// The status vocabulary the response schema allows: one bounded string,
+    /// plus the engine's version and the pump's drop counters when an engine
+    /// exists. Counters and a version, never payloads — that is the whole
+    /// observability surface this method is allowed to have.
+    private func statusPayload() async -> [String: Any] {
+        guard let adapter else { return ["state": "disconnected"] }
+        var payload: [String: Any] = ["state": await statusString(adapter: adapter)]
+        let version = adapter.descriptor.version
+        if !version.isEmpty, version != "not-enabled" {
+            payload["engineVersion"] = version
+        }
+        let counters = await adapter.pumpCounters()
+        payload["droppedOutbound"] = counters.outboundDrops
+        payload["droppedInbound"] = counters.inboundDrops
+        return payload
+    }
+
+    private func statusString(adapter: XrayAdapter) async -> String {
         switch await adapter.status() {
         case .unavailable:
             return "unavailable"

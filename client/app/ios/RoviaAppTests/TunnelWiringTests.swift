@@ -33,7 +33,8 @@ final class TunnelWiringTests: XCTestCase {
         tunnel: any TunnelControlling,
         coordinator: SubscriptionCoordinator? = nil,
         configWriter: (any TunnelConfigWriting)? = nil,
-        settingsStore: (any TunnelSettingsStoring)? = nil
+        settingsStore: (any TunnelSettingsStoring)? = nil,
+        appearanceStorage: UserDefaults? = nil
     ) -> AppModel {
         AppModel(
             tunnel: tunnel,
@@ -41,7 +42,8 @@ final class TunnelWiringTests: XCTestCase {
             subscriptions: coordinator,
             configWriter: configWriter,
             settingsStore: settingsStore,
-            selectionStorage: UserDefaults(suiteName: "rovia.test.\(UUID().uuidString)")
+            selectionStorage: UserDefaults(suiteName: "rovia.test.\(UUID().uuidString)"),
+            appearanceStorage: appearanceStorage
         )
     }
 
@@ -168,6 +170,63 @@ final class TunnelWiringTests: XCTestCase {
         XCTAssertThrowsError(try handoff.readCanonicalConfiguration()) { error in
             XCTAssertEqual(error as? TunnelHandoff.TunnelHandoffError, .configurationMissing)
         }
+    }
+
+    func testAppearancePersistsAndRestores() async {
+        let storage = UserDefaults(suiteName: "rovia.test.\(UUID().uuidString)")!
+        let model = makeModel(tunnel: StubTunnelController(), appearanceStorage: storage)
+        let prepared = await model.bootstrap()
+        XCTAssertTrue(prepared)
+        XCTAssertEqual(model.snapshot.appearance, .system)
+
+        let changed = await model.setAppearance(.dark)
+        XCTAssertTrue(changed)
+        XCTAssertEqual(model.snapshot.appearance, .dark)
+
+        let restored = makeModel(tunnel: StubTunnelController(), appearanceStorage: storage)
+        let restoredPrepared = await restored.bootstrap()
+        XCTAssertTrue(restoredPrepared)
+        XCTAssertEqual(restored.snapshot.appearance, .dark)
+    }
+
+    func testStatisticsRefreshStoresTheEnginesOwnReport() async {
+        let tunnel = StubTunnelController()
+        await tunnel.setReport(TunnelStatusReport(
+            state: "connected",
+            engineVersion: "Xray 26.9.9",
+            droppedOutbound: 3,
+            droppedInbound: 1
+        ))
+        let model = makeModel(tunnel: tunnel)
+        let prepared = await model.bootstrap()
+        XCTAssertTrue(prepared)
+
+        XCTAssertNil(model.snapshot.engineReport)
+        let refreshed = await model.refreshStatistics()
+        XCTAssertTrue(refreshed)
+        XCTAssertEqual(model.snapshot.engineReport?.engineVersion, "Xray 26.9.9")
+        XCTAssertEqual(model.snapshot.engineReport?.droppedOutbound, 3)
+        XCTAssertEqual(model.snapshot.engineReport?.droppedInbound, 1)
+    }
+
+    func testAnUnansweredStatisticsPollKeepsThePreviousReport() async {
+        let tunnel = StubTunnelController()
+        await tunnel.setReport(TunnelStatusReport(
+            state: "connected",
+            engineVersion: "Xray 26.9.9",
+            droppedOutbound: 0,
+            droppedInbound: 0
+        ))
+        let model = makeModel(tunnel: tunnel)
+        let prepared = await model.bootstrap()
+        XCTAssertTrue(prepared)
+        _ = await model.refreshStatistics()
+        XCTAssertNotNil(model.snapshot.engineReport)
+
+        await tunnel.setReport(nil)
+        _ = await model.refreshStatistics()
+        // An unanswered poll leaves the previous report — never a fabricated zero.
+        XCTAssertNotNil(model.snapshot.engineReport)
     }
 }
 

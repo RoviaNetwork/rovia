@@ -45,7 +45,7 @@
   ],
   "$defs": {
     "result": {
-      "description": "The only result this build can produce. status.get is the only implemented method, so the payload is the status envelope; a method that returns data will add its own closed shape and a probe here rather than widening this one.",
+      "description": "What a successful status.get returns. `state` is required and bounded; the engine version and the pump's drop counters are optional because an engine that never started has neither. A method that returns data adds its own closed shape and a probe rather than widening this one further.",
       "type": "object",
       "additionalProperties": false,
       "required": ["state"],
@@ -55,6 +55,22 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 64
+        },
+        "engineVersion": {
+          "description": "The engine's self-reported version string, present when the engine answered `xrayVersion`. Never a free-form error or log line.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "droppedOutbound": {
+          "description": "Datagrams dropped because the engine did not drain its fd in time. A counter, never a payload.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "droppedInbound": {
+          "description": "Engine datagrams dropped because they were not framed IPv4/IPv6 packets. A counter, never a payload.",
+          "type": "integer",
+          "minimum": 0
         }
       }
     },

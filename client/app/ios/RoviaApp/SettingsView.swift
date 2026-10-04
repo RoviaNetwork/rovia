@@ -11,9 +11,38 @@ struct SettingsView: View {
         RoviaScreen {
             RoviaScreenHeader(
                 title: "Settings",
-                subtitle: "Tunnel behaviour. Network-level protection is a property of the installed profile, applied when the tunnel starts.",
+                subtitle: "Tunnel behaviour and appearance. Network-level protection is a property of the installed profile, applied when the tunnel starts.",
                 identifier: AppAccessibilityIdentifier.settingsScreen
             )
+
+            SectionCard(
+                title: "Appearance",
+                systemImage: "circle.lefthalf.filled",
+                identifier: nil
+            ) {
+                VStack(alignment: .leading, spacing: 12) {
+                    Picker(
+                        "Appearance",
+                        selection: Binding(
+                            get: { model.snapshot.appearance },
+                            set: { preference in
+                                Task { _ = await model.setAppearance(preference) }
+                            }
+                        )
+                    ) {
+                        ForEach(AppearancePreference.allCases) { preference in
+                            Text(preference.title).tag(preference)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .accessibilityIdentifier(AppAccessibilityIdentifier.settingsAppearance)
+
+                    Text("System follows the device. Light and Dark pin the app to that scheme regardless of the device setting.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
 
             SectionCard(
                 title: "Kill switch",

@@ -7,6 +7,7 @@ struct ContentView: View {
 
     var body: some View {
         RootView(model: model)
+            .preferredColorScheme(model.snapshot.appearance.colorScheme)
             .task {
                 _ = await model.bootstrap()
             }
