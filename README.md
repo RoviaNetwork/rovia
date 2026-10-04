@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="client/app/ios/RoviaApp/Assets/rovia-logo.png" width="120" alt="Rovia logo">
+<img src="client/app/ios/RoviaApp/Assets/rovia-logo.png" width="140" alt="Rovia logo">
 
 # Rovia
 
@@ -9,13 +9,11 @@
 An open-source, engine-independent core for Apple platforms — built so that a routing
 decision can be *shown*, not just applied.
 
-[![Status](https://img.shields.io/badge/status-pre--alpha-ff6b35?style=flat-square)](#status--what-works-and-what-does-not)
-[![CI](https://github.com/RoviaNetwork/rovia/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/RoviaNetwork/rovia/actions/workflows/ci.yml)
-[![Engine repro](https://github.com/RoviaNetwork/rovia/actions/workflows/engine-repro.yml/badge.svg?branch=main)](https://github.com/RoviaNetwork/rovia/actions/workflows/engine-repro.yml)
-[![Engine proof](https://github.com/RoviaNetwork/rovia/actions/workflows/engine-proof.yml/badge.svg?branch=main)](https://github.com/RoviaNetwork/rovia/actions/workflows/engine-proof.yml)
-[![License](https://img.shields.io/badge/license-MIT%20provisional-8a8a8a?style=flat-square)](LICENSE)
-[![Engine](https://img.shields.io/badge/engine-none%20enabled-dimgray?style=flat-square)](engines.lock.json)
-[![Platform](https://img.shields.io/badge/iOS-18%2B-0a84ff?style=flat-square&logo=apple&logoColor=white)](docs/development/ios.md)
+[![Status](https://img.shields.io/badge/status-pre--alpha-ff6b35?style=flat-square)](#status--what-works-and-what-does-not) [![CI](https://github.com/RoviaNetwork/rovia/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/RoviaNetwork/rovia/actions/workflows/ci.yml) [![Engine repro](https://github.com/RoviaNetwork/rovia/actions/workflows/engine-repro.yml/badge.svg?branch=main)](https://github.com/RoviaNetwork/rovia/actions/workflows/engine-repro.yml) [![Engine proof](https://github.com/RoviaNetwork/rovia/actions/workflows/engine-proof.yml/badge.svg?branch=main)](https://github.com/RoviaNetwork/rovia/actions/workflows/engine-proof.yml)
+
+[![License](https://img.shields.io/badge/license-MIT%20provisional-8a8a8a?style=flat-square)](LICENSE) [![Engine](https://img.shields.io/badge/engine-none%20enabled-dimgray?style=flat-square)](engines.lock.json) [![Platform](https://img.shields.io/badge/iOS-17%2B-0a84ff?style=flat-square&logo=apple&logoColor=white)](docs/development/ios.md) [![Swift](https://img.shields.io/badge/Swift-6.2-F05138?style=flat-square&logo=swift&logoColor=white)](#building-and-developing)
+
+[Status](#status--what-works-and-what-does-not) · [The app](#the-app) · [Privacy](#privacy-first-principles) · [Protocols](#importable-protocols) · [Routing](#routing-architecture) · [Roadmap](#roadmap) · [Contributing](#contributing)
 
 </div>
 
@@ -28,6 +26,29 @@ decision can be *shown*, not just applied.
 > setting, and there is no `packetFlow` → Xray bridge. The part of Rovia that *is*
 > finished is the domain core and the fail-closed scaffolding around it. Read
 > [Status](#status--what-works-and-what-does-not) before anything else.
+
+---
+
+<details>
+<summary><b>Contents</b></summary>
+
+- [What is Rovia?](#what-is-rovia)
+- [Status — what works and what does not](#status--what-works-and-what-does-not)
+- [The app](#the-app)
+- [Privacy-first principles](#privacy-first-principles)
+- [Repository structure](#repository-structure)
+- [Importable protocols](#importable-protocols)
+- [Routing architecture](#routing-architecture)
+- [Security model](#security-model)
+- [Verification](#verification)
+- [Roadmap](#roadmap)
+- [Building and developing](#building-and-developing)
+- [Contributing](#contributing)
+- [Security](#security)
+- [License](#license)
+- [Documentation](#documentation)
+
+</details>
 
 ---
 
@@ -156,24 +177,20 @@ engine**.
 
 ## The app
 
-![The Rovia Overview screen on an iPad simulator: the tunnel engine is reported
-unavailable, Connect is disabled, and three sample servers carry latency and health
-badges over an explicit sample-data notice.](docs/assets/overview-ipad.png)
+<div align="center">
 
-![The Rovia Overview screen on an iPhone 17 Pro simulator, current build: the brand
-mark in the header, the engine reported unavailable, Connect disabled.](docs/assets/overview-iphone.png)
+| Overview — iPhone | Overview — iPad | Subscriptions — iPhone |
+| :---: | :---: | :---: |
+| <img src="docs/assets/overview-iphone.png" width="230" alt="The Rovia Overview screen on an iPhone 17 Pro simulator, current build: the brand mark in the header, the engine reported unavailable, Connect disabled."> | <img src="docs/assets/overview-ipad.png" width="230" alt="The Rovia Overview screen on an iPad simulator: the tunnel engine is reported unavailable, Connect is disabled, and three sample servers carry latency and health badges over an explicit sample-data notice."> | <img src="docs/assets/subscriptions-iphone.png" width="230" alt="The Subscriptions screen on an iPhone 17 Pro simulator: empty state with the brand mark and a prominent add action; pull-to-refresh, per-subscription refresh, rename, delete, and accepted/rejected counts appear once subscriptions exist."> |
 
-![The Subscriptions screen on an iPhone 17 Pro simulator: empty state with the
-brand mark and a prominent add action; pull-to-refresh, per-subscription refresh,
-rename, delete, and accepted/rejected counts appear once subscriptions exist.](docs/assets/subscriptions-iphone.png)
+</div>
 
 <sub>
-A real screenshot of the current build, taken on an iPad simulator. It is the Overview
-screen of the app in this repository, running over the app's built-in sample data —
-there is no mock here and no real provider. It is also the clearest single statement of
-this project's current state: the engine is reported unavailable, **Connect is
-disabled**, and the screen says so in its own subtitle. Nothing in the UI pretends a
-tunnel exists.
+Real screenshots of the current build, taken on simulators and running over the app's
+built-in sample data — there is no mock here and no real provider. They are also the
+clearest single statement of this project's current state: the engine is reported
+unavailable, <strong>Connect is disabled</strong>, and the screen says so in its own
+subtitle. Nothing in the UI pretends a tunnel exists.
 </sub>
 
 ## Privacy-first principles
