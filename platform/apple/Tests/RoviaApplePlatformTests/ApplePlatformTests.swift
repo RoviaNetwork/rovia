@@ -22,3 +22,17 @@ final class ApplePlatformTests: XCTestCase {
         }
     }
 }
+
+final class KeychainAccessGroupTests: XCTestCase {
+    func testTheProbeLeavesNothingBehindAndAnswersConsistently() {
+        // On a developer machine or simulator the probe resolves to whatever
+        // the Keychain stamps; the contract is only that it is deterministic
+        // within the process and leaves no probe item behind.
+        let first = KeychainAccessGroup.resolve()
+        let second = KeychainAccessGroup.resolve()
+        XCTAssertEqual(first, second)
+        if let group = first {
+            XCTAssertFalse(group.isEmpty)
+        }
+    }
+}

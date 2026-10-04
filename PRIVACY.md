@@ -22,11 +22,11 @@ decision recorded in `docs/architecture/decision-log.md`.
 
 | Data | Where it lives | Who can read it | Retention | Deleted when |
 | --- | --- | --- | --- | --- |
-| Subscription URL | Not stored in this slice. The parser returns a canonical source and a redacted display value in memory; the app keeps the sample content in memory and writes nothing | The parsing code, then the app model in memory | One import | Immediately after parsing, or when the app is closed |
+| Subscription URL | The App Group container, in the subscription store (`subscriptions/`), with the credential part in the Keychain — never in the file | The app and the tunnel extension, both via the shared App Group | Until the subscription is removed | Deleting the subscription, or deleting the app |
 | Subscription or share-link response body | Memory only | The parsing code | One import | Immediately after parsing |
-| Server credentials (UUIDs, passwords, keys) | Not stored in this slice. A credential is parsed into a transient `SecretReference` whose *key* is a name, and the value is never persisted. `platform/apple` implements `KeychainSecretStore` with `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`, and no app or extension code calls it yet | The parsing code, in memory | One import | Immediately after parsing |
-| Non-secret canonical configuration | Memory only in this slice. `platform/apple` implements `AppGroupStore`, both targets declare the `group.io.rovia.shared` entitlement, and neither target calls the store | The app model, in memory | Until the app closes | When the app closes, or when the app is deleted |
-| Routing policy and selected server | Memory only | The app model | Until changed | When the app closes |
+| Server credentials (UUIDs, passwords, keys) | The Keychain, written by the subscription import with `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly` in the shared access group the extension also reads. The canonical configuration carries only a `SecretReference` key | The app and the tunnel extension, on this device only | Until the subscription is removed | Deleting the subscription, or deleting the app |
+| Non-secret canonical configuration | The App Group container: the subscription store, plus the tunnel hand-off (`tunnel/canonical-config.json`, `tunnel/settings.json`) written before a tunnel start and read by the extension | The app and the tunnel extension | Until overwritten by the next write | Deleting the app, or the next write |
+| Routing policy and selected server | The App Group hand-off (in the canonical configuration) and the app model | The app and the tunnel extension | Until changed | The next write, or deleting the app |
 | Connection state and timestamps | Memory only | The app model | Until the next status refresh | Replaced by newer status |
 | Latency and health samples | Memory | Selection logic | Until the next sample | Replaced by newer samples |
 | Routing diagnostic (what the user asked about) | Memory, and the on-screen debugger | The user, on the device | Until the user leaves the screen | Leaving the screen or deleting the app |
@@ -34,13 +34,13 @@ decision recorded in `docs/architecture/decision-log.md`.
 | Signing material | A temporary CI keychain, never on a user's device | The release job in the protected `ios-production` environment | One job | The keychain is deleted in an `always()` step |
 
 Credentials are never written to the canonical configuration, a diagnostic, an
-error message, or a log. In this slice that is mostly because nothing is written
-at all. Where the code does assert it, the assertions are the schema rules that
+error message, or a log. The assertions are the schema rules that
 reject secret-bearing transport keys, the `SecretReference` key rule in
 `RoviaConfig` and `schemas/config.schema.json`, and canary-secret tests in
-`core/config`, `core/subscription`, and `client/app/ios/RoviaAppTests`. No
-Keychain or App Group write happens yet, so neither store is an enforcement
-mechanism today; when one is wired in, that sentence has to change with it.
+`core/config`, `core/subscription`, and `client/app/ios/RoviaAppTests`. The
+Keychain and the App Group are both written to today: credentials go to the
+Keychain, and the hand-off files carry no credential values — a test reads the
+written configuration and fails if a credential value appears in it.
 
 ## Data flows
 
@@ -54,9 +54,9 @@ bounded read (1 MiB, UTF-8)  ->  parser  ->  transient secret reference
         |                          |
         |                          +-> canonical server record naming a secret
         v
-raw body discarded; nothing is written to a Keychain or an App Group
-container in this slice, and only a redacted display value such as
-"vless://synthetic.example:443/••••••••" is ever kept
+raw body discarded after parsing; the App Group holds the redacted record and
+the Keychain holds the credential. A redacted display value such as
+"vless://synthetic.example:443/••••••••" is all the UI ever shows
 ```
 
 A URL source is stored as a URL plus a secret reference; the token, path, and

@@ -3,9 +3,10 @@
 All notable changes to this project are documented here.
 
 The project is pre-alpha. Nothing below has been signed, archived, uploaded, or
-run on a physical device. One production engine is pinned, bundled, and
-reproducible; it is not wired to the tunnel yet. The verification
-record for the current state is `docs/development/foundation-verification.md`.
+run on a physical device. One production engine is pinned and reproducible, and
+the tunnel is wired to it end to end; no packet has been observed on hardware.
+The verification record for the current state is
+`docs/development/foundation-verification.md`.
 
 ## Unreleased
 
@@ -30,6 +31,23 @@ record for the current state is `docs/development/foundation-verification.md`.
 - Refusal-path tests for the engine build gate
   (`tools/build-engine/xray/test_build_apple.py`): an unapproved, disabled,
   unpinned, or escaping lock is refused before any download or build runs.
+- The tunnel is wired to the pinned engine end to end: the app resolves the
+  selected (or first visible) server into a canonical configuration, writes it
+  to the App Group hand-off with the kill-switch setting, and starts the
+  system tunnel through a real `NETunnelProviderManager` controller. The
+  extension validates, prepares, and starts the live `XrayAdapter`, applies
+  network settings only after the engine is running, moves packets between
+  `NEPacketTunnelFlow` and the engine's `xray.tun.fd` through the pump, and
+  answers `status.get` with the real lifecycle state.
+- Kill switch: a Settings screen toggle persisted in the hand-off. When on,
+  the installed profile sets `includeAllNetworks` with always-connect
+  on-demand rules, and the extension cancels the tunnel on an engine failure
+  instead of letting traffic past a dead engine.
+- The shared Keychain access group is resolved from the running binary's own
+  stamped entitlements (`KeychainAccessGroup`), so credentials saved by the
+  app are readable by the extension without a hard-coded team identifier.
+- `SubscriptionCoordinator.canonicalServer(summaryID:)` — the canonical server
+  behind a summary ID, for the tunnel hand-off.
 
 - `ProductionFetchTests.swift`: the production composition — real
   `SubscriptionFetcher.production()` through a real coordinator over a local

@@ -1,16 +1,29 @@
 import Foundation
 import NetworkExtension
+import RoviaConfig
+import RoviaEngineAPI
 import RoviaXray
+import RoviaXrayLive
 
-final class PacketTunnelProvider: NEPacketTunnelProvider {
-    /// Sourced from the real linked engine, not a hardcoded string: the
-    /// adapter reports `not-enabled` until prepare/start are wired to
-    /// LibXray (tun fd + signed device still pending, see below).
-    private static var engineAvailability: EngineAvailability {
-        let adapter = XrayAdapter()
-        return .unavailable(
-            reason: "Engine \(adapter.descriptor.id) \(adapter.descriptor.version): prepare/start not wired to LibXray yet."
+/// NEPacketTunnelProvider is invoked on the system's queue and its mutable
+/// state is only ever touched from the provider's own async hops, so the
+/// class isSendable-by-discipline: the conformance is declared, and the
+/// state is confined to the tasks the provider itself starts.
+final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Sendable {
+    /// The live adapter for this process, built once: the descriptor version
+    /// is read from the artifact at construction. The secret reader resolves
+    /// the placeholder keys in the compiled engine config from the shared
+    /// Keychain access group — credentials never travel through the App Group
+    /// file.
+    private var adapter: XrayAdapter?
+    private var engineObserver: Task<Void, Never>?
+
+    private static var secretReader: @Sendable (String) throws -> Data? {
+        let store = KeychainSecretStore(
+            service: "io.rovia.client",
+            accessGroup: KeychainAccessGroup.resolve()
         )
+        return { key in try store.read(for: key) }
     }
 
     override func startTunnel(
@@ -18,36 +31,83 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         completionHandler: @escaping (Error?) -> Void
     ) {
         let completion = TunnelCompletion(handler: completionHandler)
-        let providerBridge = TunnelProviderBridge(provider: self)
-        let coordinator = TunnelLaunchCoordinator(
-            availability: Self.engineAvailability,
-            networkSettingsApplying: { [providerBridge] in
-                await withCheckedContinuation { continuation in
-                    let settings = Self.makeNetworkSettings()
-                    let settingsCompletion = TunnelCompletion { error in
-                        completion.call(error)
-                        continuation.resume()
-                    }
-                    providerBridge.applyNetworkSettings(settings) { error in
-                        settingsCompletion.call(error)
-                    }
-                }
-            }
-        )
-
         Task {
-            let decision = await coordinator.launch()
-            switch decision {
-            case .applyNetworkSettings:
-                break
-            case let .unavailable(reason):
-                completion.call(TunnelProviderError.engineUnavailable(reason: reason))
+            do {
+                try await self.startEngine()
+                completion.call(nil)
+            } catch {
+                completion.call(error)
             }
         }
     }
 
+    /// The start order is the fail-closed contract: the engine is prepared
+    /// and started *before* any network setting is applied, so the default
+    /// route never exists without something consuming it. A failure at any
+    /// step leaves the extension refusing to start rather than half-up.
+    private func startEngine() async throws {
+        let handoff = try TunnelHandoff()
+        let configuration = try handoff.readCanonicalConfiguration()
+        let settings = handoff.readSettings()
+
+        let adapter = XrayAdapter.live(secretReader: Self.secretReader)
+        let report = try await adapter.validate(configuration)
+        guard report.valid else {
+            throw TunnelProviderError.engineUnavailable(reason: "the stored configuration failed validation")
+        }
+        let prepared = try await adapter.prepare(configuration)
+        let context = TunnelRuntimeContext(
+            sessionID: UUID(),
+            platform: "ios",
+            preparedConfiguration: prepared,
+            packetBridge: PacketFlowBridge(flow: packetFlow)
+        )
+        try await adapter.start(context)
+        self.adapter = adapter
+
+        // The engine is running and consuming the fd before the default route
+        // exists; anything the engine emits in between waits in the pair.
+        try await applyNetworkSettings(Self.makeNetworkSettings())
+
+        if settings.killSwitch {
+            observeEngineFailure(adapter)
+        }
+    }
+
+    /// Kill-switch semantics: an engine that dies while the tunnel is up
+    /// tears the tunnel down. With `includeAllNetworks` and the always-connect
+    /// on-demand rules the app installs, iOS blackholes traffic until the
+    /// tunnel returns, and restarts it — the retry is the platform's, with its
+    /// own backoff, not a loop this process owns.
+    private func observeEngineFailure(_ adapter: XrayAdapter) {
+        engineObserver = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                if case let .failed(reason) = await adapter.status() {
+                    self?.cancelTunnelWithError(TunnelProviderError.engineFailed(reason: reason))
+                    return
+                }
+            }
+        }
+    }
+
+    private func applyNetworkSettings(_ settings: NEPacketTunnelNetworkSettings) async throws {
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            setTunnelNetworkSettings(settings) { error in
+                if let error {
+                    continuation.resume(throwing: error)
+                } else {
+                    continuation.resume()
+                }
+            }
+        }
+    }
+
+    /// The tunnel's own addresses: the engine answers DNS through its `dns`
+    /// outbound, so the resolver points at the tunnel and every lookup enters
+    /// as a packet — no DNS leaves the device unproxied.
     private static func makeNetworkSettings() -> NEPacketTunnelNetworkSettings {
-        let settings = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: "127.0.0.1")
+        let settings = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: "10.255.0.1")
         let ipv4 = NEIPv4Settings(
             addresses: ["10.255.0.2"],
             subnetMasks: ["255.255.255.0"]
@@ -58,6 +118,10 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         let ipv6 = NEIPv6Settings(addresses: ["fd00:102::2"], networkPrefixLengths: [64])
         ipv6.includedRoutes = [NEIPv6Route.default()]
         settings.ipv6Settings = ipv6
+
+        let dns = NEDNSSettings(servers: ["10.255.0.1"])
+        dns.matchDomains = [""]
+        settings.dnsSettings = dns
         return settings
     }
 
@@ -65,7 +129,14 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         with reason: NEProviderStopReason,
         completionHandler: @escaping () -> Void
     ) {
-        completionHandler()
+        engineObserver?.cancel()
+        engineObserver = nil
+        let completion = TunnelCompletion(handler: { _ in completionHandler() })
+        Task {
+            await self.adapter?.stop()
+            self.adapter = nil
+            completion.call(nil)
+        }
     }
 
     override func handleAppMessage(
@@ -85,7 +156,11 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
 
         switch request.method {
         case .statusGet:
-            completionHandler?(makeResponse(requestID: request.requestID, ok: true, result: ["state": "disconnected"]))
+            let completion = MessageCompletion(completionHandler)
+            Task {
+                let state = await statusString()
+                completion.call(makeResponse(requestID: request.requestID, ok: true, result: ["state": state]))
+            }
         case .engineCapabilities, .subscriptionInspect, .routingExplain, .healthSnapshot, .groupSelect:
             completionHandler?(
                 makeResponse(
@@ -94,6 +169,25 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
                     error: ControlContract.refusalNotImplemented
                 )
             )
+        }
+    }
+
+    /// The status vocabulary the response schema allows: one bounded string.
+    private func statusString() async -> String {
+        guard let adapter else { return "disconnected" }
+        switch await adapter.status() {
+        case .unavailable:
+            return "unavailable"
+        case .idle:
+            return "idle"
+        case .preparing:
+            return "connecting"
+        case .running:
+            return "connected"
+        case .stopping:
+            return "disconnecting"
+        case .failed:
+            return "failed"
         }
     }
 
@@ -173,18 +267,18 @@ private struct ControlRequest {
     let payload: [String: Any]
 }
 
-private final class TunnelProviderBridge: @unchecked Sendable {
-    private let provider: PacketTunnelProvider
+/// A provider-message completion boxed for the async hop: `handleAppMessage`
+/// answers on a Task, and the closure is only ever called once by
+/// construction.
+private final class MessageCompletion: @unchecked Sendable {
+    private let handler: (Data?) -> Void
 
-    init(provider: PacketTunnelProvider) {
-        self.provider = provider
+    init(_ handler: ((Data?) -> Void)?) {
+        self.handler = handler ?? { _ in }
     }
 
-    func applyNetworkSettings(
-        _ settings: NEPacketTunnelNetworkSettings,
-        completion: @escaping @Sendable (Error?) -> Void
-    ) {
-        provider.setTunnelNetworkSettings(settings, completionHandler: completion)
+    func call(_ data: Data?) {
+        handler(data)
     }
 }
 
@@ -212,11 +306,14 @@ private enum ControlMethod: String, CaseIterable {
 
 private enum TunnelProviderError: LocalizedError {
     case engineUnavailable(reason: String)
+    case engineFailed(reason: String)
 
     var errorDescription: String? {
         switch self {
         case let .engineUnavailable(reason):
             reason
+        case let .engineFailed(reason):
+            "engine failed: \(reason)"
         }
     }
 }

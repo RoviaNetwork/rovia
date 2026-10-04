@@ -309,6 +309,18 @@ final class SubscriptionCoordinator {
         return result
     }
 
+    /// The canonical server behind a summary ID, for the tunnel hand-off.
+    /// The returned model still holds a `SecretReference`, not a credential.
+    func canonicalServer(summaryID: ServerID) async -> Server? {
+        for record in await store.subscriptions() {
+            for server in record.servers
+            where Self.summaryID(subscriptionID: record.id, serverID: server.id) == summaryID {
+                return server
+            }
+        }
+        return nil
+    }
+
     /// Parses an inbound `rovia://import?url=<subscription-url>&name=<optional>`
     /// deep link. Returns the raw text and display name — the caller runs it
     /// through the usual classifier, so subscription URLs, single share

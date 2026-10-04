@@ -60,6 +60,10 @@ enum AppAccessibilityIdentifier {
     static let subscriptionEmpty = "rovia.subscription.empty"
     static let subscriptionAllRejected = "rovia.subscription.allRejected"
 
+    static let settingsScreen = "rovia.settings.screen"
+    static let settingsKillSwitch = "rovia.settings.killSwitch"
+    static let settingsKillSwitchNote = "rovia.settings.killSwitchNote"
+
     static func sidebarRoute(_ rawValue: String) -> String {
         "rovia.sidebar.\(rawValue)"
     }
@@ -114,7 +118,10 @@ enum AppAccessibilityIdentifier {
         subscriptionScreen,
         subscriptionSummary,
         subscriptionEntryPrefix,
-        subscriptionRedaction
+        subscriptionRedaction,
+        settingsScreen,
+        settingsKillSwitch,
+        settingsKillSwitchNote
     ]
 }
 
@@ -1159,6 +1166,9 @@ struct AppSnapshot: Equatable, Sendable {
     var failedRefreshIDs: Set<UUID> = []
     /// The last add/refresh attempt: accepted/rejected counts for honest UI.
     var lastSubscriptionResult: SubscriptionImportSummary?
+    /// The kill switch as the user set it. Persisted in the App Group
+    /// hand-off; applied to the tunnel profile on the next start.
+    var killSwitch: Bool = false
 
     var canConnect: Bool {
         system == .ready && engine.allowsStart && !engine.isBusy

@@ -51,7 +51,7 @@
       "required": ["state"],
       "properties": {
         "state": {
-          "description": "A non-empty state name. The only value this build emits is 'disconnected', because no engine is enabled; the value set grows with the tunnel lifecycle, so it is a bounded string rather than a one-value enum.",
+          "description": "A non-empty state name from the tunnel lifecycle: disconnected, connecting, connected, disconnecting, idle, failed, or unavailable. The set is a bounded string rather than an enum so the lifecycle can grow without a schema change.",
           "type": "string",
           "minLength": 1,
           "maxLength": 64

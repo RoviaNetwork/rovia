@@ -4,14 +4,25 @@ import SwiftUI
 
 @main
 struct RoviaApp: App {
-    @State private var model = AppModel(
-        subscriptions: RoviaApp.makeSubscriptionCoordinator()
-    )
+    @State private var model = RoviaApp.makeModel()
 
     var body: some Scene {
         WindowGroup {
             ContentView(model: model)
         }
+    }
+
+    private static func makeModel() -> AppModel {
+        let coordinator = makeSubscriptionCoordinator()
+        let handoff = try? TunnelHandoff()
+        return AppModel(
+            tunnel: NETunnelController(),
+            subscriptions: coordinator,
+            configWriter: handoff.map {
+                TunnelHandoffWriter(coordinator: coordinator, handoff: $0)
+            },
+            settingsStore: handoff.map(HandoffTunnelSettingsStore.init(handoff:))
+        )
     }
 
     /// Production subscription stack: file store in the shared app-group
@@ -31,7 +42,7 @@ struct RoviaApp: App {
         }
         return SubscriptionCoordinator(
             store: SubscriptionStore(directory: directory),
-            secrets: KeychainSecretStore(service: "io.rovia.client", accessGroup: "group.io.rovia.shared"),
+            secrets: KeychainSecretStore(service: "io.rovia.client", accessGroup: KeychainAccessGroup.resolve()),
             fetcher: SubscriptionFetcher.production()
         )
     }

@@ -6,6 +6,7 @@ enum AppRoute: String, CaseIterable, Identifiable, Hashable {
     case routing
     case routingDebugger
     case subscription
+    case settings
 
     var id: String { rawValue }
 
@@ -21,6 +22,8 @@ enum AppRoute: String, CaseIterable, Identifiable, Hashable {
             "Routing Debugger"
         case .subscription:
             "Subscriptions"
+        case .settings:
+            "Settings"
         }
     }
 
@@ -36,6 +39,8 @@ enum AppRoute: String, CaseIterable, Identifiable, Hashable {
             "Debugger"
         case .subscription:
             "Subscription"
+        case .settings:
+            "Settings"
         }
     }
 
@@ -51,6 +56,8 @@ enum AppRoute: String, CaseIterable, Identifiable, Hashable {
             "ladybug"
         case .subscription:
             "doc.text.magnifyingglass"
+        case .settings:
+            "gearshape"
         }
     }
 
@@ -102,11 +109,13 @@ struct RootView: View {
             RoutingDebuggerView(model: model)
         case .subscription:
             SubscriptionInspectorView(model: model)
+        case .settings:
+            SettingsView(model: model)
         case nil:
             ContentUnavailableView(
                 "Choose a section",
                 systemImage: "sidebar.left",
-                description: Text("Open Overview, Servers, Routing, Routing Debugger, or Subscription Inspector from the sidebar.")
+                description: Text("Open Overview, Servers, Routing, Routing Debugger, Subscription Inspector, or Settings from the sidebar.")
             )
             .modifier(ConditionalAccessibilityIdentifier(identifier: AppAccessibilityIdentifier.emptySelection))
         }
