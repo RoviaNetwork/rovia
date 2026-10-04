@@ -47,12 +47,14 @@ class ToolchainMatchesLockTests(unittest.TestCase):
 
     def test_the_repository_lock_gets_a_structured_answer(self):
         # The probe must answer, whichever way the machine compares; a crash is
-        # not an answer. The match direction itself is machine-dependent.
+        # not an answer. The match direction itself is machine-dependent, and a
+        # machine without Go gets a usage error that says so.
         result = gate.run_script(SCRIPT)
-        self.assertIn(result.returncode, (0, 1), gate.combined(result))
+        self.assertIn(result.returncode, (0, 1, 2), gate.combined(result))
         self.assertTrue(
             "toolchain matches the lock" in result.stdout
-            or "toolchain differs from the lock" in result.stdout,
+            or "toolchain differs from the lock" in result.stdout
+            or "no Go toolchain is available" in result.stderr,
             gate.combined(result),
         )
 
