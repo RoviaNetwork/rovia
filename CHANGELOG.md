@@ -93,7 +93,14 @@ record for the current state is `docs/development/foundation-verification.md`.
 - A failed first import that produced zero accepted servers stored an empty
   record whose display state never restamped `updatedAt` or the schema version;
   the rebuild now sets both, matching every other store write.
-- **Publication pass — the tree as an open-source repository.** `CODEOWNERS` names a
+- **Publication pass — the tree as an open-source repository.**
+- The engine link is coherent with the app again: `rovia-engine` v0.2.1 (the
+  first release that pins `rovia-core` 0.2.3, published to unblock the two
+  pins meeting) rather than v0.2.0, which pulled `rovia-core` 0.2.1 from
+  under the app and left the manifest unresolvable. The SBOM regenerated on
+  that link, and the recorded figure — 5 components, 5 relationships —
+  derives from it the same way the rest of the record's rows do.
+- **App state hardening.** `CODEOWNERS` names a
   real owner instead of an organisation that does not exist, and `SECURITY.md` states
   the consequence: with one maintainer, a required review would be a self-review, so
   nothing is required yet. `docs/superpowers/` is gitignored rather than published with
