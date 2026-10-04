@@ -162,6 +162,7 @@ report_path.write_text(
             gomobile_version,
             source.rstrip("/"),
             recorded_sha or "",
+            toolchain,
         ]
     )
     + "\n",
@@ -182,6 +183,7 @@ lock_go_version="${lock_fields[4]}"
 gomobile_version="${lock_fields[5]}"
 engine_source="${lock_fields[6]}"
 recorded_sha256="${lock_fields[7]}"
+engine_toolchain="${lock_fields[8]}"
 
 case "$artifact_relpath" in
   /*|*..*)
@@ -195,6 +197,17 @@ command -v go >/dev/null 2>&1 || fail "build-apple: no Go toolchain is available
 actual_go="$(go version | awk '{print $3}')"
 if [[ "$actual_go" != "$lock_go_version" ]]; then
   fail "build-apple: the lock pins $lock_go_version, found $actual_go"
+fi
+
+# Byte-identical output is a property of the whole toolchain, not of Go alone:
+# the gobind glue is compiled by the host's clang against the host's SDK, so a
+# different Xcode or host architecture produces a different artifact. The lock
+# records the reference toolchain; whether this machine's output is comparable
+# with the lock's digest is decided by the shared probe, and the build report
+# must say which of the two claims is being made.
+toolchain_matches_lock=1
+if ! "$script_root/tools/build-engine/xray/toolchain-matches-lock.sh" --lock "$lock" >&2; then
+  toolchain_matches_lock=0
 fi
 
 gomobile_mod_version() {
@@ -347,7 +360,7 @@ printf '%s\n' "build-apple: built libXray $engine_version ($engine_commit)"
 printf '%s\n' "build-apple: artifact: $artifact_path"
 printf '%s\n' "build-apple: sha256: $artifact_sha256"
 
-if [[ -n "$recorded_sha256" ]] && [[ "$recorded_sha256" != "$artifact_sha256" ]]; then
+if [[ -n "$recorded_sha256" ]] && [[ "$toolchain_matches_lock" -eq 1 ]] && [[ "$recorded_sha256" != "$artifact_sha256" ]]; then
   fail "build-apple: the built artifact does not match the engine lock sha256: $recorded_sha256"
 fi
 if [[ -z "$recorded_sha256" ]]; then

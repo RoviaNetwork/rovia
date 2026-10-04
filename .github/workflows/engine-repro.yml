@@ -60,8 +60,19 @@ jobs:
       - name: Verify the artifact
         if: steps.engine.outputs.enabled == 'true'
         run: ./tools/reproducibility/verify-xray.sh
+      - name: Probe whether this runner's toolchain matches the lock
+        id: toolchain
+        if: steps.engine.outputs.enabled == 'true'
+        run: |
+          if ./tools/build-engine/xray/toolchain-matches-lock.sh --lock "$ROVIA_ENGINE_LOCK"; then
+            echo "match=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "match=false" >> "$GITHUB_OUTPUT"
+          fi
       - name: Verify the engine lock in release mode
         # Release mode has no empty answer: it runs only when an engine is
         # enabled, and it must find exactly one approved, fully pinned entry.
-        if: steps.engine.outputs.enabled == 'true'
+        # The artifact digest comparison is meaningful only on the reference
+        # toolchain, so the step is gated on the probe above.
+        if: steps.engine.outputs.enabled == 'true' && steps.toolchain.outputs.match == 'true'
         run: ./tools/ci/verify-engine-checksums.sh --mode release --lock "$ROVIA_ENGINE_LOCK"

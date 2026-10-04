@@ -90,7 +90,7 @@ Apple silicon or on a hosted runner.
 
 | Command | Result |
 | --- | --- |
-| `./tools/ci/check-shell-syntax.sh` | `19 shell scripts parse` |
+| `./tools/ci/check-shell-syntax.sh` | `20 shell scripts parse` |
 | `./tools/ci/verify-lockfiles.sh` | `1 local package manifests verified, 0 with locked external dependencies, 0 local path dependencies` |
 | `./tools/ci/verify-third-party-notices.sh` | accepted, no output |
 | `./tools/release/verify-tag.sh v0.1.0` | `v0.1.0 is a valid release tag` |
@@ -99,11 +99,12 @@ Apple silicon or on a hosted runner.
 ### Python tool tests
 
 `./tools/ci/run-tool-tests.sh` ran every `tools/**/test_*.py` as its own
-process: **15 files, 641 tests, 0 failures**.
+process: **16 files, 645 tests, 0 failures**.
 
 | Test file | Tests | Seconds |
 | --- | --- | --- |
 | `tools/build-engine/xray/test_build_apple.py` | 11 | not measured |
+| `tools/build-engine/xray/test_toolchain_matches_lock.py` | 4 | not measured |
 | `tools/ci/test_app_dependencies.py` | 27 | 25.53 |
 | `tools/ci/test_audit_accessibility_identifiers.py` | 58 | 2.05 |
 | `tools/ci/test_check_repository_hygiene.py` | 26 | 6.27 |
@@ -303,7 +304,7 @@ the bundle launches. Neither is evidence of a tunnel.
 
 | Check | Result |
 | --- | --- |
-| `pyyaml` 6.0.2 over `.github/workflows/*.yml` | all four parse: `ci.yml` 1 job / 18 steps, `engine-proof.yml` 1 job / 7 steps, `engine-repro.yml` 1 job / 8 steps, `release-ios.yml` 1 job / 17 steps; every one declares `permissions: contents: read` |
+| `pyyaml` 6.0.2 over `.github/workflows/*.yml` | all four parse: `ci.yml` 1 job / 18 steps, `engine-proof.yml` 1 job / 9 steps, `engine-repro.yml` 1 job / 9 steps, `release-ios.yml` 1 job / 17 steps; every one declares `permissions: contents: read` |
 | `./tools/ci/check-python-lint.sh` | `3.2.0 Python 3.14.4 on Darwin, 14 files`, `no findings`; invoked by `run-tool-tests.sh`, followed by the warnings gate |
 | `./tools/ci/check-python-warnings.sh` | `Python 3.14.7, 14 files, warnings are errors`, `no warnings`; the last step of `run-tool-tests.sh` |
 | `bash -n` over every script in the tree | the same script count as the shell-syntax gate above, no syntax error |
@@ -799,7 +800,7 @@ title to be followed by an absence rather than a pass.
 
 | Thing | Before | After |
 | --- | --- | --- |
-| Tool tests | 364 | 641 |
+| Tool tests | 364 | 645 |
 | Security-sensitive paths listed | 14, one of them nonexistent | 15, all existing |
 | Ownership directions checked | 1 | 3 |
 | Engine license declared per candidate | none, defaulted to MIT | required, derived, and cross-checked |

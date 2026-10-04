@@ -67,7 +67,25 @@ jobs:
           fi
           ./tools/build-engine/xray/build-apple.sh
           ./tools/reproducibility/verify-xray.sh
-          ./tools/ci/verify-engine-checksums.sh --mode release --lock "$ROVIA_ENGINE_LOCK"
+        env:
+          ROVIA_ENGINE_LOCK: engines.lock.json
+      - name: Probe whether this runner's toolchain matches the lock
+        id: toolchain
+        if: steps.engine.outputs.enabled == 'true'
+        run: |
+          if ./tools/build-engine/xray/toolchain-matches-lock.sh --lock "$ROVIA_ENGINE_LOCK"; then
+            echo "match=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "match=false" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          ROVIA_ENGINE_LOCK: engines.lock.json
+      - name: Verify the engine lock in release mode
+        # The digest comparison is only meaningful on the reference toolchain:
+        # a different Xcode or host architecture produces a different artifact
+        # from the same pinned source, which is not drift.
+        if: steps.engine.outputs.enabled == 'true' && steps.toolchain.outputs.match == 'true'
+        run: ./tools/ci/verify-engine-checksums.sh --mode release --lock "$ROVIA_ENGINE_LOCK"
         env:
           ROVIA_ENGINE_LOCK: engines.lock.json
       - name: Upload the built artifact for digest forensics

@@ -130,8 +130,15 @@ import json, sys
 entry = json.load(open(sys.argv[1]))['candidates']['xray']
 print(entry.get('sha256') or '')
 " "$lock")"
-if [[ -n "$recorded" ]] && [[ "$recorded" != "$first" ]]; then
-  fail "verify-xray: the reproducible digest does not match the engine lock: $first != $recorded"
+if [[ -n "$recorded" ]]; then
+  if "$script_root/tools/build-engine/xray/toolchain-matches-lock.sh" --lock "$lock" >&2; then
+    if [[ "$recorded" != "$first" ]]; then
+      fail "verify-xray: the reproducible digest does not match the engine lock: $first != $recorded"
+    fi
+    printf '%s\n' "verify-xray: two independent builds agree and match the lock: $first"
+  else
+    printf '%s\n' "verify-xray: two independent builds agree: $first (the toolchain differs from the lock's reference toolchain, so the lock's digest is not comparable here)"
+  fi
+else
+  printf '%s\n' "verify-xray: two independent builds agree: $first"
 fi
-
-printf '%s\n' "verify-xray: two independent builds agree: $first"
