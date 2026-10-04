@@ -342,7 +342,12 @@ class ReleaseInputsTests(unittest.TestCase):
 
     def test_engine_lock_without_an_approved_engine_is_refused(self):
         (self.root / "engines.lock.json").write_text(
-            (REPO_ROOT / "engines.lock.json").read_text(encoding="utf-8"), encoding="utf-8"
+            json.dumps(
+                gate.engine_lock(production=[], xray=gate.pending_candidate("xray")),
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
         )
         gate.assert_refused(self, self.verify(), "release requires exactly one approved xray engine")
 

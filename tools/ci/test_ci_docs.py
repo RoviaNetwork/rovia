@@ -4,6 +4,7 @@ Shared fixtures and loaders live in ci_check_support.py; this file
 holds PrivacyAndOwnershipTests.
 """
 import inspect
+import json
 import os
 import plistlib
 import re
@@ -422,12 +423,11 @@ class PrivacyAndOwnershipTests(unittest.TestCase):
     # how a citation ends up naming a gate that is about something else - which is
     # precisely what this table exists to prevent, so it has to be held the same way.
     UNEXECUTED_CONTROLS = {
-        "Golden routing fixtures shared with Android": ("9",),
+        "Golden routing fixtures shared with Android": ("8",),
         "Fuzz targets for share-link and subscription parsing": None,
-        "CI secret scanning and workflow review": ("7", "6"),
-        "Dependency review and advisory monitoring": ("7",),
+        "CI secret scanning and workflow review": ("6", "5"),
+        "Dependency review and advisory monitoring": ("6",),
         "Physical-device tunnel tests for lifecycle": ("4",),
-        "Independent reproducibility check for the engine artifact": ("5",),
     }
 
     ROW_CITATION = re.compile(r"release-readiness\.md` row (\d+)")
@@ -565,25 +565,24 @@ class PrivacyAndOwnershipTests(unittest.TestCase):
                     "whether it is a real control, so nothing checks it",
                 )
 
-    def test_the_legal_document_states_the_engine_decision_in_conditional_terms(self):
-        # It said engine versions "are pinned and shipped with the app release",
-        # which is the opposite of the tree: the lock enables none. PRIVACY.md
-        # already recorded this document as holding the note for the day one is
-        # added, so the document was contradicting the privacy answer.
+    def test_the_legal_document_states_the_engine_decision_accurately(self):
+        # The document used to say engine versions "are pinned and shipped with
+        # the app release" while the lock enabled none — the opposite of the
+        # tree. Today the lock pins and bundles xray, and the tunnel is still
+        # not wired, so the document has to hold both halves at once.
         legal = (REPO_ROOT / "docs/legal/app-store-distribution.md").read_text(
             encoding="utf-8"
         )
         self.assertNotIn(
             "Engine versions are pinned and shipped with the app release.", legal
         )
-        self.assertIn("when an engine is added", legal)
-        self.assertIn("No engine is pinned or shipped today", legal)
-        self.assertIn("enables none", flat(legal))
-        self.assertIn("can establish a tunnel" if False else "cannot establish a tunnel", flat(legal))
+        self.assertIn("The lock now pins xray v26.9.9", legal)
+        self.assertIn("gated build pipeline produces the artifact", legal)
+        self.assertIn("cannot establish a tunnel", flat(legal))
         # And it has to stay in step with the privacy answer it is referenced from.
         privacy = (REPO_ROOT / "PRIVACY.md").read_text(encoding="utf-8")
         self.assertIn("docs/legal/app-store-distribution.md", privacy)
-        self.assertIn("no engine is bundled in this build", flat(privacy).lower())
+        self.assertIn("no engine binary is bundled in this build", flat(privacy).lower())
 
     def test_the_documented_package_list_matches_the_package_list_file(self):
         # ios.md once listed four of seven entries, which read as though the engine
@@ -1480,7 +1479,7 @@ class PrivacyAndOwnershipTests(unittest.TestCase):
         self.assertIn("no app or extension code calls it yet", self.privacy)
         self.assertIn("neither store is an enforcement", self.privacy)
 
-    def test_privacy_document_does_not_claim_a_packet_flow_or_a_bundled_engine(self):
+    def test_privacy_document_does_not_claim_a_packet_flow(self):
         provider = (REPO_ROOT / "client/app/ios/RoviaTunnel/PacketTunnelProvider.swift").read_text(
             encoding="utf-8"
         )
@@ -1488,9 +1487,13 @@ class PrivacyAndOwnershipTests(unittest.TestCase):
         # packet bridge as the flow is describing code that does not exist.
         self.assertNotIn("packetFlow", provider)
         self.assertIn("never reads or writes `packetFlow`", self.privacy)
-        self.assertIn("No engine binary is bundled in this build", self.privacy)
+        # The engine is pinned and reproducible but not linked into the app:
+        # the document must say the precise thing — pinned, built by the gated
+        # pipeline, not wired — which is not a packet flow and not a tunnel.
+        self.assertIn("No engine binary is executed in this build", self.privacy)
         self.assertNotIn("the engine binary ships inside the app", self.privacy)
-        self.assertIn("no engine is bundled in this build either", self.privacy)
+        self.assertIn("No engine binary is bundled in this build", self.privacy)
+        self.assertIn("the adapter is not wired to it yet", self.privacy)
 
     def test_privacy_document_names_the_canonical_diagnostic_and_the_raw_trace(self):
         self.assertIn("RouteEvaluator.explain", self.privacy)
@@ -2345,10 +2348,16 @@ class PrivacyAndOwnershipTests(unittest.TestCase):
         gates = self.readiness_gates()
         self.assertEqual([number for number, _ in gates], list(range(1, len(gates) + 1)))
         self.assertGreaterEqual(
-            len(gates), 9,
+            len(gates), 8,
             "the disclosure has fewer rows than it had; a gate leaves the list by being "
             "executed, and the executed one is recorded in the document's Closed section",
         )
+        # The floor moved from 9 to 8 when the production-engine gate closed on
+        # 2026-10-04. A row must never vanish silently, so the closed gate is
+        # asserted to be recorded, with evidence, in the Closed section.
+        closed = self.readiness_document().split("## Closed", 1)[1]
+        self.assertIn("**A production engine**", closed)
+        self.assertIn("2026-10-04", closed)
         body = self.readiness_document()
         readiness_lines = body.splitlines()
         for number, title in gates:
@@ -2415,7 +2424,6 @@ class PrivacyAndOwnershipTests(unittest.TestCase):
             "Archive and export": ".github/workflows/release-ios.yml",
             "Upload, TestFlight, and App Store submission": "CODEOWNERS",
             "Physical-device VPN behaviour": "tools/ci/verify-simulator-install.sh",
-            "A production engine": "engines.lock.json",
             "Required review, and environment approvals": "CODEOWNERS",
             "Dependency review and an advisory-response process":
                 "tools/ci/verify-lockfiles.sh",
@@ -2448,7 +2456,7 @@ class PrivacyAndOwnershipTests(unittest.TestCase):
             "requires the `swift-tests` status check to pass",
             "The refusal of a gate is a result, not a gap",
             "It is not a VPN",
-            "This is row 7, not a control",
+            "This is row 5, not a control",
         ):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, body)
@@ -3187,12 +3195,20 @@ class PrivacyAndOwnershipTests(unittest.TestCase):
             )
             self.assertIn("unresolved teamID", row)
 
-        # Row 5: the engine build refusal.
+        # Row 5: the engine build refusal, against a lock that enables nothing.
+        # The repository lock enables xray, so the same script against it builds
+        # the pinned engine; the refusal lives behind a fixture.
         with self.subTest(row="engine build"):
-            result = gate.run_script(
-                REPO_ROOT / "tools/build-engine/xray/build-apple.sh",
-                "--lock", str(REPO_ROOT / "engines.lock.json"),
-            )
+            with tempfile.TemporaryDirectory() as name:
+                fixture = Path(name) / "engines.lock.json"
+                fixture.write_text(
+                    json.dumps(gate.engine_lock(production=[]), indent=2) + "\n",
+                    encoding="utf-8",
+                )
+                result = gate.run_script(
+                    REPO_ROOT / "tools/build-engine/xray/build-apple.sh",
+                    "--lock", str(fixture),
+                )
             self.assertEqual(result.returncode, 1, gate.combined(result))
             self.assertIn("No approved Xray lock entry is available", result.stderr)
             row = next(
@@ -3200,12 +3216,26 @@ class PrivacyAndOwnershipTests(unittest.TestCase):
             )
             self.assertIn("No approved Xray lock entry is available", row)
 
-        # Row 6: the engine checksum verifier in release mode.
+        # Row 6: the engine checksum verifier in release mode, against a lock
+        # that enables nothing. The repository lock enables xray, and release
+        # mode accepts it; the refusal lives behind a fixture.
         with self.subTest(row="engine release mode"):
-            result = gate.run_script(
-                REPO_ROOT / "tools/ci/verify-engine-checksums.sh",
-                "--mode", "release", "--lock", str(REPO_ROOT / "engines.lock.json"),
-            )
+            with tempfile.TemporaryDirectory() as name:
+                fixture = Path(name) / "engines.lock.json"
+                fixture.write_text(
+                    json.dumps(
+                        gate.engine_lock(
+                            production=[], xray=gate.pending_candidate("xray")
+                        ),
+                        indent=2,
+                    )
+                    + "\n",
+                    encoding="utf-8",
+                )
+                result = gate.run_script(
+                    REPO_ROOT / "tools/ci/verify-engine-checksums.sh",
+                    "--mode", "release", "--lock", str(fixture),
+                )
             self.assertEqual(result.returncode, 1, gate.combined(result))
             self.assertIn("the engine lock enables none", result.stderr)
             row = next(
@@ -3213,11 +3243,20 @@ class PrivacyAndOwnershipTests(unittest.TestCase):
             )
             self.assertIn("the engine lock enables none", row)
 
-        # Row 7: the engine reproducibility verifier.
+        # Row 7: the engine reproducibility verifier, against a lock that
+        # enables nothing. Against the repository lock it builds the pinned
+        # commit twice and the digests agree; the refusal lives behind a fixture.
         with self.subTest(row="verify-xray"):
-            result = gate.run_script(
-                REPO_ROOT / "tools/reproducibility/verify-xray.sh"
-            )
+            with tempfile.TemporaryDirectory() as name:
+                fixture = Path(name) / "engines.lock.json"
+                fixture.write_text(
+                    json.dumps(gate.engine_lock(production=[]), indent=2) + "\n",
+                    encoding="utf-8",
+                )
+                result = gate.run_script(
+                    REPO_ROOT / "tools/reproducibility/verify-xray.sh",
+                    "--lock", str(fixture),
+                )
             self.assertEqual(result.returncode, 1, gate.combined(result))
             self.assertIn(
                 "No approved Xray artifact exists", result.stderr
@@ -3256,7 +3295,7 @@ class PrivacyAndOwnershipTests(unittest.TestCase):
         for external_gate in (
             "Signing, provisioning, archive, and export",
             "A physical-device VPN",
-            "A production engine",
+            "A production engine carrying traffic",
             "Branch protection",
             "Upstream SPDX tooling",
         ):

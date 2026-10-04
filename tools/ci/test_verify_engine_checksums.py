@@ -2,13 +2,15 @@
 """Tests for tools/ci/verify-engine-checksums.sh.
 
 The engine lock is the only thing standing between the build and an unreviewed
-proxy binary, so the verifier has two modes with opposite obligations:
+proxy binary, so the verifier has two modes with one deliberate difference:
 
-* foundation mode may accept an empty lock, because the current slice ships no
-  production engine, but any entry that is present must be complete;
+* foundation mode may accept an empty lock, and any enabled entry must be
+  complete — approved, enabled, a full commit SHA, a recorded digest — but the
+  artifact's bytes are only verified when the artifact is on disk, because the
+  file is gitignored and the build produces it;
 * release mode must find exactly one approved Xray entry with a full commit
-  SHA and a matching artifact hash, and must fail closed on every missing,
-  partial, or ambiguous input.
+  SHA and the artifact on disk matching the recorded digest, and must fail
+  closed on every missing, partial, or ambiguous input.
 
 Every refusal case below is a permanent negative test: each one asserts both
 the exit code and the reason the gate gave.
@@ -58,7 +60,17 @@ class VerifyEngineChecksumsTests(unittest.TestCase):
     def test_repository_lock_passes_in_foundation_mode(self):
         result = self.run_lock("--mode", "foundation")
         gate.assert_accepted(self, result)
-        self.assertIn("no production engine is enabled", result.stdout)
+        self.assertIn("xray is approved and verified", result.stdout)
+
+    def test_repository_lock_passes_in_release_mode(self):
+        # The repository lock is always structurally release-grade; the only
+        # acceptable refusal is the gitignored artifact not being built yet.
+        result = self.run_lock("--mode", "release")
+        if result.returncode != 0:
+            self.assertIn("artifact does not exist", result.stderr)
+            self.assertNotIn("checksum does not match", result.stderr)
+        else:
+            self.assertIn("xray is approved and verified", result.stdout)
 
     def test_foundation_mode_reports_an_approved_engine(self):
         with tempfile.TemporaryDirectory() as name:
@@ -143,14 +155,23 @@ class VerifyEngineChecksumsTests(unittest.TestCase):
                 "exactly one production engine",
             )
 
-    def test_foundation_mode_refuses_an_enabled_engine_without_an_artifact(self):
+    def test_foundation_mode_accepts_an_enabled_engine_whose_artifact_is_not_built_yet(self):
         with tempfile.TemporaryDirectory() as name:
             directory = Path(name)
             lock = gate.engine_lock(production=["xray"])
+            result = self.run_lock(lock=self.write_lock(directory, lock))
+            gate.assert_accepted(self, result)
+            self.assertIn("not on disk", result.stdout)
+
+    def test_foundation_mode_refuses_a_present_artifact_whose_bytes_disagree(self):
+        with tempfile.TemporaryDirectory() as name:
+            directory = Path(name)
+            lock = gate.engine_lock(production=["xray"])
+            (directory / "engine.bin").write_bytes(b"the wrong bytes")
             gate.assert_refused(
                 self,
                 self.run_lock(lock=self.write_lock(directory, lock)),
-                "artifact does not exist",
+                "checksum does not match",
             )
 
     def test_foundation_mode_refuses_a_disabled_candidate(self):
@@ -285,11 +306,14 @@ class VerifyEngineChecksumsTests(unittest.TestCase):
             gate.assert_accepted(self, self.run_lock("--mode", "release", lock=self.approved_lock(directory)))
 
     def test_release_mode_refuses_an_empty_engine_lock(self):
-        gate.assert_refused(
-            self,
-            self.run_lock("--mode", "release", lock=REPOSITORY_LOCK),
-            "release requires exactly one approved xray engine",
-        )
+        with tempfile.TemporaryDirectory() as name:
+            directory = Path(name)
+            lock = gate.engine_lock(production=[], xray=gate.pending_candidate("xray"))
+            gate.assert_refused(
+                self,
+                self.run_lock("--mode", "release", lock=self.write_lock(directory, lock)),
+                "release requires exactly one approved xray engine",
+            )
 
     def test_release_mode_refuses_a_missing_lock(self):
         with tempfile.TemporaryDirectory() as name:
@@ -369,6 +393,24 @@ class VerifyEngineChecksumsTests(unittest.TestCase):
 
     def test_github_output_reports_a_disabled_engine(self):
         with tempfile.TemporaryDirectory() as name:
+            directory = Path(name)
+            output = directory / "github-output"
+            lock = gate.engine_lock(production=[], xray=gate.pending_candidate("xray"))
+            result = self.run_lock(
+                "--mode",
+                "foundation",
+                "--github-output",
+                str(output),
+                lock=self.write_lock(directory, lock),
+            )
+            gate.assert_accepted(self, result)
+            self.assertEqual(
+                output.read_text(encoding="utf-8").split(),
+                ["enabled=false", "engine=none"],
+            )
+
+    def test_github_output_reports_the_repository_locks_enabled_engine(self):
+        with tempfile.TemporaryDirectory() as name:
             output = Path(name) / "github-output"
             result = self.run_lock(
                 "--mode",
@@ -379,7 +421,7 @@ class VerifyEngineChecksumsTests(unittest.TestCase):
             gate.assert_accepted(self, result)
             self.assertEqual(
                 output.read_text(encoding="utf-8").split(),
-                ["enabled=false", "engine=none"],
+                ["enabled=true", "engine=xray"],
             )
 
     def test_github_output_reports_an_enabled_engine(self):

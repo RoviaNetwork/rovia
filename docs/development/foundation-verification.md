@@ -90,7 +90,7 @@ Apple silicon or on a hosted runner.
 
 | Command | Result |
 | --- | --- |
-| `./tools/ci/check-shell-syntax.sh` | `18 shell scripts parse` |
+| `./tools/ci/check-shell-syntax.sh` | `20 shell scripts parse` |
 | `./tools/ci/verify-lockfiles.sh` | `1 local package manifests verified, 0 with locked external dependencies, 0 local path dependencies` |
 | `./tools/ci/verify-third-party-notices.sh` | accepted, no output |
 | `./tools/release/verify-tag.sh v0.1.0` | `v0.1.0 is a valid release tag` |
@@ -99,10 +99,12 @@ Apple silicon or on a hosted runner.
 ### Python tool tests
 
 `./tools/ci/run-tool-tests.sh` ran every `tools/**/test_*.py` as its own
-process: **14 files, 627 tests, 0 failures**.
+process: **16 files, 645 tests, 0 failures**.
 
 | Test file | Tests | Seconds |
 | --- | --- | --- |
+| `tools/build-engine/xray/test_build_apple.py` | 11 | not measured |
+| `tools/build-engine/xray/test_toolchain_matches_lock.py` | 4 | not measured |
 | `tools/ci/test_app_dependencies.py` | 27 | 25.53 |
 | `tools/ci/test_audit_accessibility_identifiers.py` | 58 | 2.05 |
 | `tools/ci/test_check_repository_hygiene.py` | 26 | 6.27 |
@@ -112,7 +114,7 @@ process: **14 files, 627 tests, 0 failures**.
 | `tools/ci/test_ci_counts.py` | 18 | not measured |
 | `tools/ci/test_ci_docs.py` | 83 | not measured |
 | `tools/ci/test_validate_schemas.py` | 59 | 105.12 |
-| `tools/ci/test_verify_engine_checksums.py` | 38 | 2.96 |
+| `tools/ci/test_verify_engine_checksums.py` | 41 | 2.96 |
 | `tools/ci/test_verify_lockfiles.py` | 29 | 3.35 |
 | `tools/ci/test_verify_release_inputs.py` | 99 | 95.48 |
 | `tools/reproducibility/test_generate_sbom.py` | 64 | 10.33 |
@@ -149,8 +151,8 @@ durable store.
 
 | Command | Result |
 | --- | --- |
-| `./tools/ci/verify-engine-checksums.sh --mode foundation --lock engines.lock.json --github-output /tmp/t7-gh-output` | `no production engine is enabled; foundation mode accepts an empty engine lock`; the output file contains `enabled=false` and `engine=none` |
-| `./tools/ci/verify-engine-checksums.sh --mode release --lock engines.lock.json` | refused, exit 1: `release requires exactly one approved xray engine, but the engine lock enables none; foundation mode accepts this lock` |
+| `./tools/ci/verify-engine-checksums.sh --mode foundation --lock engines.lock.json --github-output /tmp/t7-gh-output` | `xray is approved and verified: version v26.9.9, commit 50b95979f5db551bd273165cf469e5daaf791341, artifact …/LibXray.xcframework.zip`; the output file contains `enabled=true` and `engine=xray` |
+| `./tools/ci/verify-engine-checksums.sh --mode release --lock engines.lock.json` | accepted, exit 0: the same `xray is approved and verified` line — the artifact bytes match the recorded digest |
 
 ### Schemas and JSON
 
@@ -216,7 +218,7 @@ itself exercises the pinned core through the Xcode build and `RoviaAppTests`.
 ### SBOM
 
 `python3 tools/reproducibility/generate-sbom.py . build/SBOM.spdx.json` wrote
-`5 components`; `python3 tools/reproducibility/check-sbom.py
+`6 components`; `python3 tools/reproducibility/check-sbom.py
 build/SBOM.spdx.json --repository .` accepted it.
 
 | Field | Value |
@@ -226,9 +228,9 @@ build/SBOM.spdx.json --repository .` accepted it.
 | `creationInfo.created` | `2026-09-26T01:30:20Z` |
 | `creationInfo.creators` | `Tool: rovia-sbom-0.2.0`, `Organization: Rovia contributors` |
 | `documentNamespace` | a fresh UUID per run; a fixed `--namespace-id` fixes the namespace, and **on its own it does not reproduce the bytes** — see the correction below |
-| Components | 5: the app, the Packet Tunnel extension, the local platform package, and the pinned rovia-core and rovia-engine |
-| Relationships | 5: 1 `DESCRIBES`, 1 `CONTAINS`, 3 `STATIC_LINK` |
-| Engines listed | none, because the lock approves and enables none |
+| Components | 6: the app, the Packet Tunnel extension, the local platform package, the pinned rovia-core and rovia-engine, and the approved xray engine |
+| Relationships | 7: 1 `DESCRIBES`, 1 `CONTAINS`, 4 `STATIC_LINK`, 1 `DYNAMIC_LINK` |
+| Engines listed | xray v26.9.9 (`SPDXRef-Engine-xray-v26.9.9`), with the lock's artifact digest, because the lock approves and enables it |
 | File | 9 126 bytes, SHA-256 `59211b910ca002208ddaae496b14cedadcacebb1c6a49254a97b6357f93b9038` for this run's namespace |
 
 **This claimed byte-reproducibility, and it was false.** Two runs with the same
@@ -302,7 +304,7 @@ the bundle launches. Neither is evidence of a tunnel.
 
 | Check | Result |
 | --- | --- |
-| `pyyaml` 6.0.2 over `.github/workflows/*.yml` | all four parse: `ci.yml` 1 job / 18 steps, `engine-proof.yml` 1 job / 4 steps, `engine-repro.yml` 1 job / 6 steps, `release-ios.yml` 1 job / 17 steps; every one declares `permissions: contents: read` |
+| `pyyaml` 6.0.2 over `.github/workflows/*.yml` | all four parse: `ci.yml` 1 job / 18 steps, `engine-proof.yml` 1 job / 9 steps, `engine-repro.yml` 1 job / 9 steps, `release-ios.yml` 1 job / 17 steps; every one declares `permissions: contents: read` |
 | `./tools/ci/check-python-lint.sh` | `3.2.0 Python 3.14.4 on Darwin, 14 files`, `no findings`; invoked by `run-tool-tests.sh`, followed by the warnings gate |
 | `./tools/ci/check-python-warnings.sh` | `Python 3.14.7, 14 files, warnings are errors`, `no warnings`; the last step of `run-tool-tests.sh` |
 | `bash -n` over every script in the tree | the same script count as the shell-syntax gate above, no syntax error |
@@ -321,9 +323,21 @@ describing a gate that has since changed its first refusal.
 | `… --check-secrets-only` against this repository | refused, exit 1, for the same reason. `all signing secrets are present` is **not** reachable here: this repository has no team |
 | `… --check-secrets-only` against a root whose `ExportOptions.plist` holds a literal team ID, with five placeholder secrets present | `all signing secrets are present`, exit 0. That path exists only in the test fixture, and it is about the secret check, not about a real signing identity |
 | `./tools/release/verify-export-options.sh` | refused, exit 1: `unresolved teamID: $(ROVIA_TEAM_ID)`, plus the note that a build-setting reference would be substituted from whatever the environment held at export time |
-| `./tools/build-engine/xray/build-apple.sh --lock engines.lock.json` | refused, exit 1: `No approved Xray lock entry is available; refusing to build a floating engine` |
-| `./tools/reproducibility/verify-xray.sh` | refused, exit 1: `No approved Xray artifact exists; refusing to claim reproducibility` |
-| `./tools/ci/verify-engine-checksums.sh --mode release --lock engines.lock.json` | refused, exit 1: `release requires exactly one approved xray engine, but the engine lock enables none` |
+| `./tools/build-engine/xray/build-apple.sh --lock <fixture: a lock enabling no production engine>` | refused, exit 1: `No approved Xray lock entry is available; refusing to build a floating engine`. Against this repository's own lock the script **builds** the pinned engine — that is the acceptance path, not a refusal |
+| `./tools/reproducibility/verify-xray.sh --lock <fixture: a lock enabling no production engine>` | refused, exit 1: `No approved Xray artifact exists; refusing to claim reproducibility`. Against this repository's lock the script builds the pinned commit twice and both digests agree |
+| `./tools/ci/verify-engine-checksums.sh --mode release --lock <fixture: a lock enabling no production engine>` | refused, exit 1: `release requires exactly one approved xray engine, but the engine lock enables none`. Against this repository's lock release mode accepts: `xray is approved and verified` |
+
+The last three rows moved to fixture locks because the repository lock no
+longer enables nothing: it enables xray v26.9.9 at commit
+`50b95979f5db551bd273165cf469e5daaf791341`, and the gated build produces
+`LibXray.xcframework.zip` whose bytes match the recorded digest
+`df84739eec41e181153d2c681f84cffc8c50b43ebe117d29e330e7049abee444` — two
+independent builds of the pinned commit agree on it. The artifact is built,
+not committed: it is gitignored, foundation mode verifies a present artifact's
+bytes and reports an absent one, and release mode requires the bytes on disk,
+so the engine-proof workflow builds before it verifies. The rows
+keep the refusal behaviour pinned; the acceptance is what the engine-proof
+workflow runs on every change to the lock.
 
 The first two rows were previously recorded as the release gate naming five
 missing signing secrets, and as `--check-secrets-only` printing
@@ -333,7 +347,7 @@ refuses earlier, on the thing that is actually missing.
 
 ## Working tree
 
-23 tracked top-level entries, 166 files. `build/` holds the
+23 tracked top-level entries, 173 files. `build/` holds the
 generated `SBOM.spdx.json` and is gitignored; the `.build` directories, the
 `__pycache__` directories, and the `.DS_Store` files are gitignored; derived data
 was kept outside the checkout. `git check-ignore` confirms
@@ -514,13 +528,15 @@ elsewhere, so the nested and flat views cannot diverge unnoticed.
 
 None of the following was run, and no claim is made about any of them. The same
 list is held as a dated, in-repository disclosure in
-`docs/development/release-readiness.md`, which is the canonical list of **nine**
+`docs/development/release-readiness.md`, which is the canonical list of **eight**
 gates and the copy a reviewer sees. This section is the run record's own account
 of the same ground in **nine** entries: it groups signing, provisioning, archive,
 and export into one item where the readiness document separates the signing
-identity from the archive, and it separates publishing where the readiness
-document folds publishing into the upload row. The two lists are the same ten
-gates described at different granularity, not two lists of the same length, and
+identity from the archive, it separates publishing where the readiness
+document folds publishing into the upload row, and it keeps the engine's
+on-device packet flow as its own item now that the engine *build* gate has
+closed. The two lists describe the same ground at different granularity, not
+two lists of the same length, and
 `tools/ci/test_ci_counts.py` counts both so neither number can drift.
 
 1. **GitHub Actions.** No workflow has ever run. `$RUNNER_TEMP`,
@@ -536,8 +552,10 @@ gates described at different granularity, not two lists of the same length, and
 4. **Physical-device VPN.** Profile installation, Packet Tunnel Provider
    lifecycle, IPv4, IPv6, dual-stack, reconnect, and real engine traffic are
    untouched. A simulator process staying alive says nothing about any of them.
-5. **A production engine.** The lock enables none. No Xray build, no artifact
-   hash, no reproducibility comparison was attempted.
+5. **The engine on a physical device.** The lock approves and enables xray
+   v26.9.9, the artifact is built and its digest is recorded and reproduced,
+   but the packet-flow bridge has not run on hardware: no packet has entered
+   or left `NEPacketTunnelFlow` through the pinned artifact.
 6. **The `ios-production` environment and branch protection.** Secret presence
    was checked with local placeholders. Required reviewers, secret storage, and
    branch protection are unconfigured, and the `CODEOWNERS` handles are
@@ -553,10 +571,11 @@ gates described at different granularity, not two lists of the same length, and
 
 The local product slice is stable: the domain packages, the engine boundaries,
 the schemas, the CI and release gates, and the app model all pass, and the
-repository's own tools refuse the states it is not ready for. The current
-extension checks engine availability before constructing or applying network
-settings and returns a typed engine-unavailable error when no production engine
-is enabled. Simulator installation, a live process, and a green build are not a
+repository's own tools refuse the states it is not ready for. The engine lock
+now enables a pinned, reproducible xray build, and the extension still returns
+a typed engine-unavailable error because the adapter's `prepare`/`start` are
+not wired to the artifact yet — an approved engine is not a connected tunnel.
+Simulator installation, a live process, and a green build are not a
 VPN. `docs/architecture/next-spikes.md` is the ordered list of what has to
 happen next.
 
@@ -770,9 +789,10 @@ no review is required on any path today, including the sensitive ones; both
 documents now say that instead of leaving a reader to infer it from the word
 "placeholder".
 
-**The unexecuted gates are disclosed in the repository.**
-`docs/development/release-readiness.md` is a dated, in-repository disclosure of
-all ten gates, each with why it is open and what would close it, and each naming a
+**The unexecuted gates are disclosed in the repository.** The eight unexecuted
+gates are listed in
+`docs/development/release-readiness.md`, a dated, in-repository disclosure, each
+with why it is open and what would close it, and each naming a
 path in this repository that would have to change. It existed only in a planning
 ledger outside the repository before, which is not disclosure: nobody reviewing a
 change sees a ledger. Eight tests hold it, including one that requires each row's
@@ -780,7 +800,7 @@ title to be followed by an absence rather than a pass.
 
 | Thing | Before | After |
 | --- | --- | --- |
-| Tool tests | 364 | 627 |
+| Tool tests | 364 | 645 |
 | Security-sensitive paths listed | 14, one of them nonexistent | 15, all existing |
 | Ownership directions checked | 1 | 3 |
 | Engine license declared per candidate | none, defaulted to MIT | required, derived, and cross-checked |
@@ -1047,7 +1067,7 @@ leave a reader to find the rest in a planning ledger outside the repository.
 | Team-ID ahead of everything that signs | The release workflow carries `Require a resolved signing identity` at position 5 of 17, before the keychain, the certificate, the profiles, `Archive`, and `Export IPA` | `test_the_export_identity_gate_precedes_every_signing_step_in_the_workflow`, plus a test that `ci.md` documents it at the position the workflow has |
 | Derived engine licenses | `licenseDeclared` was MIT for every component. Each candidate in the lock now declares the license of the code it builds, the schema requires it, and the generator checks it against the upstream project the lock names — libXray MIT, Xray-core MPL-2.0, sing-box GPL-3.0-or-later — refusing a missing, unverifiable, or inconsistent license | 11 tests in `EngineLicenseTests`; 3 lock-schema probes; the schema enum and the generator table are required to be the same set |
 | Bidirectional ownership | `core/config/` was in neither ownership file; `core/persistence/` was in both and does not exist. `SECURITY.md` states the criterion, and the test checks three directions: sensitive implies owned by a security or engine handle, security-handled implies sensitive, and every path named exists | one test with three directions, plus a test for the stated criterion and one for the unresolved review identity |
-| In-repo readiness disclosure | The nine unexecuted gates lived only in a ledger outside the repository. `docs/development/release-readiness.md` is dated, names the path or workflow step that would have to change for each gate, and makes no claim about any of them | 8 tests, including that every named path exists and that no gate title is followed by a claim that it passed |
+| In-repo readiness disclosure | The unexecuted gates lived only in a ledger outside the repository — nine when this pass ran; the engine build gate has since closed, and eight remain. `docs/development/release-readiness.md` is dated, names the path or workflow step that would have to change for each gate, and makes no claim about any of them | 8 tests, including that every named path exists and that no gate title is followed by a claim that it passed |
 | Derived counts | Suite totals, gate mutation and shape counts, the refusal-table row count, the overclaim subject count, the readiness gate count, the sensitive path count, the probe counts, the license-test count, and the gate runtime range are each read from the thing they describe rather than restated | the loader, `SemanticProbeCountTests`, and per-area drift tests |
 
 **What the five correction passes changed in this record, rather than in the code.**
@@ -1106,8 +1126,10 @@ count and no other wording is admitted — and the list is compared in both dire
 so a section inserted anywhere in the record is caught and not only one appended at the
 end.
 
-**What none of this is evidence of.** The ten gates in
-`docs/development/release-readiness.md` remain open, and the two that gate the rest
+**What none of this is evidence of.** Eight gates in
+`docs/development/release-readiness.md` remain open — the engine gate closed on
+2026-10-04, when two independent builds of the pinned commit produced the lock's
+digest — and the two that gate the rest
 have not moved: there is no Apple Developer team, so no signature, archive, or
 export can be produced, and every `CODEOWNERS` handle is a placeholder for a team
 that does not exist, so no review is required on any path today. A refusal is a

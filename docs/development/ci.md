@@ -479,9 +479,10 @@ rather than at this summary.
 - **Publishing.** No upload step exists, and the policy test keeps it that way.
 - **A physical-device VPN.** Profile installation, the Packet Tunnel Provider
   lifecycle, IPv4/IPv6/dual-stack, and reconnect are unverified.
-- **A production engine.** The engine lock enables none, and
-  `tools/build-engine/xray/build-apple.sh` refuses even with an approved lock
-  because the deterministic build recipe does not exist yet.
+- **A production engine carrying traffic.** The engine is built and
+  reproducible — `tools/build-engine/xray/build-apple.sh` builds the pinned
+  libXray and `tools/reproducibility/verify-xray.sh` proves two builds agree —
+  but no packet has crossed `NEPacketTunnelFlow` through it.
 - **Branch protection, required reviews, and the `ios-production` environment
   approvals.** The `CODEOWNERS` handles are placeholders.
 - **Upstream SPDX tooling.** `check-sbom.py` checks this repository's

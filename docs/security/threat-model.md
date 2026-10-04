@@ -49,30 +49,33 @@ drift apart.
 **In place and executed here**
 
 - Unit tests for parser limits, normalization, redaction, and route evaluation.
+- Independent reproducibility check for the engine artifact.
+  `tools/reproducibility/verify-xray.sh` builds the pinned libXray commit twice
+  through the gated build path and refuses unless both runs produce the digest
+  the lock records; `tools/ci/verify-engine-checksums.sh --mode release` then
+  refuses anything whose bytes do not match it. Both ran, and the agreement is
+  recorded in `docs/development/foundation-verification.md`.
 
 **Planned, not implemented**
 
 - Golden routing fixtures shared with Android. Android is not started, so there is
-  no second platform to share them with. `release-readiness.md` row 9.
+  no second platform to share them with. `release-readiness.md` row 8.
 - Fuzz targets for share-link and subscription parsing. There is no fuzz target in
   the tree and no fuzzing step in any workflow. No row of `release-readiness.md`
   covers this one: that disclosure lists the gates that are open, and fuzzing is
   not among them, so citing a row here would be citing a gate that is about
   something else.
 - CI secret scanning and workflow review. The workflow has now run, so there is
-  something to scan, and nothing scans it. `release-readiness.md` row 7.
+  something to scan, and nothing scans it. `release-readiness.md` row 6.
   `CODEOWNERS` lists the paths a review would cover, and the handles in it are
   placeholders, so no review is currently required on any path.
-  `release-readiness.md` row 6.
+  `release-readiness.md` row 5.
 - Dependency review and advisory monitoring. SBOM generation does exist and runs,
   but dependency review, advisory monitoring, and secret scanning are not
-  configured. `release-readiness.md` row 7.
+  configured. `release-readiness.md` row 6.
 - Physical-device tunnel tests for lifecycle, IPv4, IPv6, and reconnect behaviour.
   Simulator install and launch are checked; a simulator process staying alive says
   nothing about a tunnel. `release-readiness.md` row 4.
-- Independent reproducibility check for the engine artifact. No engine is built, so
-  there is no artifact to reproduce, and the verifier refuses rather than claiming
-  it. `release-readiness.md` row 5.
 
 ## Residual risks
 

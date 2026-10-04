@@ -3,6 +3,7 @@
 Shared fixtures and loaders live in ci_check_support.py; this file
 holds WorkflowPolicyTests.
 """
+import json
 import plistlib
 import re
 import subprocess
@@ -196,25 +197,50 @@ class WorkflowPolicyTests(unittest.TestCase):
                     f"{name} must only run when the lock enables an engine",
                 )
 
-    def test_engine_build_stub_refuses_without_an_approved_lock(self):
-        stub = REPO_ROOT / "tools/build-engine/xray/build-apple.sh"
+    def test_engine_build_gate_refuses_before_any_build(self):
+        script = REPO_ROOT / "tools/build-engine/xray/build-apple.sh"
         with tempfile.TemporaryDirectory() as name:
             gate.assert_refused(
                 self,
-                gate.run_script(stub, "--lock", str(Path(name) / "engines.lock.json")),
+                gate.run_script(script, "--lock", str(Path(name) / "engines.lock.json")),
                 "engines.lock.json is required",
             )
-        gate.assert_refused(
-            self, gate.run_script(stub), "refusing to build a floating engine"
-        )
         with tempfile.TemporaryDirectory() as name:
             directory = Path(name)
-            gate.write_approved_lock(directory)
-            approved = gate.run_script(stub, "--lock", str(directory / "engines.lock.json"))
-            # The stub must not succeed even with a fully approved lock: the
-            # deterministic build recipe does not exist yet.
+            (directory / "engines.lock.json").write_text(
+                json.dumps(
+                    gate.engine_lock(production=[], xray=gate.pending_candidate("xray")),
+                    indent=2,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            gate.assert_refused(
+                self,
+                gate.run_script(script, "--lock", str(directory / "engines.lock.json")),
+                "refusing to build a floating engine",
+            )
+        with tempfile.TemporaryDirectory() as name:
+            directory = Path(name)
+            lock_path = gate.write_approved_lock(directory)
+            lock = json.loads(lock_path.read_text(encoding="utf-8"))
+            # A full gating pass needs a toolchain pin; a Go version this
+            # machine does not have then stops the build before any download.
+            lock["candidates"]["xray"]["toolchain"] = (
+                "go1.24.0 darwin/amd64 + gomobile v0.0.0-20260908204917-8b95e45f8d3e"
+            )
+            lock_path.write_text(json.dumps(lock, indent=2) + "\n", encoding="utf-8")
+            approved = gate.run_script(script, "--lock", str(lock_path))
             self.assertNotEqual(approved.returncode, 0, gate.combined(approved))
-            self.assertIn("not implemented yet", gate.combined(approved))
+            # With or without a Go toolchain on the machine, the refusal must
+            # come from the gating phase: nothing was downloaded or built.
+            self.assertTrue(
+                "the lock pins" in gate.combined(approved)
+                or "no Go toolchain is available" in gate.combined(approved),
+                gate.combined(approved),
+            )
+            self.assertNotIn("downloading", gate.combined(approved).lower())
+            self.assertNotIn("built libXray", gate.combined(approved))
 
     def test_engine_build_stub_rejects_a_usage_error(self):
         stub = REPO_ROOT / "tools/build-engine/xray/build-apple.sh"

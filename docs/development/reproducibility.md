@@ -140,6 +140,26 @@ an approved binary with no declared release path.
 `tools/ci/test_verify_lockfiles.py` fails when a `Package.swift` exists in the
 tree but is not listed, so the list, the scripts, and the tests cannot drift.
 
-## Current foundation
+## Current state
 
-No production engine is enabled in the current lock, so there is no engine hash to compare yet. `tools/ci/verify-engine-checksums.sh --mode foundation` accepts the empty lock and says so; `--mode release` refuses it, and the release workflow only ever runs the release mode. `tools/reproducibility/verify-xray.sh` still exits non-zero, and `tools/build-engine/xray/build-apple.sh` refuses even when the lock pins an approved Xray build, because the deterministic build recipe is not written yet. No claim of engine reproducibility is made.
+The lock enables one production engine: xray v26.9.9, pinned to commit
+`50b95979f5db551bd273165cf469e5daaf791341` with a verified source archive
+digest. `tools/build-engine/xray/build-apple.sh` builds
+`LibXray.xcframework.zip` from that pin, and
+`tools/reproducibility/verify-xray.sh` builds it twice in isolation and
+refuses unless both digests agree.
+
+One deliberate limit, stated rather than hidden: byte-identical output is a
+property of the **whole** toolchain. The Go version and the gomobile revision
+are pinned and installed exactly; the host architecture and the host's Xcode
+also change the bytes (the gobind glue is compiled by the host's clang against
+the host's SDK). The lock records the reference toolchain
+(`go1.27.1 darwin/amd64 + gomobile v0.0.0-20260908204917-8b95e45f8d3e + Xcode 26.3`),
+and `tools/build-engine/xray/toolchain-matches-lock.sh` decides whether a
+machine's output is comparable with the recorded digest
+`df84739eec41e181153d2c681f84cffc8c50b43ebe117d29e330e7049abee444`. The
+two-tier rule: any machine must produce two identical builds (drift within a
+toolchain is a hard failure), and a machine matching the reference toolchain
+must also match the lock (drift against the reference is a hard failure).
+A hosted runner whose Xcode is newer than the reference proves the first tier
+and says so, rather than claiming the second.
