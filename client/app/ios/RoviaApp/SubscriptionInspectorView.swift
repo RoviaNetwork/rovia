@@ -92,7 +92,7 @@ struct SubscriptionInspectorView: View {
             .accessibilityIdentifier(AppAccessibilityIdentifier.subscriptionScreen + ".retry")
         }
         .modifier(ConditionalAccessibilityIdentifier(
-            identifier: AppAccessibilityIdentifier.subscriptionEmpty
+            identifier: AppAccessibilityIdentifier.subscriptionScreen + ".unavailable"
         ))
     }
 
@@ -160,6 +160,7 @@ struct SubscriptionInspectorView: View {
         .listStyle(.insetGrouped)
         .refreshable {
             for subscription in model.storedSubscriptions {
+                guard !Task.isCancelled else { break }
                 await model.refreshSubscription(subscription.id)
             }
         }
@@ -403,13 +404,17 @@ struct ImportPreviewSheet: View {
                     Button("Add subscription") {
                         let name = nameText.trimmingCharacters(in: .whitespacesAndNewlines)
                         Task {
-                            await model.addSubscriptionText(
+                            let succeeded = await model.addSubscriptionText(
                                 pending.text,
                                 name: name.isEmpty ? (pending.name ?? "Imported subscription") : name
                             )
-                            model.discardPendingImport()
+                            // Only then discard the pending link — a failed
+                            // add must not throw the link away with the tap.
+                            if succeeded {
+                                model.discardPendingImport()
+                            }
+                            dismiss()
                         }
-                        dismiss()
                     }
                     .disabled(!canAdd)
                 }
@@ -425,6 +430,11 @@ struct ImportPreviewSheet: View {
                 }
             }
             .onAppear {
+                nameText = pending.name ?? ""
+            }
+            // A second deep link replaces the item: reset the editable name
+            // so it never carries the previous link's suggestion.
+            .onChange(of: pending.id) { _, _ in
                 nameText = pending.name ?? ""
             }
         }

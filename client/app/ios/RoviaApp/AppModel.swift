@@ -204,24 +204,50 @@ final class AppModel {
            content.isKnownProfile(profile)
         {
             snapshot.selection.profile = profile
-        } else if let fallback = content.defaultProfileID {
-            snapshot.selection.profile = fallback
+        } else {
+            // Unknown stored ID or none stored: fall back to the default,
+            // which is nil only when the content has no profiles at all.
+            // Never keep a value from the previous projection.
+            snapshot.selection.profile = content.defaultProfileID
         }
         if let group = selectionStorage.string(forKey: Self.selectionGroupKey),
            content.group(id: group) != nil
         {
             snapshot.selection.group = group
-        } else if let fallback = content.defaultGroupID {
-            snapshot.selection.group = fallback
+        } else {
+            snapshot.selection.group = content.defaultGroupID
         }
+        // The stored server is kept only if it is actually reachable from
+        // the selected profile and group — never by bare existence in the
+        // full server list.
         if let server = selectionStorage.string(forKey: Self.selectionServerKey),
-           content.server(id: server) != nil
+           content.server(id: server) != nil,
+           isReachableSelection(serverID: server, in: content)
         {
             snapshot.selection.server = server
         } else {
             snapshot.selection.server = nil
         }
         updateDerivedMeasurements()
+    }
+
+    /// A server is selectable only inside the currently selected profile and
+    /// group: membership is re-derived from the content, never from the fact
+    /// that the ID still exists somewhere in the fleet.
+    private func isReachableSelection(serverID: ServerID, in content: AppContent) -> Bool {
+        if let profileID = snapshot.selection.profile,
+           let profile = content.profile(id: profileID),
+           !profile.serverIDs.contains(serverID)
+        {
+            return false
+        }
+        if let groupID = snapshot.selection.group,
+           let group = content.group(id: groupID),
+           !group.memberIDs.contains(serverID)
+        {
+            return false
+        }
+        return true
     }
 
     var pendingActions: Set<AppAction> {
@@ -407,6 +433,9 @@ final class AppModel {
             snapshot.selection = .none
             snapshot.system = .failed(sanitized)
             snapshot.lastError = sanitized
+            snapshot.engine = .unknown
+            snapshot.failedRefreshIDs = []
+            snapshot.lastSubscriptionResult = nil
             updateDerivedMeasurements()
             return false
         }
@@ -460,6 +489,9 @@ final class AppModel {
             let failure = AppError.unknown(code: "subscription.storage.failed")
             snapshot.system = .failed(failure)
             snapshot.lastError = failure
+            snapshot.engine = .unknown
+            snapshot.failedRefreshIDs = []
+            snapshot.lastSubscriptionResult = nil
             updateDerivedMeasurements()
             return true
         }
@@ -499,6 +531,10 @@ final class AppModel {
 
         do {
             try await tunnel.requestStart()
+        } catch is CancellationError {
+            // The user or the engine is no longer waiting: no banner, and
+            // the engine figure stays whatever the next status read says.
+            return false
         } catch {
             let sanitized = AppError(sanitizing: error, operation: .connect)
             snapshot.engine = .failed(sanitized)
@@ -522,6 +558,9 @@ final class AppModel {
         snapshot.engine = .stopping
         do {
             try await tunnel.requestStop()
+        } catch is CancellationError {
+            snapshot.engine = engineBeforeStop
+            return false
         } catch {
             let sanitized = AppError(sanitizing: error, operation: .disconnect)
             snapshot.engine = engineBeforeStop
@@ -542,6 +581,13 @@ final class AppModel {
             snapshot.engine = .unavailable(reason)
             snapshot.lastError = .engineUnavailable(reason: reason)
         case .disconnected:
+            // A failed connect writes `.failed`, and a disconnecting tunnel
+            // or reassert must not wipe it before the user acts. Anything
+            // other than a fresh poll result resets to the honest state.
+            if case .failed = snapshot.engine {
+                updateDerivedMeasurements()
+                return true
+            }
             snapshot.engine = .idle
             snapshot.lastError = nil
         case .connecting, .reasserting:
@@ -651,7 +697,12 @@ final class AppModel {
     // MARK: - Subscriptions
 
     private func addSubscriptionFromURL(_ url: URL, name: String, allowInsecure: Bool) async -> Bool {
-        guard snapshot.system == .ready, let coordinator = subscriptions else { return false }
+        guard snapshot.system == .ready, let coordinator = subscriptions else {
+            if snapshot.system != .ready {
+                snapshot.lastError = .unknown(code: "app.not.ready")
+            }
+            return false
+        }
         do {
             let summary = try await coordinator.add(url: url, name: name, allowInsecure: allowInsecure)
             await resyncSubscriptions(lastResult: summary)
@@ -674,7 +725,12 @@ final class AppModel {
     }
 
     private func addSubscriptionFromText(_ text: String, name: String) async -> Bool {
-        guard snapshot.system == .ready, let coordinator = subscriptions else { return false }
+        guard snapshot.system == .ready, let coordinator = subscriptions else {
+            if snapshot.system != .ready {
+                snapshot.lastError = .unknown(code: "app.not.ready")
+            }
+            return false
+        }
         do {
             let kind = SubscriptionInputClassifier.classify(text)
             let summary: SubscriptionImportSummary
@@ -715,8 +771,6 @@ final class AppModel {
             return true
         } catch is CancellationError {
             return false
-        } catch is CancellationError {
-            return false
         } catch let error as SubscriptionCoordinatorError {
             // A fetch the caller cancelled reports `.cancelled` rather than
             // throwing raw: silence it like any other cancellation instead of
@@ -725,9 +779,11 @@ final class AppModel {
                 return false
             }
             await resyncAfterSubscriptionFailure(error)
+            snapshot.failedRefreshIDs.insert(id)
             return false
         } catch {
             snapshot.lastError = .unknown(code: "subscription.refresh.failed")
+            snapshot.failedRefreshIDs.insert(id)
             return false
         }
     }
@@ -763,15 +819,31 @@ final class AppModel {
     private func resyncSubscriptions(lastResult: SubscriptionImportSummary?) async {
         guard let coordinator = subscriptions else { return }
         let content = await coordinator.syncToContent()
-        storedSubscriptions = await coordinator.subscriptions()
+        let records = await coordinator.subscriptions()
+        storedSubscriptions = records
         if content.servers.isEmpty, content.subscription == nil {
             snapshot.content = .empty
         } else {
             snapshot.content = content
             snapshot.isSampleData = false
         }
+        // The content state is recomputed on every resync, not only at
+        // bootstrap: removing the last subscription or a refresh that
+        // rejects everything must move the state too.
+        if records.isEmpty {
+            snapshot.contentSource = .none
+        } else if content.servers.isEmpty {
+            snapshot.contentSource = .allRejected
+        } else {
+            snapshot.contentSource = .live
+        }
         snapshot.lastSubscriptionResult = lastResult
-        snapshot.lastError = nil
+        // A fresh success retires the subscription banner only — an engine
+        // or tunnel error shown elsewhere must not be wiped by a resync.
+        if let lastResult {
+            snapshot.lastError = nil
+            snapshot.failedRefreshIDs.remove(lastResult.subscriptionID)
+        }
         if let result = lastResult, !result.remappedServerIDs.isEmpty {
             applyServerIDRemap(subscriptionID: result.subscriptionID, map: result.remappedServerIDs)
         }
@@ -818,19 +890,27 @@ final class AppModel {
     private func resyncAfterSubscriptionFailure(_ error: SubscriptionCoordinatorError) async {
         guard let coordinator = subscriptions else { return }
         let content = await coordinator.syncToContent()
-        storedSubscriptions = await coordinator.subscriptions()
+        let records = await coordinator.subscriptions()
+        storedSubscriptions = records
         if !content.servers.isEmpty || content.subscription != nil {
             snapshot.content = content
             snapshot.isSampleData = false
         }
+        if records.isEmpty {
+            snapshot.contentSource = .none
+        } else if content.servers.isEmpty {
+            snapshot.contentSource = .allRejected
+        } else {
+            snapshot.contentSource = .live
+        }
         switch error {
         case let .nothingAccepted(accepted, rejected):
-            snapshot.lastSubscriptionResult = SubscriptionImportSummary(
-                subscriptionID: UUID(),
-                accepted: accepted,
-                rejected: rejected
-            )
+            // The summary reports counts, not a fabricated identity: the
+            // callers that need the failing subscription track it
+            // themselves, and the row error lives in failedRefreshIDs.
+            snapshot.lastSubscriptionResult = nil
             snapshot.lastError = .unknown(code: "subscription.import.empty")
+            _ = (accepted, rejected)
         case .unknownSubscription:
             snapshot.lastError = .unknown(code: "subscription.unknown")
         case .invalidInput:
@@ -865,6 +945,7 @@ final class AppModel {
         var attempted: Set<ServerID> = []
         if let probeLatency {
             for server in candidates {
+                guard !Task.isCancelled else { return false }
                 guard let endpoint = endpoints[server.id] else { continue }
                 attempted.insert(server.id)
                 if let ms = await probeLatency(endpoint.host, endpoint.port) {
@@ -877,6 +958,7 @@ final class AppModel {
                 return (server.id, endpoint.host, endpoint.port)
             }
             let values = await LatencyProber.probeAll(targets.map { (host: $0.host, port: $0.port) })
+            guard !Task.isCancelled else { return false }
             for (target, ms) in zip(targets, values) {
                 attempted.insert(target.id)
                 if let ms {
@@ -898,7 +980,10 @@ final class AppModel {
     private func refreshStale(maxAge: TimeInterval) async -> Bool {
         guard snapshot.system == .ready, let coordinator = subscriptions else { return false }
         let cutoff = now().addingTimeInterval(-max(60, maxAge))
-        let stale = await coordinator.subscriptions().filter { $0.updatedAt < cutoff }
+        // Pasted/single-link subscriptions have no URL to re-fetch: a
+        // pasted record's updatedAt never moves, so counting it stale
+        // would fire a no-op refresh on every foregrounding.
+        let stale = await coordinator.subscriptions().filter { $0.source.kind == .url && $0.updatedAt < cutoff }
         guard !stale.isEmpty else { return true }
         var last: SubscriptionImportSummary?
         var failed: Set<UUID> = []
@@ -906,8 +991,17 @@ final class AppModel {
             do {
                 last = try await coordinator.refresh(id: record.id)
             } catch is CancellationError {
+                // Progress so far is real: keep it on screen instead of
+                // dropping the loop's successful refreshes on the floor.
+                await resyncSubscriptions(lastResult: last)
+                snapshot.failedRefreshIDs = failed
                 return false
             } catch let error as SubscriptionCoordinatorError {
+                if case .fetchFailed(.cancelled) = error {
+                    await resyncSubscriptions(lastResult: last)
+                    snapshot.failedRefreshIDs = failed
+                    return false
+                }
                 failed.insert(record.id)
                 if case let .nothingAccepted(accepted, rejected) = error {
                     last = SubscriptionImportSummary(
@@ -947,6 +1041,7 @@ final class AppModel {
     private func reconcileSelection() {
         if let serverID = snapshot.selection.server,
            snapshot.content.server(id: serverID) == nil
+           || !isReachableSelection(serverID: serverID, in: snapshot.content)
         {
             snapshot.selection.server = nil
         }
