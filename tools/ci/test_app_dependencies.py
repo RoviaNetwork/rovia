@@ -101,6 +101,11 @@ REMOTE_PACKAGES = {
         "version": "0.2.3",
         "products": ("RoviaConfig", "RoviaRouting", "RoviaSubscription"),
     },
+    "rovia-engine": {
+        "url": "https://github.com/RoviaNetwork/rovia-engine",
+        "version": "0.2.1",
+        "products": ("RoviaXray",),
+    },
 }
 # Local references that must never come back: core and engines moved to
 # RoviaNetwork/rovia-core and RoviaNetwork/rovia-engine. A sibling checkout
@@ -750,6 +755,10 @@ def package_dependency_problems(root: Path) -> list[str]:
         # The Xcode pin is a bare version, the git tag carries its `v`:
         # v0.2.3 the tag, 0.2.3 the pin. Compared after that prefix, so a
         # real drift still fails and the naming convention cannot hide it.
+        # Only rovia-core has a core-pin.txt binding; rovia-engine is pinned
+        # by the exactVersion above.
+        if name != "rovia-core":
+            continue
         if expected["version"] != pinned_core_tag().removeprefix("v"):
             problems.append(
                 f"the {name} pin {expected['version']} disagrees with tools/ci/core-pin.txt"
