@@ -6,8 +6,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/RoviaNetwork/rovia-core",
       "state" : {
-        "revision" : "748a33a8430138125aa4b891fdbeb105d1c4a1e8",
-        "version" : "0.2.1"
+        "revision" : "c4dd0a3a8c0ccfdcdcb65c1a70f6891921bcd9e2",
+        "version" : "0.2.3"
       }
     },
     {

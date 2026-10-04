@@ -85,7 +85,7 @@ class LiveCountDerivationTests(unittest.TestCase):
     def test_the_workflow_step_counts_come_from_the_workflows(self):
         counts = workflow_step_counts()
         self.assertEqual(
-            sorted(counts), ["ci.yml", "engine-repro.yml", "release-ios.yml"]
+            sorted(counts), ["ci.yml", "engine-proof.yml", "engine-repro.yml", "release-ios.yml"]
         )
         for name, (jobs, steps) in counts.items():
             with self.subTest(workflow=name):

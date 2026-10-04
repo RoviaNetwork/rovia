@@ -16,7 +16,9 @@ struct RoviaApp: App {
 
     /// Production subscription stack: file store in the shared app-group
     /// container (so the tunnel extension can read server lists later),
-    /// secrets in the Keychain, real network session.
+    /// secrets in the Keychain, and the streaming production fetcher (byte
+    /// cap during the read, redirect delegate) — passed explicitly, never
+    /// inferred.
     private static func makeSubscriptionCoordinator() -> SubscriptionCoordinator {
         let directory: URL
         if let container = FileManager.default.containerURL(
@@ -29,7 +31,8 @@ struct RoviaApp: App {
         }
         return SubscriptionCoordinator(
             store: SubscriptionStore(directory: directory),
-            secrets: KeychainSecretStore(service: "io.rovia.client", accessGroup: "group.io.rovia.shared")
+            secrets: KeychainSecretStore(service: "io.rovia.client", accessGroup: "group.io.rovia.shared"),
+            fetcher: SubscriptionFetcher.production()
         )
     }
 }

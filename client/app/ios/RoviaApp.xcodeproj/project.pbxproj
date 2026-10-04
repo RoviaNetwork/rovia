@@ -40,6 +40,7 @@
 		C10000000000000000000020 = {isa = PBXBuildFile; fileRef = B1000000000000000000001C /* SubscriptionCoordinatorTests.swift */; };
 		C10000000000000000000021 = {isa = PBXBuildFile; fileRef = B1000000000000000000001B /* SubscriptionCoordinator.swift */; };
 		C10000000000000000000022 = {isa = PBXBuildFile; productRef = E1000000000000000000000E /* RoviaXray */; };
+		C10000000000000000000023 = {isa = PBXBuildFile; fileRef = B1000000000000000000001D /* ProductionFetchTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -81,6 +82,7 @@
 		B1000000000000000000001A = {isa = PBXFileReference; lastKnownFileType = image.png; path = Assets/rovia-logo.png; sourceTree = "<group>"; };
 		B1000000000000000000001B = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubscriptionCoordinator.swift; sourceTree = "<group>"; };
 		B1000000000000000000001C = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubscriptionCoordinatorTests.swift; sourceTree = "<group>"; };
+		B1000000000000000000001D = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProductionFetchTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -187,6 +189,7 @@
 			children = (
 				B10000000000000000000017,
 				B1000000000000000000001C,
+				B1000000000000000000001D,
 			);
 			path = RoviaAppTests;
 			sourceTree = "<group>";
@@ -370,6 +373,7 @@
 				C10000000000000000000016,
 				C10000000000000000000020,
 				C10000000000000000000021,
+				C10000000000000000000023,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -571,7 +575,7 @@
 			repositoryURL = "https://github.com/RoviaNetwork/rovia-core";
 			requirement = {
 				kind = exactVersion;
-				version = 0.2.1;
+				version = 0.2.3;
 			};
 		};
 		E1000000000000000000000D /* XCRemoteSwiftPackageReference "rovia-engine" */ = {
