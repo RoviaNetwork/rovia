@@ -161,54 +161,62 @@ struct ServersView: View {
         }
         .buttonStyle(.bordered)
         .disabled(isProbing || model.snapshot.visibleServers.isEmpty)
-        .accessibilityHint("Opens a TCP connection to each listed server and shows the handshake time. Bounded and cancellable by leaving the screen.")
+        .accessibilityHint("Opens a TCP connection to each listed server and shows the handshake time.")
         .accessibilityIdentifier(AppAccessibilityIdentifier.serversScreen + ".checkLatency")
     }
 
     private func serverRow(_ server: ServerSummary) -> some View {
         let isSelected = model.snapshot.selection.server == server.id
-        return Button {
-            Task { await model.selectServer(server.id) }
-        } label: {
-            HStack(alignment: .top, spacing: 12) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(server.name)
-                        .font(.headline)
-                    Text("\(server.protocolLabel) · \(server.locationLabel)")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                    HStack(spacing: 8) {
-                        QualityBadge(latency: server.latency)
+        return HStack(alignment: .top, spacing: 12) {
+            Button {
+                Task { await model.selectServer(server.id) }
+            } label: {
+                HStack(alignment: .top, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(server.name)
+                            .font(.headline)
+                        Text("\(server.protocolLabel) · \(server.locationLabel)")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        HStack(spacing: 8) {
+                            QualityBadge(latency: server.latency)
+                        }
+                        HStack(spacing: 8) {
+                            ConfidenceBadge(confidence: server.healthConfidence, evidence: server.health)
+                        }
                     }
-                    HStack(spacing: 8) {
-                        ConfidenceBadge(confidence: server.healthConfidence, evidence: server.health)
-                    }
+                    Spacer(minLength: 8)
+                    Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                        .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
+                        .accessibilityHidden(true)
                 }
-                Spacer(minLength: 8)
-                Button {
-                    Task { await model.toggleFavorite(server.id) }
-                } label: {
-                    Image(systemName: model.isFavorite(server.id) ? "star.fill" : "star")
-                        .foregroundStyle(model.isFavorite(server.id) ? Color.yellow : Color.secondary)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(model.isFavorite(server.id) ? "Unfavorite \(server.name)" : "Favorite \(server.name)")
-                .accessibilityIdentifier(AppAccessibilityIdentifier.serversScreen + ".favorite." + server.id)
-                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                    .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
-                    .accessibilityHidden(true)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .padding(14)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(.quaternary.opacity(isSelected ? 0.5 : 0.25), in: RoundedRectangle(cornerRadius: 14))
+            .buttonStyle(.plain)
+            .accessibilityLabel(server.name)
+            .accessibilityValue(accessibilityValue(for: server, isSelected: isSelected))
+            .accessibilityHint("Selects this server for the selected group.")
+            .accessibilityAddTraits(isSelected ? .isSelected : [])
+            .accessibilityIdentifier(AppAccessibilityIdentifier.serversRowPrefix + server.id)
+
+            // The favorite toggle is a sibling of the row button: a nested
+            // button would also fire the row select (iOS hit-testing), so
+            // loving a server would select it too.
+            Button {
+                Task { await model.toggleFavorite(server.id) }
+            } label: {
+                Image(systemName: model.isFavorite(server.id) ? "star.fill" : "star")
+                    .foregroundStyle(model.isFavorite(server.id) ? Color.yellow : Color.secondary)
+                    .padding(.vertical, 6)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(model.isFavorite(server.id) ? "Unfavorite \(server.name)" : "Favorite \(server.name)")
+            .accessibilityIdentifier(AppAccessibilityIdentifier.serversScreen + ".favorite." + server.id)
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel(server.name)
-        .accessibilityValue(accessibilityValue(for: server, isSelected: isSelected))
-        .accessibilityHint("Selects this server for the selected group.")
-        .accessibilityAddTraits(isSelected ? .isSelected : [])
-        .accessibilityIdentifier(AppAccessibilityIdentifier.serversRowPrefix + server.id)
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.quaternary.opacity(isSelected ? 0.5 : 0.25), in: RoundedRectangle(cornerRadius: 14))
     }
 
     private func accessibilityValue(for server: ServerSummary, isSelected: Bool) -> String {

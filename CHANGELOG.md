@@ -93,6 +93,15 @@ record for the current state is `docs/development/foundation-verification.md`.
 - A failed first import that produced zero accepted servers stored an empty
   record whose display state never restamped `updatedAt` or the schema version;
   the rebuild now sets both, matching every other store write.
+- App-model hardening: a cancelled connect/disconnect no longer banners a
+  failure or corrupts the engine state; a failed bootstrap drops a stale
+  engine state; the persisted selection is re-validated against the
+  profile and group it belongs to; subscription resyncs recompute the content
+  state and no longer erase unrelated error banners; a cancelled stale
+  refresh keeps the progress it already made instead of dropping it; the TCP
+  probe honors cancellation; the favorite toggle no longer sits inside the
+  row button, so favoriting a server can no longer also select it; and the
+  import preview keeps a failed add's link instead of throwing it away.
 - **Publication pass — the tree as an open-source repository.** `CODEOWNERS` names a
   real owner instead of an organisation that does not exist, and `SECURITY.md` states
   the consequence: with one maintainer, a required review would be a self-review, so
