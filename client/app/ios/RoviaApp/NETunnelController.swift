@@ -20,6 +20,11 @@ protocol TunnelProfileManaging: AnyObject, Sendable {
     func sendStatusRequest(_ body: Data) async -> Data?
 }
 
+/// The manager is a framework class, so the compiler cannot see it is safe
+/// to share across the controller's async calls; the conformance is declared
+/// unchecked, the way Apple's own NE types expect to be used.
+extension NETunnelProviderManager: @unchecked Sendable {}
+
 extension NETunnelProviderManager: TunnelProfileManaging {
     var includeAllNetworks: Bool {
         get { (protocolConfiguration as? NETunnelProviderProtocol)?.includeAllNetworks ?? false }
