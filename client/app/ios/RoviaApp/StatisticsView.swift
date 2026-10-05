@@ -41,16 +41,18 @@ struct StatisticsView: View {
                     InfoRow(
                         label: "Outbound dropped",
                         value: model.snapshot.engineReport.map { String($0.droppedOutbound) } ?? "—",
-                        identifier: AppAccessibilityIdentifier.statisticsDroppedOutbound
+                        identifier: AppAccessibilityIdentifier.statisticsDroppedOutbound,
+                        tabular: true
                     )
                     InfoRow(
                         label: "Inbound dropped",
                         value: model.snapshot.engineReport.map { String($0.droppedInbound) } ?? "—",
-                        identifier: AppAccessibilityIdentifier.statisticsDroppedInbound
+                        identifier: AppAccessibilityIdentifier.statisticsDroppedInbound,
+                        tabular: true
                     )
                     Text("Drops are the backpressure policy working: a datagram that could not be written in time is dropped and counted, never queued. Payloads are never counted here — or anywhere.")
                         .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(ScopeTheme.inkSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -62,6 +64,7 @@ struct StatisticsView: View {
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.bordered)
+            .tint(ScopeTheme.phosphor)
             .controlSize(.large)
             .disabled(model.snapshot.system != .ready)
             .accessibilityHint("Asks the extension for its current report over the provider channel.")

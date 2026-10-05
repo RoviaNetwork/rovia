@@ -31,7 +31,7 @@ struct RoutingDebuggerView: View {
                 }
             }
         }
-        .navigationTitle(AppRoute.routingDebugger.title)
+        .navigationTitle(ToolRoute.routingDebugger.title)
         .navigationBarTitleDisplayMode(.inline)
     }
 
@@ -59,7 +59,7 @@ struct RoutingDebuggerView: View {
                 if let sample = selectedSample {
                     Text(sample.detail)
                         .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(ScopeTheme.inkSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
@@ -78,7 +78,7 @@ struct RoutingDebuggerView: View {
                 if model.snapshot.evaluation == nil {
                     Text("Choose a sample and explain it to see the rule-by-rule outcome.")
                         .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(ScopeTheme.inkSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -143,7 +143,7 @@ struct RoutingDebuggerView: View {
                         .font(.subheadline.weight(.semibold))
                     Text(step.reason.summary)
                         .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(ScopeTheme.inkSecondary)
                     Spacer(minLength: 12)
                     stepBadge(step)
                 }
@@ -152,18 +152,18 @@ struct RoutingDebuggerView: View {
                         .font(.subheadline.weight(.semibold))
                     Text(step.reason.summary)
                         .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(ScopeTheme.inkSecondary)
                     stepBadge(step)
                 }
             }
             Text(stepDetail(step))
                 .font(.footnote)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(ScopeTheme.inkSecondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.quaternary.opacity(0.25), in: RoundedRectangle(cornerRadius: 12))
+        .background(ScopeTheme.housing, in: RoundedRectangle(cornerRadius: 12))
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Rule \(step.ruleIndex + 1), \(step.reason.summary)")
         .accessibilityValue(stepDetail(step))
@@ -195,7 +195,7 @@ struct RoutingDebuggerView: View {
             systemImage: "eye.slash"
         )
         .font(.footnote)
-        .foregroundStyle(.secondary)
+        .foregroundStyle(ScopeTheme.inkSecondary)
         .fixedSize(horizontal: false, vertical: true)
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier(AppAccessibilityIdentifier.routingDebuggerRedaction)

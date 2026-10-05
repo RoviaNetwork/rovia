@@ -38,6 +38,10 @@ __pycache__/
 # lives in docs/adr/ and docs/architecture/.
 /.superpowers/
 /docs/superpowers/
+# The design harness's working state (review captures, build state, mocks,
+# surface briefs, and the token mirror) is machine-local output, the same
+# class as .superpowers/: the durable records are PRODUCT.md and DESIGN.md.
+/.impeccable/
 
 # Generated engine artifacts
 /LibXray.xcframework/

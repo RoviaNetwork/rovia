@@ -28,7 +28,7 @@ struct RoutingView: View {
                 }
             }
         }
-        .navigationTitle(AppRoute.routing.title)
+        .navigationTitle(ToolRoute.routing.title)
         .navigationBarTitleDisplayMode(.inline)
     }
 
@@ -75,7 +75,7 @@ struct RoutingView: View {
                         .font(.subheadline.weight(.semibold))
                     Text(rule.action.label(using: model.snapshot.content))
                         .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(ScopeTheme.inkSecondary)
                     Spacer(minLength: 12)
                     ruleStateBadge(rule)
                 }
@@ -84,7 +84,7 @@ struct RoutingView: View {
                         .font(.subheadline.weight(.semibold))
                     Text(rule.action.label(using: model.snapshot.content))
                         .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(ScopeTheme.inkSecondary)
                     ruleStateBadge(rule)
                 }
             }
@@ -92,20 +92,20 @@ struct RoutingView: View {
             ForEach(rule.matchers) { matcher in
                 Label(matcher.summaryText, systemImage: "line.3.horizontal.decrease.circle")
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ScopeTheme.inkSecondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
             if let note = rule.note {
                 Text(note)
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ScopeTheme.inkSecondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.quaternary.opacity(0.25), in: RoundedRectangle(cornerRadius: 12))
+        .background(ScopeTheme.housing, in: RoundedRectangle(cornerRadius: 12))
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Rule \(rule.index + 1), \(rule.isEnabled ? "enabled" : "disabled"), \(rule.action.label(using: model.snapshot.content))")
         .accessibilityValue(rule.matchers.map(\.summaryText).joined(separator: ", "))

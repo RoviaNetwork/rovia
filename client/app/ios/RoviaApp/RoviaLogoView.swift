@@ -60,7 +60,7 @@ struct RoviaLogoView: View {
                 Image(systemName: "paperplane.circle.fill")
                     .resizable()
                     .aspectRatio(contentMode: .fit)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ScopeTheme.inkSecondary)
             }
         }
         .frame(width: size.side, height: size.side)

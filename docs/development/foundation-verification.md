@@ -195,7 +195,7 @@ that stops failing is the signal that a constraint stopped being load-bearing.
 
 | Command | Result |
 | --- | --- |
-| `python3 tools/ci/audit-accessibility-identifiers.py` | `58` declared constants, `13` container identifiers, `45` element identifiers, `58` reaching a view |
+| `python3 tools/ci/audit-accessibility-identifiers.py` | `57` declared constants, `12` container identifiers, `45` element identifiers, `57` reaching a view |
 | `python3 tools/ci/test_audit_accessibility_identifiers.py` | 58 tests, 0 failures |
 
 The audit is a structural check over the Swift sources. The container/element

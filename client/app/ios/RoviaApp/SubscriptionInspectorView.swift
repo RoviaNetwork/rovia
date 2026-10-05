@@ -28,7 +28,7 @@ struct SubscriptionInspectorView: View {
                 subscriptionList
             }
         }
-        .navigationTitle(AppRoute.subscription.title)
+        .navigationTitle(ToolRoute.subscription.title)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
@@ -104,7 +104,7 @@ struct SubscriptionInspectorView: View {
                 Section {
                     Text("Subscriptions are stored, but every entry was rejected. Check a row's reasons, fix the source, and refresh.")
                         .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(ScopeTheme.inkSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .modifier(ConditionalAccessibilityIdentifier(
@@ -121,7 +121,7 @@ struct SubscriptionInspectorView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         Text(error.userMessage)
                             .font(.footnote)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(ScopeTheme.inkSecondary)
                             .fixedSize(horizontal: false, vertical: true)
                         Button("Dismiss") {
                             model.clearError()
@@ -152,7 +152,7 @@ struct SubscriptionInspectorView: View {
                     systemImage: "eye.slash"
                 )
                 .font(.footnote)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(ScopeTheme.inkSecondary)
                 .accessibilityElement(children: .combine)
                 .accessibilityIdentifier(AppAccessibilityIdentifier.subscriptionRedaction)
             }
@@ -192,7 +192,7 @@ struct SubscriptionInspectorView: View {
             }
             Text("\(memberCount) servers · updated \(subscription.updatedAt.formatted(date: .abbreviated, time: .shortened))")
                 .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(ScopeTheme.inkSecondary)
             if subscription.rejectedCount > 0 {
                 Text("\(subscription.acceptedCount) accepted · \(subscription.rejectedCount) rejected")
                     .font(.footnote)
@@ -201,7 +201,7 @@ struct SubscriptionInspectorView: View {
             if let info = subscription.userInfo, let line = userInfoLine(info) {
                 Text(line)
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ScopeTheme.inkSecondary)
             }
         }
         .padding(.vertical, 4)
@@ -232,12 +232,12 @@ struct SubscriptionInspectorView: View {
             ForEach(result.rejected.prefix(5), id: \.index) { line in
                 Text("Line \(line.index): \(reasonText(line.reason))")
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ScopeTheme.inkSecondary)
             }
             if result.rejected.count > 5 {
                 Text("…and \(result.rejected.count - 5) more")
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ScopeTheme.inkSecondary)
             }
         }
         .accessibilityElement(children: .combine)
@@ -394,7 +394,7 @@ struct ImportPreviewSheet: View {
                         Text(base64 ? "Subscription list (\(lines) servers)" : "\(lines) pasted lines")
                     case .invalid:
                         Text("This link holds nothing importable.")
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(ScopeTheme.inkSecondary)
                     }
                 }
                 Section("Name") {
@@ -421,6 +421,7 @@ struct ImportPreviewSheet: View {
             }
             .navigationTitle("Import subscription")
             .navigationBarTitleDisplayMode(.inline)
+            .tint(ScopeTheme.phosphor)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
