@@ -709,6 +709,19 @@ final class AppModel {
             snapshot.engine = .starting
             snapshot.lastError = nil
         case .connected:
+            // The tunnel interface being up is not the engine being alive:
+            // cross-check with the engine's own report so a dead engine never
+            // presents as a working tunnel.
+            if let report = await tunnel.statusReport() {
+                snapshot.engineReport = report
+                if report.state == "failed" {
+                    let failure = AppError.unknown(code: "engine.report.failed")
+                    snapshot.engine = .failed(failure)
+                    snapshot.lastError = failure
+                    updateDerivedMeasurements()
+                    return true
+                }
+            }
             if case .connected = snapshot.engine {
                 break
             }

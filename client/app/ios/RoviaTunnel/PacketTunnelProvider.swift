@@ -131,10 +131,13 @@ final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Sendable {
     ) {
         engineObserver?.cancel()
         engineObserver = nil
+        // Capture the engine being stopped: a quick restart builds a new
+        // adapter, and a stale stop must never clear the new reference.
+        let stopping = adapter
+        adapter = nil
         let completion = TunnelCompletion(handler: { _ in completionHandler() })
         Task {
-            await self.adapter?.stop()
-            self.adapter = nil
+            await stopping?.stop()
             completion.call(nil)
         }
     }

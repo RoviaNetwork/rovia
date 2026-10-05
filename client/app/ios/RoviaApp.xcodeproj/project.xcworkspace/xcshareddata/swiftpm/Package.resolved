@@ -15,8 +15,8 @@
       "kind": "remoteSourceControl",
       "location": "https://github.com/RoviaNetwork/rovia-engine",
       "state": {
-        "revision": "7028d287aa302f5cb4db413fa76e51f7ed88cd73",
-        "version": "0.3.1"
+        "revision": "b93fd344ebde7cbf3fc738e73ca86293d42ae58c",
+        "version": "0.3.2"
       }
     }
   ],

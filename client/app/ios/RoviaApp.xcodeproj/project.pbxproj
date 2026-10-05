@@ -58,6 +58,8 @@
 		C10000000000000000000032 = {isa = PBXBuildFile; fileRef = B10000000000000000000026 /* StatisticsView.swift */; };
 		C10000000000000000000033 = {isa = PBXBuildFile; fileRef = B10000000000000000000027 /* AppearancePreference.swift */; };
 		C10000000000000000000034 = {isa = PBXBuildFile; fileRef = B10000000000000000000027 /* AppearancePreference.swift */; };
+		C10000000000000000000035 = {isa = PBXBuildFile; fileRef = B10000000000000000000028 /* TunnelControllerTests.swift */; };
+		C10000000000000000000036 = {isa = PBXBuildFile; fileRef = B10000000000000000000020 /* NETunnelController.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -108,6 +110,7 @@
 		B10000000000000000000023 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../../../platform/apple/Sources/RoviaApplePlatform/ApplePlatform.swift; sourceTree = "<group>"; };
 		B10000000000000000000024 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../../../platform/apple/Sources/RoviaApplePlatform/KeychainAccessGroup.swift; sourceTree = "<group>"; };
 		B10000000000000000000025 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TunnelWiringTests.swift; sourceTree = "<group>"; };
+		B10000000000000000000028 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TunnelControllerTests.swift; sourceTree = "<group>"; };
 		B10000000000000000000026 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatisticsView.swift; sourceTree = "<group>"; };
 		B10000000000000000000027 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppearancePreference.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -231,6 +234,7 @@
 				B1000000000000000000001C,
 				B1000000000000000000001D,
 				B10000000000000000000025,
+				B10000000000000000000028,
 			);
 			path = RoviaAppTests;
 			sourceTree = "<group>";
@@ -431,6 +435,8 @@
 				C1000000000000000000002E,
 				C1000000000000000000002F,
 				C10000000000000000000034,
+				C10000000000000000000035,
+				C10000000000000000000036,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -642,7 +648,7 @@
 			repositoryURL = "https://github.com/RoviaNetwork/rovia-engine";
 			requirement = {
 				kind = exactVersion;
-				version = 0.3.1;
+				version = 0.3.2;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */

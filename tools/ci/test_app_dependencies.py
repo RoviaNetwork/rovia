@@ -103,7 +103,7 @@ REMOTE_PACKAGES = {
     },
     "rovia-engine": {
         "url": "https://github.com/RoviaNetwork/rovia-engine",
-        "version": "0.3.1",
+        "version": "0.3.2",
         "products": ("RoviaXray", "RoviaXrayLive"),
     },
 }
