@@ -92,6 +92,52 @@ final class NETunnelController: TunnelControlling {
         }
     }
 
+    /// Asks the extension for the engine's own report. A tunnel that is not
+    /// running has nothing to ask, and a message the extension cannot answer
+    /// is nil — the caller shows "no report", never a fabricated one.
+    func statusReport() async -> TunnelStatusReport? {
+        guard let manager = try? await managerProvider(),
+              let session = manager.connection as? NETunnelProviderSession
+        else {
+            return nil
+        }
+        let request: [String: Any] = [
+            "apiVersion": 1,
+            "requestID": UUID().uuidString,
+            "method": "status.get",
+            "payload": [:] as [String: Any]
+        ]
+        guard let body = try? JSONSerialization.data(withJSONObject: request, options: [.sortedKeys]) else {
+            return nil
+        }
+        let response: Data? = await withCheckedContinuation { continuation in
+            do {
+                try session.sendProviderMessage(body) { data in
+                    continuation.resume(returning: data)
+                }
+            } catch {
+                continuation.resume(returning: nil)
+            }
+        }
+        guard let response else {
+            return nil
+        }
+        guard let object = try? JSONSerialization.jsonObject(with: response),
+              let envelope = object as? [String: Any],
+              envelope["ok"] as? Bool == true,
+              let result = envelope["result"] as? [String: Any],
+              let state = result["state"] as? String
+        else {
+            return nil
+        }
+        return TunnelStatusReport(
+            state: state,
+            engineVersion: result["engineVersion"] as? String,
+            droppedOutbound: (result["droppedOutbound"] as? NSNumber)?.uint64Value ?? 0,
+            droppedInbound: (result["droppedInbound"] as? NSNumber)?.uint64Value ?? 0
+        )
+    }
+
     private static func mapStart(_ error: NEVPNError) -> TunnelControlFailure {
         switch error.code {
         case .configurationInvalid, .configurationDisabled, .configurationReadWriteFailed:

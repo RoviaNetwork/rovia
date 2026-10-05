@@ -4,6 +4,11 @@ struct OverviewView: View {
     let model: AppModel
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// The hero scales with the user's text size: a control you tap is part of
+    /// the type hierarchy, not a fixed ornament.
+    @ScaledMetric private var heroRing: CGFloat = 148
+    @ScaledMetric private var heroCore: CGFloat = 120
+    @ScaledMetric private var heroGlyph: CGFloat = 44
 
     var body: some View {
         Group {
@@ -110,7 +115,7 @@ struct OverviewView: View {
                 ZStack {
                     Circle()
                         .stroke(engineTint.opacity(0.18), lineWidth: 8)
-                        .frame(width: 148, height: 148)
+                        .frame(width: heroRing, height: heroRing)
                     if case .connected = model.snapshot.engine, !reduceMotion {
                         Circle()
                             .trim(from: 0, to: 0.72)
@@ -118,14 +123,14 @@ struct OverviewView: View {
                                 engineTint,
                                 style: StrokeStyle(lineWidth: 8, lineCap: .round)
                             )
-                            .frame(width: 148, height: 148)
+                            .frame(width: heroRing, height: heroRing)
                             .rotationEffect(.degrees(-90))
                     }
                     Circle()
                         .fill(engineTint.opacity(0.10))
-                        .frame(width: 120, height: 120)
+                        .frame(width: heroCore, height: heroCore)
                     Image(systemName: "power")
-                        .font(.system(size: 44, weight: .semibold))
+                        .font(.system(size: heroGlyph, weight: .semibold))
                         .foregroundStyle(engineTint)
                 }
                 .contentShape(Circle())

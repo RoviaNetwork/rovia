@@ -14,10 +14,10 @@ The simulator is useful for SwiftUI and pure-domain tests. It is not evidence th
 
 ## The app depends on the domain packages
 
-`client/app/ios/RoviaApp.xcodeproj` links the local Swift packages
-`core/config` and `core/routing` through `XCLocalSwiftPackageReference`
-entries, and the `RoviaApp` and `RoviaAppTests` targets both declare the
-`RoviaRouting` and `RoviaConfig` product dependencies. The app has no copy of
+`client/app/ios/RoviaApp.xcodeproj` links the domain packages as pinned remote
+SPM dependencies: `rovia-core` (RoviaConfig, RoviaRouting, RoviaSubscription,
+RoviaEngineAPI) and `rovia-engine` (RoviaXray, plus RoviaXrayLive for the
+tunnel extension). The app has no copy of
 the routing rules: `CanonicalRouteBridge` converts the app's display models into
 the canonical `RouteSet` and `RouteInput`, calls `RouteEvaluator.explain`, and
 renders the returned `RoutingDiagnostic`.
@@ -85,7 +85,8 @@ The canonical core (`core/config`, `core/routing`, `core/subscription`,
 used to be listed here. They moved to RoviaNetwork/rovia-core and
 RoviaNetwork/rovia-engine, where their own CI runs their suites, and they
 enter this repository only as pinned SPM dependencies: `rovia-core` at exact
-`0.1.0` in the Xcode project, held by the dependency gate, the SBOM, and
+`0.2.3` and `rovia-engine` at exact `0.3.1` in the Xcode project, held by the
+dependency gate, the SBOM, and
 `tools/ci/core-pin.txt`.
 `platform/apple` carries the Keychain and App Group store tests.
 `tools/ci/test_ci_docs.py` requires this list

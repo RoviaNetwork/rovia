@@ -7,6 +7,20 @@ protocol TunnelControlling: Sendable {
     func requestStart() async throws
     func requestStop() async throws
     func currentStatus() async -> TunnelStatus
+    /// The engine's own report via the provider message channel, when a tunnel
+    /// process exists to ask. nil when no engine is wired or the extension is
+    /// not running — never a synthesized answer.
+    func statusReport() async -> TunnelStatusReport?
+}
+
+/// What the extension reports beyond the lifecycle state: the engine's
+/// self-described version and the pump's drop counters. Counters and a version
+/// string — never a payload, never a log line.
+struct TunnelStatusReport: Equatable, Sendable {
+    let state: String
+    let engineVersion: String?
+    let droppedOutbound: UInt64
+    let droppedInbound: UInt64
 }
 
 /// The kill-switch hand-off settings, abstracted so tests never touch the App
@@ -45,6 +59,10 @@ struct UnavailableTunnelController: TunnelControlling {
 
     func currentStatus() async -> TunnelStatus {
         .engineUnavailable(Self.reason)
+    }
+
+    func statusReport() async -> TunnelStatusReport? {
+        nil
     }
 }
 
@@ -88,6 +106,8 @@ enum AppAction: Hashable, Sendable {
     case refreshStaleSubscriptions(TimeInterval)
     case toggleFavorite(ServerID)
     case setKillSwitch(Bool)
+    case setAppearance(AppearancePreference)
+    case refreshStatistics
 
     var label: String {
         switch self {
@@ -127,6 +147,10 @@ enum AppAction: Hashable, Sendable {
             "Toggle a favorite server"
         case .setKillSwitch:
             "Toggle the kill switch"
+        case .setAppearance:
+            "Change the appearance"
+        case .refreshStatistics:
+            "Refresh engine statistics"
         }
     }
 }
@@ -164,6 +188,7 @@ final class AppModel {
     private let probeLatency: (@Sendable (String, Int) async -> Int?)?
     private let favoritesStorage: UserDefaults
     private let selectionStorage: UserDefaults
+    private let appearanceStorage: UserDefaults
     private let now: @Sendable () -> Date
 
     init(
@@ -175,6 +200,7 @@ final class AppModel {
         probeLatency: (@Sendable (String, Int) async -> Int?)? = nil,
         favoritesStorage: UserDefaults = .standard,
         selectionStorage: UserDefaults? = nil,
+        appearanceStorage: UserDefaults? = nil,
         now: @escaping @Sendable () -> Date = { Date() }
     ) {
         self.tunnel = tunnel
@@ -187,8 +213,13 @@ final class AppModel {
         // An explicit store persists across launches; tests that pass none
         // get an isolated suite so selections never leak between cases.
         self.selectionStorage = selectionStorage ?? UserDefaults(suiteName: "rovia.test.\(UUID().uuidString)")!
+        self.appearanceStorage = appearanceStorage ?? UserDefaults(suiteName: "rovia.test.\(UUID().uuidString)")!
         self.now = now
         self.favoriteServerIDs = Set(favoritesStorage.stringArray(forKey: Self.favoritesKey) ?? [])
+        if let raw = self.appearanceStorage.string(forKey: Self.appearanceKey),
+           let preference = AppearancePreference(rawValue: raw) {
+            snapshot.appearance = preference
+        }
     }
 
     func queueDeepLink(text: String, name: String?) {
@@ -203,6 +234,7 @@ final class AppModel {
     private static let selectionProfileKey = "rovia.selection.profile"
     private static let selectionGroupKey = "rovia.selection.group"
     private static let selectionServerKey = "rovia.selection.server"
+    static let appearanceKey = "rovia.appearance"
 
     private func persistSelection() {
         let selection = snapshot.selection
@@ -320,6 +352,16 @@ final class AppModel {
     @discardableResult
     func setKillSwitch(_ enabled: Bool) async -> Bool {
         await perform(.setKillSwitch(enabled))
+    }
+
+    @discardableResult
+    func setAppearance(_ preference: AppearancePreference) async -> Bool {
+        await perform(.setAppearance(preference))
+    }
+
+    @discardableResult
+    func refreshStatistics() async -> Bool {
+        await perform(.refreshStatistics)
     }
 
     @discardableResult
@@ -442,6 +484,10 @@ final class AppModel {
             return applyFavorite(id)
         case let .setKillSwitch(enabled):
             return applyKillSwitch(enabled)
+        case let .setAppearance(preference):
+            return applyAppearance(preference)
+        case .refreshStatistics:
+            return await pullEngineReport()
         }
     }
 
@@ -1114,6 +1160,24 @@ final class AppModel {
             try settingsStore?.saveSettings(TunnelSettings(killSwitch: enabled))
         } catch {
             snapshot.lastError = .unknown(code: "settings.persist.failed")
+        }
+        return true
+    }
+
+    /// Appearance is app-local and synchronous: user defaults, applied at the
+    /// window root. It never enters the tunnel hand-off.
+    private func applyAppearance(_ preference: AppearancePreference) -> Bool {
+        snapshot.appearance = preference
+        appearanceStorage.set(preference.rawValue, forKey: Self.appearanceKey)
+        return true
+    }
+
+    /// The engine's own report, pulled through the provider channel. An
+    /// unanswered poll keeps the previous report; there is no fabricated one.
+    private func pullEngineReport() async -> Bool {
+        guard snapshot.system == .ready else { return false }
+        if let report = await tunnel.statusReport() {
+            snapshot.engineReport = report
         }
         return true
     }

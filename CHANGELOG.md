@@ -12,6 +12,17 @@ The verification record for the current state is
 
 ### Added
 
+- A Statistics screen reporting only what the engine reports: the extension's
+  lifecycle state, the engine's self-described version, and the pump's drop
+  counters — pulled through the provider channel, never synthesized by the app.
+  `status.get` carries optional `engineVersion`, `droppedOutbound`, and
+  `droppedInbound` fields (bounded, schema-described).
+- Appearance preference (System / Light / Dark) applied at the window root via
+  `preferredColorScheme`, persisted as an app-local user default — it never
+  enters the tunnel hand-off.
+- Dynamic Type support for the Overview hero: the connect powerhouse scales
+  with the user's text size through `@ScaledMetric`.
+
 - The pinned Xray engine build: `engines.lock.json` approves and enables xray
   v26.9.9 (`50b95979f5db551bd273165cf469e5daaf791341`, verified against the
   upstream source archive digest), `tools/build-engine/xray/build-apple.sh`

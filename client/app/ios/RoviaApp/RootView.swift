@@ -3,6 +3,7 @@ import SwiftUI
 enum AppRoute: String, CaseIterable, Identifiable, Hashable {
     case overview
     case servers
+    case statistics
     case routing
     case routingDebugger
     case subscription
@@ -16,6 +17,8 @@ enum AppRoute: String, CaseIterable, Identifiable, Hashable {
             "Overview"
         case .servers:
             "Servers"
+        case .statistics:
+            "Statistics"
         case .routing:
             "Routing"
         case .routingDebugger:
@@ -33,6 +36,8 @@ enum AppRoute: String, CaseIterable, Identifiable, Hashable {
             "Overview"
         case .servers:
             "Servers"
+        case .statistics:
+            "Statistics"
         case .routing:
             "Routing"
         case .routingDebugger:
@@ -50,6 +55,8 @@ enum AppRoute: String, CaseIterable, Identifiable, Hashable {
             "gauge.with.dots.needle.33percent"
         case .servers:
             "server.rack"
+        case .statistics:
+            "chart.bar.xaxis"
         case .routing:
             "arrow.triangle.branch"
         case .routingDebugger:
@@ -103,6 +110,8 @@ struct RootView: View {
             OverviewView(model: model)
         case .servers:
             ServersView(model: model)
+        case .statistics:
+            StatisticsView(model: model)
         case .routing:
             RoutingView(model: model)
         case .routingDebugger:
@@ -115,7 +124,7 @@ struct RootView: View {
             ContentUnavailableView(
                 "Choose a section",
                 systemImage: "sidebar.left",
-                description: Text("Open Overview, Servers, Routing, Routing Debugger, Subscription Inspector, or Settings from the sidebar.")
+                description: Text("Open Overview, Servers, Statistics, Routing, Routing Debugger, Subscription Inspector, or Settings from the sidebar.")
             )
             .modifier(ConditionalAccessibilityIdentifier(identifier: AppAccessibilityIdentifier.emptySelection))
         }

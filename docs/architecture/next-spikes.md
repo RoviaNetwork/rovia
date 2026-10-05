@@ -169,6 +169,16 @@ results against the Swift corpus before considering Rust or Kotlin Multiplatform
 The schemas in `schemas/` are portable precisely so this comparison is possible
 later; nothing about it should pull the iOS work forward.
 
+## 7. Per-app proxy: what iOS actually allows
+
+iOS has no per-app VPN for consumer apps: per-app routing requires a managed
+(MDM) per-app VPN profile, which is not available to an App Store build. What a
+consumer iOS client can do instead, and what Rovia's routing model already
+expresses: per-domain and per-CIDR split rules (`RouteRule` matchers map to
+Xray field rules in `XrayConfigCompiler`), plus the platform kill-switch. A
+"which apps go through the tunnel" switch is Android/desktop-only; the honest
+iOS answer is documented here rather than promised in the UI.
+
 ## Recorded decisions
 
 Decisions taken during the client review that a later change should not silently

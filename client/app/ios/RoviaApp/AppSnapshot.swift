@@ -63,6 +63,15 @@ enum AppAccessibilityIdentifier {
     static let settingsScreen = "rovia.settings.screen"
     static let settingsKillSwitch = "rovia.settings.killSwitch"
     static let settingsKillSwitchNote = "rovia.settings.killSwitchNote"
+    static let settingsAppearance = "rovia.settings.appearance"
+
+    static let statisticsScreen = "rovia.statistics.screen"
+    static let statisticsTunnelState = "rovia.statistics.tunnelState"
+    static let statisticsEngineState = "rovia.statistics.engineState"
+    static let statisticsEngineVersion = "rovia.statistics.engineVersion"
+    static let statisticsDroppedOutbound = "rovia.statistics.droppedOutbound"
+    static let statisticsDroppedInbound = "rovia.statistics.droppedInbound"
+    static let statisticsRefresh = "rovia.statistics.refresh"
 
     static func sidebarRoute(_ rawValue: String) -> String {
         "rovia.sidebar.\(rawValue)"
@@ -121,7 +130,15 @@ enum AppAccessibilityIdentifier {
         subscriptionRedaction,
         settingsScreen,
         settingsKillSwitch,
-        settingsKillSwitchNote
+        settingsKillSwitchNote,
+        settingsAppearance,
+        statisticsScreen,
+        statisticsTunnelState,
+        statisticsEngineState,
+        statisticsEngineVersion,
+        statisticsDroppedOutbound,
+        statisticsDroppedInbound,
+        statisticsRefresh
     ]
 }
 
@@ -1169,6 +1186,12 @@ struct AppSnapshot: Equatable, Sendable {
     /// The kill switch as the user set it. Persisted in the App Group
     /// hand-off; applied to the tunnel profile on the next start.
     var killSwitch: Bool = false
+    /// App-local appearance. User defaults, applied at the window root; never
+    /// written into the tunnel hand-off.
+    var appearance: AppearancePreference = .system
+    /// The extension's own report from the last answered status poll. Never
+    /// synthesized by the app: an unanswered poll leaves the previous value.
+    var engineReport: TunnelStatusReport?
 
     var canConnect: Bool {
         system == .ready && engine.allowsStart && !engine.isBusy
