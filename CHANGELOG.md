@@ -12,6 +12,20 @@ The verification record for the current state is
 
 ### Added
 
+- The app is now one instrument: a sonar range-scope. The Overview's center
+  control sits at the middle of an etched face — range rings, tick marks, and
+  a sweep that rotates only while the engine works or runs — and the fleet's
+  fastest servers ride it as contacts, the selected one burning brightest.
+  Latency maps to range, nothing is synthesized, and Reduce Motion holds the
+  sweep as a soft lit sector instead of rotating it.
+- A tab bar replaces the split-view sidebar: Overview, Servers, Statistics,
+  Settings. The developer instruments (Routing, Routing Debugger,
+  Subscriptions) live under Settings → Tools.
+- The Scope design system (`ScopeTheme`): phosphor mint reserved for what is
+  actionable or locked, dynamic ground/housing/etched palette for both
+  appearances, tabular figures for real measurements, one press spring, and
+  crossfade state changes — recorded in `DESIGN.md`.
+
 - A Statistics screen reporting only what the engine reports: the extension's
   lifecycle state, the engine's self-described version, and the pump's drop
   counters — pulled through the provider channel, never synthesized by the app.

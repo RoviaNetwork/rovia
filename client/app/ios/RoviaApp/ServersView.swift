@@ -38,13 +38,12 @@ struct ServersView: View {
                         } label: {
                             Label("Favorites only", systemImage: favoritesOnly ? "star.fill" : "star")
                         }
+                        .tint(ScopeTheme.phosphor)
                         .accessibilityIdentifier(AppAccessibilityIdentifier.serversScreen + ".favoritesOnly")
                     }
                 }
             }
         }
-        .navigationTitle(AppRoute.servers.title)
-        .navigationBarTitleDisplayMode(.inline)
     }
 
     private var filteredServers: [ServerSummary] {
@@ -75,6 +74,7 @@ struct ServersView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .buttonStyle(.bordered)
+                .tint(ScopeTheme.phosphor)
                 .accessibilityLabel("Profile")
                 .accessibilityValue(selectedProfileLabel)
                 .accessibilityHint("Changes which servers are listed. A selected server that the new profile does not contain is cleared.")
@@ -107,6 +107,7 @@ struct ServersView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .buttonStyle(.bordered)
+                .tint(ScopeTheme.phosphor)
                 .accessibilityLabel("Server group")
                 .accessibilityValue(selectedGroupLabel)
                 .accessibilityHint("Changes which servers are listed and which servers can be selected.")
@@ -134,14 +135,18 @@ struct ServersView: View {
         ) {
             // LazyVStack: rows are built on scroll, not all upfront. With
             // thousands of servers an eager VStack stalls the first frame.
-            LazyVStack(alignment: .leading, spacing: 12) {
+            LazyVStack(alignment: .leading, spacing: 0) {
                 if filteredServers.isEmpty {
                     Text("No server matches \(model.snapshot.serverFilterDescription). Choose a different profile or group to see members.")
                         .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(ScopeTheme.inkSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                ForEach(filteredServers) { server in
+                ForEach(Array(filteredServers.enumerated()), id: \.element.id) { index, server in
+                    if index > 0 {
+                        Divider()
+                            .overlay(ScopeTheme.etched.opacity(0.6))
+                    }
                     serverRow(server)
                 }
             }
@@ -160,6 +165,7 @@ struct ServersView: View {
             }
         }
         .buttonStyle(.bordered)
+        .tint(ScopeTheme.phosphor)
         .disabled(isProbing || model.snapshot.visibleServers.isEmpty)
         .accessibilityHint("Opens a TCP connection to each listed server and shows the handshake time.")
         .accessibilityIdentifier(AppAccessibilityIdentifier.serversScreen + ".checkLatency")
@@ -167,7 +173,7 @@ struct ServersView: View {
 
     private func serverRow(_ server: ServerSummary) -> some View {
         let isSelected = model.snapshot.selection.server == server.id
-        return HStack(alignment: .top, spacing: 12) {
+        return HStack(alignment: .center, spacing: 12) {
             Button {
                 Task { await model.selectServer(server.id) }
             } label: {
@@ -177,7 +183,7 @@ struct ServersView: View {
                             .font(.headline)
                         Text("\(server.protocolLabel) · \(server.locationLabel)")
                             .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(ScopeTheme.inkSecondary)
                             .fixedSize(horizontal: false, vertical: true)
                         HStack(spacing: 8) {
                             QualityBadge(latency: server.latency)
@@ -188,10 +194,11 @@ struct ServersView: View {
                     }
                     Spacer(minLength: 8)
                     Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                        .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
+                        .foregroundStyle(isSelected ? ScopeTheme.phosphor : ScopeTheme.inkSecondary)
                         .accessibilityHidden(true)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel(server.name)
@@ -207,16 +214,16 @@ struct ServersView: View {
                 Task { await model.toggleFavorite(server.id) }
             } label: {
                 Image(systemName: model.isFavorite(server.id) ? "star.fill" : "star")
-                    .foregroundStyle(model.isFavorite(server.id) ? Color.yellow : Color.secondary)
-                    .padding(.vertical, 6)
+                    .foregroundStyle(model.isFavorite(server.id) ? ScopeTheme.phosphor : ScopeTheme.inkSecondary)
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel(model.isFavorite(server.id) ? "Unfavorite \(server.name)" : "Favorite \(server.name)")
             .accessibilityIdentifier(AppAccessibilityIdentifier.serversScreen + ".favorite." + server.id)
         }
-        .padding(14)
+        .padding(.vertical, 6)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.quaternary.opacity(isSelected ? 0.5 : 0.25), in: RoundedRectangle(cornerRadius: 14))
     }
 
     private func accessibilityValue(for server: ServerSummary, isSelected: Bool) -> String {

@@ -151,10 +151,12 @@ evaluator into the app, and 20 that persist a raw routing trace.
 - A pure health-aware selector: manual choice, lowest latency, and failover, with
   stale-sample handling, deterministic tie-breaking, and an explicit no-candidate
   result.
-- A SwiftUI app with a `NavigationSplitView`, six semantic screens, an idempotent
-  bootstrap, duplicate-action suppression, and a fail-closed tunnel start: the
-  extension prepares and starts the engine **before** any network setting is
-  applied, so the default route never exists without something consuming it.
+- A SwiftUI app built as a sonar range-scope: four tabs (Overview, Servers,
+  Statistics, Settings) with the developer instruments under Settings → Tools,
+  the connect action as the scope's center control, an idempotent bootstrap,
+  duplicate-action suppression, and a fail-closed tunnel start: the extension
+  prepares and starts the engine **before** any network setting is applied, so
+  the default route never exists without something consuming it.
 - A kill switch: a persisted toggle that installs `includeAllNetworks` with
   always-connect on-demand rules, and an extension that tears the tunnel down
   when the engine fails.

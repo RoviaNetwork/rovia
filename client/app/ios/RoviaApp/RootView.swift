@@ -4,9 +4,6 @@ enum AppRoute: String, CaseIterable, Identifiable, Hashable {
     case overview
     case servers
     case statistics
-    case routing
-    case routingDebugger
-    case subscription
     case settings
 
     var id: String { rawValue }
@@ -19,31 +16,6 @@ enum AppRoute: String, CaseIterable, Identifiable, Hashable {
             "Servers"
         case .statistics:
             "Statistics"
-        case .routing:
-            "Routing"
-        case .routingDebugger:
-            "Routing Debugger"
-        case .subscription:
-            "Subscriptions"
-        case .settings:
-            "Settings"
-        }
-    }
-
-    var shortTitle: String {
-        switch self {
-        case .overview:
-            "Overview"
-        case .servers:
-            "Servers"
-        case .statistics:
-            "Statistics"
-        case .routing:
-            "Routing"
-        case .routingDebugger:
-            "Debugger"
-        case .subscription:
-            "Subscription"
         case .settings:
             "Settings"
         }
@@ -52,59 +24,79 @@ enum AppRoute: String, CaseIterable, Identifiable, Hashable {
     var systemImage: String {
         switch self {
         case .overview:
-            "gauge.with.dots.needle.33percent"
+            "scope"
         case .servers:
             "server.rack"
         case .statistics:
             "chart.bar.xaxis"
-        case .routing:
-            "arrow.triangle.branch"
-        case .routingDebugger:
-            "ladybug"
-        case .subscription:
-            "doc.text.magnifyingglass"
         case .settings:
             "gearshape"
         }
     }
 
     var accessibilityIdentifier: String {
-        AppAccessibilityIdentifier.sidebarRoute(rawValue)
+        AppAccessibilityIdentifier.tabRoute(rawValue)
+    }
+}
+
+/// The developer-facing instruments, reachable from Settings → Tools rather
+/// than the tab bar: a working client shows four tabs, not seven.
+enum ToolRoute: String, CaseIterable, Identifiable, Hashable {
+    case routing
+    case routingDebugger
+    case subscription
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .routing:
+            "Routing"
+        case .routingDebugger:
+            "Routing Debugger"
+        case .subscription:
+            "Subscriptions"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .routing:
+            "arrow.triangle.branch"
+        case .routingDebugger:
+            "ladybug"
+        case .subscription:
+            "doc.text.magnifyingglass"
+        }
+    }
+
+    var accessibilityIdentifier: String {
+        "rovia.settings.tools.\(rawValue)"
     }
 }
 
 struct RootView: View {
     let model: AppModel
 
-    @State private var route: AppRoute? = .overview
-    @State private var columnVisibility: NavigationSplitViewVisibility = .automatic
-
     var body: some View {
-        NavigationSplitView(columnVisibility: $columnVisibility) {
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 10) {
-                    RoviaLogoView(.navigation)
-                    Text("Rovia")
-                        .font(.headline)
+        TabView {
+            ForEach(AppRoute.allCases) { route in
+                NavigationStack {
+                    detail(for: route)
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 8)
-                List(AppRoute.allCases, selection: $route) { destination in
-                    Label(destination.title, systemImage: destination.systemImage)
-                        .tag(destination)
-                        .accessibilityIdentifier(destination.accessibilityIdentifier)
+                .tabItem {
+                    Label(route.title, systemImage: route.systemImage)
                 }
-                .listStyle(.sidebar)
+                .accessibilityIdentifier(route.accessibilityIdentifier)
+                .tag(route)
             }
-            .navigationTitle("Rovia")
-        } detail: {
-            detail
         }
-        .navigationSplitViewStyle(.balanced)
+        .tint(ScopeTheme.phosphor)
+        .background(ScopeTheme.ground.ignoresSafeArea())
     }
 
     @ViewBuilder
-    private var detail: some View {
+    private func detail(for route: AppRoute) -> some View {
         switch route {
         case .overview:
             OverviewView(model: model)
@@ -112,21 +104,8 @@ struct RootView: View {
             ServersView(model: model)
         case .statistics:
             StatisticsView(model: model)
-        case .routing:
-            RoutingView(model: model)
-        case .routingDebugger:
-            RoutingDebuggerView(model: model)
-        case .subscription:
-            SubscriptionInspectorView(model: model)
         case .settings:
             SettingsView(model: model)
-        case nil:
-            ContentUnavailableView(
-                "Choose a section",
-                systemImage: "sidebar.left",
-                description: Text("Open Overview, Servers, Statistics, Routing, Routing Debugger, Subscription Inspector, or Settings from the sidebar.")
-            )
-            .modifier(ConditionalAccessibilityIdentifier(identifier: AppAccessibilityIdentifier.emptySelection))
         }
     }
 }
@@ -143,6 +122,7 @@ struct RoviaScreen<Content: View>: View {
             .frame(maxWidth: 720, alignment: .leading)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .background(ScopeTheme.ground)
     }
 }
 
@@ -160,9 +140,10 @@ struct RoviaScreenHeader: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text(title)
                     .font(.largeTitle.weight(.semibold))
+                    .foregroundStyle(ScopeTheme.ink)
                 Text(subtitle)
                     .font(.body)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ScopeTheme.inkSecondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -173,6 +154,8 @@ struct RoviaScreenHeader: View {
     }
 }
 
+/// An instrument panel: the housing ground and an etched edge. One idea per
+/// panel; nothing here is a card stack.
 struct SectionCard<Content: View>: View {
     let title: String
     var systemImage: String?
@@ -196,9 +179,11 @@ struct SectionCard<Content: View>: View {
             Label {
                 Text(title)
                     .font(.headline)
+                    .foregroundStyle(ScopeTheme.ink)
             } icon: {
                 if let systemImage {
                     Image(systemName: systemImage)
+                        .foregroundStyle(ScopeTheme.inkSecondary)
                 }
             }
             .accessibilityAddTraits(.isHeader)
@@ -206,7 +191,11 @@ struct SectionCard<Content: View>: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 16))
+        .background(ScopeTheme.housing, in: RoundedRectangle(cornerRadius: 16))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(ScopeTheme.etched.opacity(0.6), lineWidth: 1)
+        )
         .modifier(ConditionalAccessibilityIdentifier(identifier: identifier))
     }
 }
@@ -229,23 +218,29 @@ struct InfoRow: View {
     let label: String
     let value: String
     let identifier: String
+    /// Measurements (ms, counters) read tabular, so a rerank never makes the
+    /// line jump.
+    var tabular: Bool = false
 
     var body: some View {
         ViewThatFits(in: .horizontal) {
             HStack(alignment: .firstTextBaseline, spacing: 12) {
                 Text(label)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ScopeTheme.inkSecondary)
                 Spacer(minLength: 12)
                 Text(value)
+                    .font(tabular ? ScopeTheme.measurement(.body) : .body)
                     .multilineTextAlignment(.trailing)
             }
             VStack(alignment: .leading, spacing: 2) {
                 Text(label)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ScopeTheme.inkSecondary)
                 Text(value)
+                    .font(tabular ? ScopeTheme.measurement(.body) : .body)
             }
         }
         .font(.body)
+        .foregroundStyle(ScopeTheme.ink)
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier(identifier)
     }
@@ -272,16 +267,7 @@ struct QualityBadge: View {
     let latency: LatencyState
 
     private var tint: Color {
-        switch latency.quality {
-        case .unavailable:
-            .secondary
-        case .good:
-            .green
-        case .fair:
-            .orange
-        case .poor:
-            .red
-        }
+        ScopeTheme.qualityTint(latency.quality)
     }
 
     private var systemImage: String {
@@ -307,10 +293,22 @@ struct ConfidenceBadge: View {
     let evidence: HealthEvidence
 
     var body: some View {
+        // Health reads quiet until evidence exists: an unknown confidence
+        // earns no color, a measured one earns the state's tint.
+        let tint: Color = switch confidence {
+        case .unknown:
+            ScopeTheme.inkSecondary
+        case .low:
+            ScopeTheme.alarm
+        case .medium:
+            ScopeTheme.warn
+        case .high:
+            ScopeTheme.phosphor
+        }
         StatusBadge(
             text: "Health \(confidence.summary) · \(evidence.displayText)",
             systemImage: "heart.text.square",
-            tint: .accentColor
+            tint: tint
         )
     }
 }
@@ -322,7 +320,7 @@ struct SampleDataNotice: View {
     var body: some View {
         Label(text, systemImage: "shippingbox")
             .font(.footnote)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(ScopeTheme.inkSecondary)
             .fixedSize(horizontal: false, vertical: true)
             .accessibilityElement(children: .combine)
             .accessibilityIdentifier(identifier)
@@ -338,21 +336,24 @@ struct ErrorBanner: View {
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundStyle(.orange)
+                .foregroundStyle(ScopeTheme.alarm)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 4) {
                 Text(error.userMessage)
                     .font(.subheadline)
+                    .foregroundStyle(ScopeTheme.ink)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier(messageIdentifier)
                 Text(error.code)
-                    .font(.caption.monospaced())
-                    .foregroundStyle(.secondary)
+                    .font(ScopeTheme.measurement(.caption))
+                    .foregroundStyle(ScopeTheme.inkSecondary)
             }
             Spacer(minLength: 8)
             Button(action: dismiss) {
                 Image(systemName: "xmark.circle.fill")
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ScopeTheme.inkSecondary)
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Dismiss message")
@@ -360,6 +361,10 @@ struct ErrorBanner: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: 16))
+        .background(ScopeTheme.alarm.opacity(0.12), in: RoundedRectangle(cornerRadius: 16))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(ScopeTheme.alarm.opacity(0.35), lineWidth: 1)
+        )
     }
 }

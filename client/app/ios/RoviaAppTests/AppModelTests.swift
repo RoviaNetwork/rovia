@@ -1065,7 +1065,6 @@ final class AppModelTests: XCTestCase {
 
     func testAccessibilityIdentifiersAreNamespacedUniqueAndNonEmpty() {
         let concrete: [String] = [
-            AppAccessibilityIdentifier.emptySelection,
             AppAccessibilityIdentifier.overviewScreen,
             AppAccessibilityIdentifier.overviewEngineStatus,
             AppAccessibilityIdentifier.overviewSystemStatus,
@@ -1133,17 +1132,16 @@ final class AppModelTests: XCTestCase {
         }
     }
 
-    func testSidebarIdentifiersAreStableAndNamespaced() {
-        let routes = ["overview", "servers", "routing", "routingDebugger", "subscription"]
-        let identifiers = routes.map(AppAccessibilityIdentifier.sidebarRoute)
+    func testTabIdentifiersAreStableAndNamespaced() {
+        let routes = ["overview", "servers", "statistics", "settings"]
+        let identifiers = routes.map(AppAccessibilityIdentifier.tabRoute)
         assertEqual(
             identifiers,
             [
-                "rovia.sidebar.overview",
-                "rovia.sidebar.servers",
-                "rovia.sidebar.routing",
-                "rovia.sidebar.routingDebugger",
-                "rovia.sidebar.subscription"
+                "rovia.tab.overview",
+                "rovia.tab.servers",
+                "rovia.tab.statistics",
+                "rovia.tab.settings"
             ]
         )
         assertEqual(Set(identifiers).count, routes.count)

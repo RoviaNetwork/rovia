@@ -60,6 +60,8 @@
 		C10000000000000000000034 = {isa = PBXBuildFile; fileRef = B10000000000000000000027 /* AppearancePreference.swift */; };
 		C10000000000000000000035 = {isa = PBXBuildFile; fileRef = B10000000000000000000028 /* TunnelControllerTests.swift */; };
 		C10000000000000000000036 = {isa = PBXBuildFile; fileRef = B10000000000000000000020 /* NETunnelController.swift */; };
+		C10000000000000000000037 = {isa = PBXBuildFile; fileRef = B10000000000000000000029 /* ScopeTheme.swift */; };
+		C10000000000000000000038 = {isa = PBXBuildFile; fileRef = B1000000000000000000002A /* ScopeView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -113,6 +115,8 @@
 		B10000000000000000000028 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TunnelControllerTests.swift; sourceTree = "<group>"; };
 		B10000000000000000000026 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatisticsView.swift; sourceTree = "<group>"; };
 		B10000000000000000000027 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppearancePreference.swift; sourceTree = "<group>"; };
+		B10000000000000000000029 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScopeTheme.swift; sourceTree = "<group>"; };
+		B1000000000000000000002A = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScopeView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -200,6 +204,8 @@
 				B10000000000000000000022,
 				B10000000000000000000026,
 				B10000000000000000000027,
+				B10000000000000000000029,
+				B1000000000000000000002A,
 				B1000000000000000000001F,
 				B10000000000000000000003,
 				B10000000000000000000004,
@@ -404,6 +410,8 @@
 				C1000000000000000000002A,
 				C10000000000000000000032,
 				C10000000000000000000033,
+				C10000000000000000000037,
+				C10000000000000000000038,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

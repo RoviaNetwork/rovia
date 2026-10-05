@@ -3,13 +3,6 @@ import SwiftUI
 struct OverviewView: View {
     let model: AppModel
 
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    /// The hero scales with the user's text size: a control you tap is part of
-    /// the type hierarchy, not a fixed ornament.
-    @ScaledMetric private var heroRing: CGFloat = 148
-    @ScaledMetric private var heroCore: CGFloat = 120
-    @ScaledMetric private var heroGlyph: CGFloat = 44
-
     var body: some View {
         Group {
             switch model.snapshot.system {
@@ -21,8 +14,6 @@ struct OverviewView: View {
                 readyView
             }
         }
-        .navigationTitle(AppRoute.overview.title)
-        .navigationBarTitleDisplayMode(.inline)
     }
 
     private var preparingView: some View {
@@ -66,7 +57,7 @@ struct OverviewView: View {
         RoviaScreen {
             RoviaScreenHeader(
                 title: "Overview",
-                subtitle: "The pinned engine is wired in this build. A start installs the system VPN profile on first run, and the status below is what the extension reports.",
+                subtitle: "The scope is the tunnel: the sweep runs only while the engine does, and every contact is a real server.",
                 identifier: AppAccessibilityIdentifier.overviewScreen,
                 showsLogo: true
             )
@@ -87,8 +78,7 @@ struct OverviewView: View {
                     identifier: AppAccessibilityIdentifier.overviewEmptyNoContent
                 ))
             } else {
-                heroCard
-                actions
+                scopeCard
                 if let error = model.snapshot.lastError {
                     ErrorBanner(
                         error: error,
@@ -104,100 +94,74 @@ struct OverviewView: View {
         }
     }
 
-    /// The connect powerhouse: one big round action, honest engine state,
-    /// and the time since the last confirmed connection — the three things
-    /// a person opens a VPN client to see, ahead of everything else.
-    private var heroCard: some View {
-        VStack(spacing: 18) {
-            Button {
-                Task { await runPrimaryAction() }
-            } label: {
-                ZStack {
-                    Circle()
-                        .stroke(engineTint.opacity(0.18), lineWidth: 8)
-                        .frame(width: heroRing, height: heroRing)
-                    if case .connected = model.snapshot.engine, !reduceMotion {
-                        Circle()
-                            .trim(from: 0, to: 0.72)
-                            .stroke(
-                                engineTint,
-                                style: StrokeStyle(lineWidth: 8, lineCap: .round)
-                            )
-                            .frame(width: heroRing, height: heroRing)
-                            .rotationEffect(.degrees(-90))
-                    }
-                    Circle()
-                        .fill(engineTint.opacity(0.10))
-                        .frame(width: heroCore, height: heroCore)
-                    Image(systemName: "power")
-                        .font(.system(size: heroGlyph, weight: .semibold))
-                        .foregroundStyle(engineTint)
-                }
-                .contentShape(Circle())
-                .padding(8)
-            }
-            .buttonStyle(.plain)
-            .disabled(!model.snapshot.isPrimaryActionEnabled)
-            .accessibilityLabel(model.snapshot.connectActionTitle)
-            .accessibilityHint(model.snapshot.primaryActionHint)
-            .accessibilityIdentifier(AppAccessibilityIdentifier.overviewPrimaryAction)
+    /// The instrument cluster: the scope with the connect control at its
+    /// center, the state annunciator beneath, and the refresh alongside —
+    /// the three things a person opens a VPN client to read, ahead of
+    /// everything else.
+    private var scopeCard: some View {
+        VStack(spacing: 16) {
+            ScopeView(
+                engine: model.snapshot.engine,
+                contacts: scopeContacts,
+                selectedServer: model.snapshot.selection.server,
+                actionEnabled: model.snapshot.isPrimaryActionEnabled,
+                action: { Task { await runPrimaryAction() } },
+                identifier: AppAccessibilityIdentifier.overviewPrimaryAction,
+                actionLabel: model.snapshot.connectActionTitle,
+                actionHint: model.snapshot.primaryActionHint
+            )
 
             VStack(spacing: 6) {
-                HStack(spacing: 8) {
-                    Image(systemName: engineIcon)
-                        .foregroundStyle(engineTint)
-                        .accessibilityHidden(true)
-                    Text(model.snapshot.engineStatusText)
-                        .font(.headline)
-                        .multilineTextAlignment(.center)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .accessibilityElement(children: .combine)
-                .accessibilityIdentifier(AppAccessibilityIdentifier.overviewEngineStatus)
+                Text(model.snapshot.engineStatusText)
+                    .font(.headline)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier(AppAccessibilityIdentifier.overviewEngineStatus)
 
                 if let connectedSinceText = model.snapshot.connectedSinceText {
                     Text(connectedSinceText)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .font(ScopeTheme.measurement(.subheadline))
+                        .foregroundStyle(ScopeTheme.inkSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                         .accessibilityIdentifier(AppAccessibilityIdentifier.overviewConnectedSince)
                 }
 
                 Text(model.snapshot.systemStatusText)
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ScopeTheme.inkSecondary)
                     .accessibilityIdentifier(AppAccessibilityIdentifier.overviewSystemStatus)
             }
-        }
-        .frame(maxWidth: .infinity)
-        .padding(20)
-        .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 20))
-        .animation(reduceMotion ? nil : .easeInOut(duration: 0.25), value: model.snapshot.engine)
-    }
 
-    private var actions: some View {
-        VStack(alignment: .leading, spacing: 12) {
             Button {
                 Task { await model.refreshStatus() }
             } label: {
                 Label("Refresh tunnel status", systemImage: "arrow.clockwise")
-                    .frame(maxWidth: .infinity)
+                    .font(.subheadline)
             }
-            .buttonStyle(.bordered)
-            .controlSize(.large)
+            .buttonStyle(.plain)
+            .foregroundStyle(ScopeTheme.inkSecondary)
             .disabled(model.snapshot.system != .ready)
             .accessibilityHint("Re-reads the engine status. Only a confirmed engine status can report a running tunnel.")
             .accessibilityIdentifier(AppAccessibilityIdentifier.overviewRefreshAction)
-
-            Text(model.snapshot.primaryActionHint)
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
         }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 20)
+        .animation(ScopeTheme.stateChange, value: model.snapshot.engine)
+    }
+
+    /// The fastest members of the fleet, up to six: close contacts are fast
+    /// servers. Sorted by measurement so a fresh probe reranks them in place.
+    private var scopeContacts: [ServerSummary] {
+        model.snapshot.content.servers
+            .sorted {
+                ($0.latency.milliseconds ?? .max) < ($1.latency.milliseconds ?? .max)
+            }
+            .prefix(6)
+            .map { $0 }
     }
 
     private var selectionCard: some View {
-        SectionCard(title: "Selected profile and group", systemImage: "checklist") {
+        SectionCard(title: "Locked contact", systemImage: "scope") {
             VStack(alignment: .leading, spacing: 12) {
                 InfoRow(
                     label: "Profile",
@@ -217,7 +181,8 @@ struct OverviewView: View {
                 InfoRow(
                     label: "Latency",
                     value: model.snapshot.latency.displayText,
-                    identifier: AppAccessibilityIdentifier.overviewLatency
+                    identifier: AppAccessibilityIdentifier.overviewLatency,
+                    tabular: true
                 )
                 InfoRow(
                     label: "Health confidence",
@@ -229,60 +194,35 @@ struct OverviewView: View {
     }
 
     private var fleetCard: some View {
-        SectionCard(title: "Sample servers", systemImage: "server.rack") {
-            VStack(alignment: .leading, spacing: 12) {
-                ForEach(model.snapshot.content.servers.prefix(3)) { server in
+        SectionCard(title: "Fleet", systemImage: "server.rack") {
+            VStack(alignment: .leading, spacing: 0) {
+                ForEach(Array(model.snapshot.content.servers.prefix(3).enumerated()), id: \.element.id) { index, server in
+                    if index > 0 {
+                        Divider()
+                            .overlay(ScopeTheme.etched.opacity(0.6))
+                            .padding(.vertical, 4)
+                    }
                     VStack(alignment: .leading, spacing: 6) {
                         Text(server.name)
                             .font(.subheadline.weight(.semibold))
                         Text("\(server.protocolLabel) · \(server.locationLabel)")
                             .font(.footnote)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(ScopeTheme.inkSecondary)
                         HStack(spacing: 8) {
                             QualityBadge(latency: server.latency)
                             ConfidenceBadge(confidence: server.healthConfidence, evidence: server.health)
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(12)
-                    .background(.quaternary.opacity(0.25), in: RoundedRectangle(cornerRadius: 12))
+                    .padding(.vertical, 8)
                     .accessibilityElement(children: .combine)
                     .accessibilityIdentifier(AppAccessibilityIdentifier.overviewServerRowPrefix + server.id)
                 }
-                Text("Open the Servers section to pick a group and a server.")
+                Text("Open the Servers tab to lock a different contact.")
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ScopeTheme.inkSecondary)
+                    .padding(.top, 8)
             }
-        }
-    }
-
-    private var engineIcon: String {
-        switch model.snapshot.engine {
-        case .unknown:
-            "questionmark.circle"
-        case .unavailable:
-            "xmark.shield"
-        case .idle:
-            "shield"
-        case .starting, .stopping:
-            "clock.arrow.circlepath"
-        case .connected:
-            "checkmark.shield"
-        case .failed:
-            "exclamationmark.shield"
-        }
-    }
-
-    private var engineTint: Color {
-        switch model.snapshot.engine {
-        case .connected:
-            .green
-        case .unavailable, .failed:
-            .red
-        case .starting, .stopping:
-            .orange
-        case .unknown, .idle:
-            .secondary
         }
     }
 

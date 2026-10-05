@@ -7,8 +7,6 @@ typealias RouteRuleID = String
 typealias DebugSampleID = String
 
 enum AppAccessibilityIdentifier {
-    static let emptySelection = "rovia.root.emptySelection"
-
     static let overviewScreen = "rovia.overview.screen"
     static let overviewEngineStatus = "rovia.overview.engineStatus"
     static let overviewConnectedSince = "rovia.overview.connectedSince"
@@ -73,12 +71,11 @@ enum AppAccessibilityIdentifier {
     static let statisticsDroppedInbound = "rovia.statistics.droppedInbound"
     static let statisticsRefresh = "rovia.statistics.refresh"
 
-    static func sidebarRoute(_ rawValue: String) -> String {
-        "rovia.sidebar.\(rawValue)"
+    static func tabRoute(_ rawValue: String) -> String {
+        "rovia.tab.\(rawValue)"
     }
 
     static let containerIdentifiers: [String] = [
-        emptySelection,
         overviewEmptyFailed,
         overviewEmptyNoContent,
         serversList,
