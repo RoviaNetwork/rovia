@@ -22,7 +22,6 @@ The verification record for the current state is
   enters the tunnel hand-off.
 - Dynamic Type support for the Overview hero: the connect powerhouse scales
   with the user's text size through `@ScaledMetric`.
-
 - The pinned Xray engine build: `engines.lock.json` approves and enables xray
   v26.9.9 (`50b95979f5db551bd273165cf469e5daaf791341`, verified against the
   upstream source archive digest), `tools/build-engine/xray/build-apple.sh`
@@ -124,6 +123,22 @@ The verification record for the current state is
 
 ### Fixed
 
+- A stop with the kill switch on restarted the tunnel: the always-connect
+  on-demand rule re-fired it. `requestStop` disarms on-demand before stopping.
+- A quick stop-then-start could wipe the new engine adapter: `stopTunnel`
+  captured `self.adapter` and nilled whatever was current. It now captures the
+  engine being stopped and never touches the reference again.
+- A connected tunnel with a dead engine presented as "connected": status reads
+  cross-check the engine's own report when the tunnel is up.
+- The engine's `status()` believed the state machine; it now asks the engine
+  (`getXrayState`), and a disagreement reports `failed` — the kill switch fires
+  on the truth (rovia-engine 0.3.2).
+- The pump's read buffer was one byte short of a maximal framed datagram; a
+  65535-byte packet with the 4-byte utun header would have been truncated
+  silently (rovia-engine 0.3.2).
+- The tunnel controller talks to a `TunnelProfileManaging` seam, so the
+  profile logic is covered by tests that never touch the system's VPN
+  preferences.
 - The production-composition fetch shim recursed forever: `SubscriptionFetchClient.fetch(_:policy:)`
   called `fetch(url, policy:)` inside its own conformance, binding to itself rather
   than to `SubscriptionFetcher.fetch(_:policy override:)` — every production fetch
