@@ -21,7 +21,7 @@ struct ServersView: View {
                 RoviaScreen {
                     RoviaScreenHeader(
                         title: "Servers",
-                        subtitle: "Pick a group, then a member server. Selection never reaches the tunnel engine in this build.",
+                        subtitle: "Pick a group, then a member server. The locked contact is written to the tunnel handoff when the tunnel starts.",
                         identifier: AppAccessibilityIdentifier.serversScreen
                     )
                     groupCard
