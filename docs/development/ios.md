@@ -147,7 +147,57 @@ xcrun simctl launch booted io.rovia.client
 
 The app bundle identifier is `io.rovia.client`, and the test bundle is `io.rovia.client.tests`; both come from `Config/BundleIdentifiers.xcconfig`, which every target, including the test target, uses as its base configuration.
 
-The model reports engine availability from `UnavailableTunnelController`, so the app cannot report a connected tunnel in this build. Passing tests and a successful launch are not evidence of a working VPN.
+The host constructs `NETunnelController`, so availability reports `.available` and the model idles with Connect offered; a connect with no server resolved is refused loudly. The `RoviaFreeDev` target is the deliberate exception: built with `ROVIA_UI_ONLY`, it wires `UnavailableTunnelController` instead, so Connect stays disabled and labelled. Passing tests and a successful launch are not evidence of a working VPN.
+
+## FreeDev: the UI-only build a free Personal Team can sign
+
+The signed pair — host app plus Packet Tunnel extension — needs capabilities a
+free Apple account cannot provision: `packet-tunnel-provider` is a restricted
+Network Extension entitlement, and the shared App Group must be registered on a
+paid App ID. `RoviaFreeDev` is the honest answer to "run the app on my iPhone
+for free": the same SwiftUI sources, compiled with `ROVIA_UI_ONLY`, embedding
+no extension, asking for no restricted capability.
+
+What the target changes, and nothing else:
+
+- `RoviaApp/RoviaFreeDev.entitlements` is empty on purpose — every entitlement
+  in the full build maps to a capability a Personal Team profile cannot carry,
+  and an entitlement a profile does not authorise is an install failure, not a
+  warning.
+- `RoviaApp.makeTunnelController()` returns `UnavailableTunnelController`, so
+  Connect stays disabled and the engine reads unavailable rather than faked.
+- The Overview screen carries a banner naming the build UI-only.
+- The bundle identifier is `io.rovia.client.freedev`. A Personal Team profile
+  lasts seven days, covers at most three apps on a device, and the device needs
+  Developer Mode on.
+
+Build it for a connected device with the personal account signed into Xcode:
+
+```text
+xcodebuild \
+  -project client/app/ios/RoviaApp.xcodeproj \
+  -scheme RoviaFreeDev \
+  -configuration Debug \
+  -destination 'platform=iOS,id=<DEVICE_UDID>' \
+  -allowProvisioningUpdates \
+  build
+```
+
+A green FreeDev run is evidence about the UI, the model, the accessibility
+surface, and the install path. It is never evidence about a tunnel: the VPN
+claim still starts at a paid team, both targets signed, and the manual
+packet-flow gate below.
+
+Verified on hardware, 2026-10-06: the command above (with
+`DEVELOPMENT_TEAM` set to the personal team) built, signed, and installed on a
+paired iPhone 14 Plus over a free Personal Team. The profile Xcode minted is
+named `iOS Team Provisioning Profile: io.rovia.client.freedev`, authorises
+exactly `application-identifier`, the team identifier, `get-task-allow`, and
+`keychain-access-groups` — no Network Extension entitlement exists in it —
+and it expires seven days after creation, the documented free-team lifetime.
+The first launch is refused until the developer certificate is trusted on the
+device (Settings → General → VPN & Device Management), which is a manual step
+no build flag can skip.
 
 ## Project layout
 
@@ -155,7 +205,8 @@ The initial Apple source lives under `client/app/ios/`. The Packet Tunnel extens
 
 ## Manual packet-flow gate
 
-Before adding Xray, verify that the extension can:
+Xray is pinned and wired; what has never happened is the hardware pass. Before
+claiming a working tunnel, verify on a physical device that the extension can:
 
 1. Apply minimal network settings.
 2. Read packets from `packetFlow`.

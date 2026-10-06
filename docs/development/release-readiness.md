@@ -35,7 +35,6 @@ that the table carries this date, that the gate numbering is contiguous, and tha
 the set of gates is exactly the set the source-derived check expects, so the list
 cannot quietly lose a row or gain one that names nothing.
 
-## Not verified, and not executed here
 ## Closed
 
 A gate leaves this list by being executed, with a result someone else can read.
@@ -44,41 +43,23 @@ than a run someone has to trust a screenshot for.
 
 | Gate | Closed | Evidence |
 | --- | --- | --- |
-| **Hosted CI execution** | 2026-09-27 | `.github/workflows/ci.yml` ran to
-| **Secret scanning** | 2026-09-28 | `GET /repos/princeofscale/rovia` returns
-  `security_and_analysis.secret_scanning.status = enabled`.
-| **Secret scanning push protection** | 2026-09-28 | Same response returns
-  `secret_scanning_push_protection.status = enabled`, so a push containing a
-  recognised credential is rejected rather than accepted and scanned later.
-| **Dependabot security updates and automated fixes** | 2026-09-28 |
-  `dependabot_security_updates.status = enabled` and
-  `GET /repos/princeofscale/rovia/automated-security-fixes` returns `enabled`.
-  Dependabot has also opened pull request #1 against the pinned
-  `actions/checkout` SHA, which is the first of these settings producing observable
-  work rather than a stored preference.
-| **Private vulnerability reporting** | 2026-09-28 |
-  `GET /repos/princeofscale/rovia/private-vulnerability-reporting` returns
-  `enabled`, so a reporter has a channel that does not require an account on
-  GitHub and does not require a public issue.
-| **A production engine** | 2026-10-04 | `engines.lock.json` approves and
-  enables xray v26.9.9 at commit `50b95979f5db551bd273165cf469e5daaf791341`,
-  with the source archive digest verified before the build.
-  `tools/build-engine/xray/build-apple.sh` builds `LibXray.xcframework.zip`
-  from that pin through `tools/build-engine/xray/determinize-xcframework.py`,
-  and two independent builds produce one digest,
-  `df84739eec41e181153d2c681f84cffc8c50b43ebe117d29e330e7049abee444`, recorded
-  in the lock and matching the bytes every build produces. The artifact is
-  gitignored — built, not committed: a 100 MB ceiling sits between the zip and
-  a push, and the engine workflows rebuild it on every lock change anyway. The
-  engine-proof workflow reruns
-  the build and the double-build comparison on every change to the lock. What
-  this closes is the *build*: an approved, reproducible artifact exists. What
-  it does not close is the tunnel: no packet has crossed
-  `NEPacketTunnelFlow` through this artifact, which is why row 4 stays open. |
+| **Hosted CI execution** | 2026-09-27 | `.github/workflows/ci.yml` ran to completion on the real runners at commit `13981d5`: <https://github.com/princeofscale/rovia/actions/runs/36344718641> — nineteen steps, all green, 824 s. |
+| **Secret scanning** | 2026-09-28 | `GET /repos/princeofscale/rovia` returns `security_and_analysis.secret_scanning.status = enabled`. |
+| **Secret scanning push protection** | 2026-09-28 | Same response returns `secret_scanning_push_protection.status = enabled`, so a push containing a recognised credential is rejected rather than accepted and scanned later. |
+| **Dependabot security updates and automated fixes** | 2026-09-28 | `dependabot_security_updates.status = enabled` and `GET /repos/princeofscale/rovia/automated-security-fixes` returns `enabled`. Dependabot has also opened pull request #1 against the pinned `actions/checkout` SHA, which is the first of these settings producing observable work rather than a stored preference. |
+| **Private vulnerability reporting** | 2026-09-28 | `GET /repos/princeofscale/rovia/private-vulnerability-reporting` returns `enabled`, so a reporter has a channel that does not require an account on GitHub and does not require a public issue. |
+| **A production engine** | 2026-10-04 | `engines.lock.json` approves and enables xray v26.9.9 at commit `50b95979f5db551bd273165cf469e5daaf791341`, with the source archive digest verified before the build. `tools/build-engine/xray/build-apple.sh` builds `LibXray.xcframework.zip` from that pin through `tools/build-engine/xray/determinize-xcframework.py`, and two independent builds produce one digest, `df84739eec41e181153d2c681f84cffc8c50b43ebe117d29e330e7049abee444`, recorded in the lock and matching the bytes every build produces. The artifact is gitignored — built, not committed: a 100 MB ceiling sits between the zip and a push, and the engine workflows rebuild it on every lock change anyway. The engine-proof workflow reruns the build and the double-build comparison on every change to the lock. What this closes is the *build*: an approved, reproducible artifact exists. What it does not close is the tunnel: no packet has crossed `NEPacketTunnelFlow` through this artifact, which is why row 4 stays open. |
 
-  completion on the real runners at commit `13981d5`:
-  <https://github.com/princeofscale/rovia/actions/runs/36344718641> — nineteen
-  steps, all green, 824 s. |
+Repository moves do not carry every setting: after the move to the
+RoviaNetwork organisation the scanning controls silently reverted, and on
+2026-10-06 `GET /repos/RoviaNetwork/rovia` reported secret scanning and push
+protection **disabled** while the table above still said enabled. Both were
+re-enabled the same day (`PATCH /repos/RoviaNetwork/rovia`), and all five
+controls — scanning, push protection, Dependabot security updates, automated
+security fixes, and private vulnerability reporting — were re-read from the
+API on `RoviaNetwork/rovia` and report `enabled`. The lesson is the one this
+document exists for: a control recorded against a repository is a claim about
+that repository, and the org repository is re-verified, not inherited.
 
 **What that run found was four real defects in this repository**, each of the kind
 no local check can see, and the first five runs failed in this order:
@@ -102,26 +83,10 @@ The other two workflows remain unrun by design: `engine-repro` fires on engine
 paths no commit has touched, and `ios-release` on a `v*` tag, and no tag exists.
 No release has been made and none is planned until the rows below close.
 
+## Not verified, and not executed here
 
 | # | Gate | Why it is open | What would close it |
 | --- | --- | --- | --- |
-
-      What the run found was four real defects in this repository, not runner
-      peculiarities, and each is the kind no local check can see: a workflow-level
-      `env:` naming a context GitHub does not provide there, which rejects the file
-      and creates no job; the same variable written as a shell reference, which
-      GitHub does not expand at all, so `xcodebuild` resolved it against the working
-      directory and produced a path with the checkout glued to the runner's temp
-      directory; a lint gate and a test that both required `uvx`, which a hosted
-      macOS runner does not have; and two tests that read files the repository
-      deliberately does not publish, so they passed on the machine that wrote them
-      and failed on a fresh clone. The first five runs failed, for those reasons,
-      in that order.
-
-      The other two workflows remain unrun by design: `engine-repro` fires on
-      engine paths no commit has touched, and `ios-release` on a `v*` tag, and no
-      tag exists. | Nothing further. Every later commit produces another run, which
-      is the point of having it. |
 | 1 | **Signing, provisioning, and the Apple team identity** | No certificate has been imported, no provisioning profile installed, and no keychain created. `tools/release/ExportOptions.plist` holds `$(ROVIA_TEAM_ID)`, an unresolved reference, and `tools/release/verify-export-options.sh` refuses it; `tools/ci/verify-release-inputs.sh` runs that refusal before it reports on any other input. No Apple Developer team is configured for this repository and none was invented. | A real team, written into the plist as a literal ten-character identifier, plus a certificate and two profiles. |
 | 2 | **Archive and export** | `xcodebuild archive` and `-exportArchive` have never been run. The release gate's happy path is exercised only against a synthetic IPA in a throwaway repository (`tools/ci/test_verify_release_inputs.py`), which is a test of the checker, not of Apple's tooling. | Steps 13 and 14 of `.github/workflows/release-ios.yml` running to completion, which cannot happen before step 2. |
 | 3 | **Upload, TestFlight, and App Store submission** | No upload step exists in any workflow, and `tools/ci/test_ci_workflows.py` fails if one appears. Nothing has been submitted anywhere, and no submission is planned by this slice. | A deliberate decision to add an upload step, with credentials and an App Store Connect record. |
@@ -168,7 +133,7 @@ No release has been made and none is planned until the rows below close.
   maintainer with write access, and a GitHub organisation so that per-role teams can
   exist. Then `required_approving_review_count: 1` and `require_code_owner_review` can
   be turned on, and the `ios-production` environment configured with its reviewers. |
-| 6 | **Dependency review and an advisory-response process** | Secret scanning, push protection, Dependabot security updates, automated security fixes, and private vulnerability reporting are all enabled and readable through the API; that half is closed and is recorded in the `## Closed` section above. What is still open is narrower. GitHub dependency review — the check that inspects a pull request's dependency changes — has not been enabled, so nothing would stop a pull request that adds a dependency with a known advisory. There is also no written process for what happens when a Dependabot alert fires: no severity threshold, no response window, no named person. The local packages have no external dependencies (`tools/ci/verify-lockfiles.sh` reports 7 local path dependencies and 0 locked externals), so nothing is exposed today, and nothing would catch a dependency added tomorrow. | GitHub dependency review enabled on `main`, and a written advisory-response process with a severity threshold and a response window. |
+| 6 | **Dependency review and an advisory-response process** | Secret scanning, push protection, Dependabot security updates, automated security fixes, and private vulnerability reporting are all enabled and readable through the API; that half is closed and is recorded in the `## Closed` section above. What is still open is narrower. The workflow half now exists — `.github/workflows/ci.yml` carries a `dependency-review` job pinned by commit SHA, so a pull request that adds a dependency with a known advisory would fail the check — but that job has never executed on a pull request, and a gate that has not run is not a result. There is also no written process for what happens when a Dependabot alert fires: no severity threshold, no response window, no named person. The one local package has no external dependencies (`tools/ci/verify-lockfiles.sh` reports one local manifest, no locked externals), so what the job scans is the app's two pinned SPM remotes and any dependency a pull request adds. | A dependency-review run recorded on a real pull request, and a written advisory-response process with a severity threshold and a response window. |
 | 7 | **Upstream SPDX tooling** | `tools/reproducibility/check-sbom.py` checks this repository's own documented invariants. It is not a third-party SPDX validator, and no `spdx-tools` run has occurred. The `documentNamespace` host is a deliberate `.invalid` placeholder that will not resolve. | A run of a conformant SPDX validator against the generated document. |
 | 8 | **Android** | Not started. No path in this repository is Android code, so this row names no file: there is nothing here that would have to change, and claiming a path would be a fiction. No claim is made about any other platform. | A separate slice. |
 

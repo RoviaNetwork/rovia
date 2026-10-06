@@ -20,14 +20,16 @@ decision can be *shown*, not just applied.
 ---
 
 > [!IMPORTANT]
-> **This build does not establish a VPN tunnel, and no VPN claim is made here.**
-> The production engine is pinned and reproducible — `engines.lock.json`
-> approves xray v26.9.9, and the gated pipeline builds it byte-identically on
-> every run — but the adapter's `prepare`/`start` are not wired to the
-> artifact, so the Packet Tunnel extension still refuses to start before it
-> touches any network setting, and there is no `packetFlow` → Xray bridge. The
-> part of Rovia that *is* finished is the domain core, the fail-closed
-> scaffolding around it, and the engine build pipeline.
+> **This build does not establish a VPN tunnel on any hardware, and no VPN
+> claim is made here.** The production engine is pinned and reproducible —
+> `engines.lock.json` approves xray v26.9.9, and the gated pipeline builds it
+> byte-identically on every run — and the app and the Packet Tunnel extension
+> are wired end to end: the extension prepares and starts the engine *before*
+> any network setting is applied, and a `packetFlow` ⇄ Xray bridge moves the
+> packets. What does not exist is evidence: no packet has been observed on
+> hardware, because no signed build has ever run on a device. The part of
+> Rovia that *is* finished is the domain core, the fail-closed scaffolding
+> around it, and the engine build pipeline.
 > Read [Status](#status--what-works-and-what-does-not) before anything else.
 
 ---
@@ -75,7 +77,7 @@ network and no device.
 ```mermaid
 flowchart LR
     subgraph host["App process"]
-        UI["SwiftUI app<br/>5 screens"]
+        UI["SwiftUI app<br/>4 tabs"]
         AM["AppModel<br/>@MainActor @Observable"]
         UI --> AM
     end
@@ -96,7 +98,7 @@ flowchart LR
 
     subgraph adapters["Engine adapters — the only place an engine is named"]
         API["RoviaEngineAPI<br/>TunnelEngine protocol"]
-        XRAY["RoviaXray<br/>unavailable"]
+        XRAY["RoviaXray<br/>live adapter"]
         SBOX["RoviaSingBox<br/>unavailable (GPL)"]
         API --- XRAY
         API --- SBOX
@@ -110,7 +112,7 @@ flowchart LR
     COORD -->|"engine or nothing"| API
     PTP <-->|"provider messages"| AM
 
-    XRAY -.->|"not linked"| XR["Xray-core<br/>MPL-2.0"]
+    XRAY -.->|"pinned artifact,<br/>built not committed"| XR["Xray-core<br/>MPL-2.0"]
     SBOX -.->|"not linked"| SB["sing-box<br/>GPL-3.0-or-later"]
 
     classDef absent stroke-dasharray: 5 5,opacity:.55
@@ -180,10 +182,11 @@ evaluator into the app, and 20 that persist a raw routing trace.
 
 ### 🔒 Blocked by prerequisites outside this repository
 
-Ten gates, each naming the artefact that would close it, are tracked in
+Eight gates, each naming the artefact that would close it, are tracked in
 [`docs/development/release-readiness.md`](docs/development/release-readiness.md).
-The two that gate everything else: **no Apple Developer team** and **no production
-engine**.
+The one that gates everything else: **no Apple Developer team**. The
+production-engine gate closed on 2026-10-04: xray v26.9.9 is approved, pinned,
+and reproducibly built.
 
 ## The app
 
@@ -191,16 +194,19 @@ engine**.
 
 | Overview — iPhone | Overview — iPad | Subscriptions — iPhone |
 | :---: | :---: | :---: |
-| <img src="docs/assets/overview-iphone.png" width="230" alt="The Rovia Overview screen on an iPhone 17 Pro simulator, current build: the brand mark in the header, the engine reported unavailable, Connect disabled."> | <img src="docs/assets/overview-ipad.png" width="230" alt="The Rovia Overview screen on an iPad simulator: the tunnel engine is reported unavailable, Connect is disabled, and three sample servers carry latency and health badges over an explicit sample-data notice."> | <img src="docs/assets/subscriptions-iphone.png" width="230" alt="The Subscriptions screen on an iPhone 17 Pro simulator: empty state with the brand mark and a prominent add action; pull-to-refresh, per-subscription refresh, rename, delete, and accepted/rejected counts appear once subscriptions exist."> |
+| <img src="docs/assets/overview-iphone.png" width="230" alt="The Rovia Overview screen on an iPhone simulator, captured before the sonar scope redesign: the brand mark in the header, the engine reported unavailable, Connect disabled."> | <img src="docs/assets/overview-ipad.png" width="230" alt="The Rovia Overview screen on an iPad simulator, captured before the sonar scope redesign: the tunnel engine reported unavailable, Connect disabled, and three sample servers carrying latency and health badges over an explicit sample-data notice."> | <img src="docs/assets/subscriptions-iphone.png" width="230" alt="The Subscriptions screen on an iPhone simulator, captured before the tab redesign: empty state with the brand mark and a prominent add action; pull-to-refresh, per-subscription refresh, rename, delete, and accepted/rejected counts appear once subscriptions exist."> |
 
 </div>
 
 <sub>
-Real screenshots of the current build, taken on simulators and running over the app's
-built-in sample data — there is no mock here and no real provider. They are also the
-clearest single statement of this project's current state: the engine is reported
-unavailable, <strong>Connect is disabled</strong>, and the screen says so in its own
-subtitle. Nothing in the UI pretends a tunnel exists.
+These captures predate the current build: they show the pre-redesign layout,
+from when the engine still reported itself unavailable and Connect stayed
+disabled. The current build is a sonar range-scope with four tabs —
+Subscriptions now lives under Settings → Tools — the engine reports itself
+available and idle, and Connect is offered; a connect with no server selected
+is refused loudly, and no simulator run installs a profile. The images stay
+until captures of the current build exist, and nothing in the UI then or now
+pretends a tunnel exists.
 </sub>
 
 ## Privacy-first principles
@@ -406,8 +412,10 @@ xcodebuild -project client/app/ios/RoviaApp.xcodeproj -scheme RoviaApp \
 ./tools/ci/run-tool-tests.sh
 ```
 
-The app runs unsigned in a simulator, where it will show its six screens over
-built-in sample data and refuse to start a tunnel. `docs/development/ios.md` has the
+The app runs unsigned in a simulator, where it shows its four tabs over
+built-in sample data — the developer tools live under Settings → Tools — and
+will not start a tunnel, because a simulator profile proves nothing about one.
+`docs/development/ios.md` has the
 full commands; `docs/development/ci.md` has every gate and what each one proves.
 
 ## Contributing
@@ -447,7 +455,7 @@ Third-party notices: [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 | [`docs/legal/app-store-distribution.md`](docs/legal/app-store-distribution.md) | Distribution constraints and the pre-submission checklist. |
 | [`docs/development/ci.md`](docs/development/ci.md) | Every gate, its order, and what it proves. |
 | [`docs/development/foundation-verification.md`](docs/development/foundation-verification.md) | The dated verification record, with derived figures. |
-| [`docs/development/release-readiness.md`](docs/development/release-readiness.md) | The nine open external gates, and the one that has closed. |
+| [`docs/development/release-readiness.md`](docs/development/release-readiness.md) | The eight open external gates, and the six that have closed. |
 | [`docs/development/control-api.md`](docs/development/control-api.md) | The host ⇄ extension message contract. |
 
 <p align="center">
