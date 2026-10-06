@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  RoviaFreeDev: the UI-only development build for a free Apple Personal Team.
+
+  This file is deliberately empty. Every entitlement in the full build maps
+  to a capability a Personal Team provisioning profile cannot carry:
+
+  - com.apple.developer.networking.networkextension (packet-tunnel-provider)
+    is the restricted entitlement a NEPacketTunnelProvider needs, and the
+    reason the real RoviaTunnel.appex requires a paid Apple Developer Program
+    membership. This target embeds no extension at all.
+  - com.apple.security.application-groups needs an App Group registered on
+    the App ID, which the developer portal only offers to paid members.
+    Without it the app falls back to its own container, which the code
+    already handles (RoviaApp.makeSubscriptionCoordinator,
+    KeychainAccessGroup.resolve treats "no shared group" as "no sharing").
+  - keychain-access-groups would pin the shared Keychain group; the probe in
+    KeychainAccessGroup.resolve degrades to the app's default group instead.
+
+  An entitlement a profile does not authorise is an install failure, not a
+  warning, so the honest UI-only build asks for nothing. VPN actions are
+  disabled in code under ROVIA_UI_ONLY; this plist is what makes the build
+  signable, the code is what makes it truthful.
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+</dict>
+</plist>

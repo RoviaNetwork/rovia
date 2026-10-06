@@ -1492,7 +1492,8 @@ class PackageDependencyStructureTests(WorkspaceTestCase):
     def test_the_project_is_parsed_into_targets_references_and_products(self):
         project = Project(self.workspace.read(PROJECT_FILE))
         self.assertEqual(
-            sorted(project.targets), ["RoviaApp", "RoviaAppTests", "RoviaTunnel"]
+            sorted(project.targets),
+            ["RoviaApp", "RoviaAppTests", "RoviaFreeDev", "RoviaTunnel"],
         )
         self.assertEqual(
             {reference["path"] for reference in project.local_references.values()},

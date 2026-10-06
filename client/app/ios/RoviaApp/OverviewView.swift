@@ -62,6 +62,17 @@ struct OverviewView: View {
                 showsLogo: true
             )
 
+            if BuildVariant.isUIOnly {
+                Label(
+                    "UI-only development build: no VPN extension is embedded in this target, so Connect stays disabled. This is what a free Personal Team signature can install.",
+                    systemImage: "hammer"
+                )
+                .font(.footnote)
+                .foregroundStyle(ScopeTheme.warn)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityElement(children: .combine)
+            }
+
             if !model.snapshot.hasContent {
                 ContentUnavailableView {
                     Label("No configuration loaded", systemImage: "tray")

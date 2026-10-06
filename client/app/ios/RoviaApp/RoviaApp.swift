@@ -2,6 +2,22 @@ import RoviaApplePlatform
 import RoviaSubscription
 import SwiftUI
 
+/// The compile-time identity of this build, so any screen can label the
+/// UI-only variant without re-deriving it — and cannot get it wrong in one
+/// place and right in another.
+enum BuildVariant {
+    /// True only in the RoviaFreeDev target: the UI-only Personal Team build
+    /// with no Packet Tunnel extension embedded and no Network Extension
+    /// entitlement.
+    static let isUIOnly: Bool = {
+        #if ROVIA_UI_ONLY
+            return true
+        #else
+            return false
+        #endif
+    }()
+}
+
 @main
 struct RoviaApp: App {
     @State private var model = RoviaApp.makeModel()
@@ -16,13 +32,27 @@ struct RoviaApp: App {
         let coordinator = makeSubscriptionCoordinator()
         let handoff = try? TunnelHandoff()
         return AppModel(
-            tunnel: NETunnelController(),
+            tunnel: makeTunnelController(),
             subscriptions: coordinator,
             configWriter: handoff.map {
                 TunnelHandoffWriter(coordinator: coordinator, handoff: $0)
             },
             settingsStore: handoff.map(HandoffTunnelSettingsStore.init(handoff:))
         )
+    }
+
+    /// Which tunnel controller the build gets is a compile-time property of
+    /// the target, not a runtime switch. The UI-only FreeDev target is built
+    /// without the Network Extension entitlement and embeds no extension, so
+    /// constructing a real controller there would promise a capability the
+    /// binary cannot have; the unavailable controller keeps Connect disabled
+    /// and says why.
+    private static func makeTunnelController() -> any TunnelControlling {
+        #if ROVIA_UI_ONLY
+            UnavailableTunnelController()
+        #else
+            NETunnelController()
+        #endif
     }
 
     /// Production subscription stack: file store in the shared app-group
