@@ -326,7 +326,7 @@ class LiveCountDerivationTests(unittest.TestCase):
             (
                 "workflow steps",
                 "test_the_workflow_step_counts_come_from_the_workflows",
-                f"`ci.yml` 1 job / {steps['ci.yml'][1]} steps",
+                f"`ci.yml` {steps['ci.yml'][0]} job{'s' if steps['ci.yml'][0] != 1 else ''} / {steps['ci.yml'][1]} steps",
                 "`ci.yml` 1 job / 1 steps",
             ),
             (

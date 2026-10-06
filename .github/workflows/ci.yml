@@ -178,3 +178,18 @@ jobs:
           ./tools/ci/verify-simulator-install.sh \
             "$DERIVED_DATA/Build/Products/Debug-iphonesimulator/Rovia.app" \
             --device "$ROVIA_SIMULATOR_ID"
+
+  # Pull requests change dependencies; nothing else in this pipeline reads a
+  # diff. Package.resolved changes are scanned against the GitHub Advisory
+  # Database and a known-vulnerable addition fails the check, which is the
+  # narrower half of release-readiness gate 6 that a workflow can close. The
+  # advisory-response process itself is still a document, not a job.
+  # No secrets and no macOS runner: the review reads manifests, not builds.
+  dependency-review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Review dependency changes against the advisory database
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294
