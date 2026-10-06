@@ -1,0 +1,2 @@
+# Test canaries used to prove redaction tests fail loudly, not credentials.
+a4081d7797e4182ca3be92e3f19f9519d7c5d869:client/app/ios/RoviaAppTests/AppModelTests.swift:generic-api-key:8
